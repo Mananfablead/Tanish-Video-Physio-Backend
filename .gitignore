@@ -85,9 +85,6 @@ dist
 # DynamoDB Local files
 .dynamodb/
 
-# Files related to authentication utilities that might contain sensitive data
-src/utils/auth.utils.js
-
 # Database files
 *.db
 *.db-journal
