@@ -1,0 +1,14 @@
+const express = require('express');
+const { getAllUsers, getUserById, updateUser, deleteUser, getUserProfile, updateUserProfile } = require('../controllers/users.controller');
+const { authenticateToken, authorizeRoles } = require('../middlewares/auth.middleware');
+
+const router = express.Router();
+
+router.get('/', authenticateToken, authorizeRoles('admin'), getAllUsers);
+router.get('/profile', authenticateToken, getUserProfile);
+router.get('/:id', authenticateToken, getUserById);
+router.put('/profile', authenticateToken, updateUserProfile);
+router.put('/:id', authenticateToken, authorizeRoles('admin'), updateUser);
+router.delete('/:id', authenticateToken, authorizeRoles('admin'), deleteUser);
+
+module.exports = router;
