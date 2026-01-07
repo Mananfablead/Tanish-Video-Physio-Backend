@@ -21,8 +21,9 @@ const register = async (req, res, next) => {
         const user = new User({
             name,
             email,
-            password, // 👈 plain password
+            password: hashedPassword, // 👈 use hashed password
             phone
+            // role will default to 'patient' as per schema
         });
 
 
@@ -48,66 +49,22 @@ const register = async (req, res, next) => {
 };
 
 // Login user
-// const login = async (req, res, next) => {
-//     try {
-//         const { email, password } = req.body;
-
-//         // Find user by email
-//         const user = await User.findOne({ email });
-//         if (!user) {
-//             return res.status(401).json(ApiResponse.error('Invalid email or password', 401));
-//         }
-
-//         // Compare password
-//         const isMatch = await comparePassword(password, user.password);
-//         if (!isMatch) {
-//             return res.status(401).json(ApiResponse.error('Invalid email or password', 401));
-//         }
-
-//         // Generate token
-//         const token = generateToken({ userId: user._id, role: user.role });
-
-//         res.status(200).json(
-//             ApiResponse.success({
-//                 token,
-//                 user: {
-//                     id: user._id,
-//                     email: user.email,
-//                     name: user.name,
-//                     role: user.role
-//                 }
-//             }, 'Login successful')
-//         );
-//     } catch (error) {
-//         next(error);
-//     }
-// };
-
-// Login user
 const login = async (req, res, next) => {
     try {
-        console.log("🔐 Login attempt start");
 
         const { email, password } = req.body;
-        console.log("📩 Login request received for email:", email);
 
         // Find user by email
         const user = await User.findOne({ email });
         if (!user) {
-            console.warn("❌ Login failed: User not found:", email);
             return res
                 .status(401)
                 .json(ApiResponse.error("Invalid email or password", 401));
         }
 
-        console.log("✅ User found:", {
-            id: user._id.toString(),
-            role: user.role,
-        });
 
         // Check if password is properly hashed
         if (!user.password || typeof user.password !== 'string' || user.password.length < 10) {
-            console.error('❌ Password validation failed - password might not be properly hashed:', user.password);
             return res
                 .status(401)
                 .json(ApiResponse.error("Invalid email or password", 401));
@@ -200,10 +157,64 @@ const updateProfile = async (req, res, next) => {
     }
 };
 
+// Create admin user (accessible by existing admins, or anyone when no admin exists yet)
+const createAdminUser = async (req, res, next) => {
+    try {
+        // Check if any admin already exists
+        const adminExists = await User.exists({ role: 'admin' });
+
+        // Only allow if the requesting user is an admin, or if no admin exists yet
+        if (adminExists && req.user.role !== 'admin') {
+            return res.status(403).json(ApiResponse.error('Access denied. Admin privileges required.', 403));
+        }
+
+        const { name, email, password, phone } = req.body;
+
+        // Validate required fields
+        if (!name || !email || !password) {
+            return res.status(400).json(ApiResponse.error('Name, email, and password are required.'));
+        }
+
+        // Check if user already exists
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+            return res.status(400).json(ApiResponse.error('User already exists with this email'));
+        }
+
+        // Hash password
+        const hashedPassword = await hashPassword(password);
+
+        // Create new admin user
+        const user = new User({
+            name,
+            email,
+            password: hashedPassword,
+            phone,
+            role: 'admin' // Explicitly set role to admin
+        });
+
+        await user.save();
+
+        res.status(201).json(
+            ApiResponse.success({
+                user: {
+                    id: user._id,
+                    email: user.email,
+                    name: user.name,
+                    role: user.role
+                }
+            }, 'Admin user created successfully')
+        );
+    } catch (error) {
+        next(error);
+    }
+};
+
 module.exports = {
     register,
     login,
     logout,
     getProfile,
-    updateProfile
+    updateProfile,
+    createAdminUser
 };
