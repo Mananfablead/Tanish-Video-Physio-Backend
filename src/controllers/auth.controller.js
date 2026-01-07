@@ -21,7 +21,7 @@ const register = async (req, res, next) => {
         const user = new User({
             name,
             email,
-            password: hashedPassword, // 👈 use hashed password
+            password, // 👈 use hashed password
             phone
             // role will default to 'patient' as per schema
         });
