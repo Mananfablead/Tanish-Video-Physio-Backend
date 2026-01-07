@@ -10,10 +10,6 @@ router.post('/login', validateLogin, login);
 router.post('/logout', authenticateToken, logout);
 router.get('/profile', authenticateToken, getProfile);
 router.put('/profile', authenticateToken, updateProfile);
-// Route for creating first admin (no auth required if no admin exists)
 router.post('/admin/create-first', createAdminUser);
-
-// Route for creating additional admins (auth required if admin exists)
-router.post('/admin/create-user', authenticateToken, createAdminUser);
 
 module.exports = router;

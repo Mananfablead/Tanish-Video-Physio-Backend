@@ -118,6 +118,55 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "Create First Admin (No Auth)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Admin User\",\n  \"email\": \"admin@clinic.com\",\n  \"password\": \"adminpassword123\",\n  \"phone\": \"+919876543210\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/admin/create-first",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "admin", "create-first"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Additional Admin (Admin Auth)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Another Admin\",\n  \"email\": \"admin2@clinic.com\",\n  \"password\": \"adminpassword123\",\n  \"phone\": \"+919876543211\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/admin/create-user",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "admin", "create-user"]
+            }
+          },
+          "response": []
         }
       ]
     },

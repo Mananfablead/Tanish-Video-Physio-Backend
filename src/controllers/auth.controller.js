@@ -14,14 +14,11 @@ const register = async (req, res, next) => {
             return res.status(400).json(ApiResponse.error('User already exists with this email'));
         }
 
-        // Hash password
-        const hashedPassword = await hashPassword(password);
-
         // Create new user
         const user = new User({
             name,
             email,
-            password: hashedPassword, // 👈 use hashed password
+            password,
             phone
             // role will default to 'patient' as per schema
         });
@@ -157,51 +154,49 @@ const updateProfile = async (req, res, next) => {
     }
 };
 
-// Create admin user (accessible by existing admins, or anyone when no admin exists yet)
+// Create admin user (for initial setup only)
 const createAdminUser = async (req, res, next) => {
     try {
-        // Check if any admin already exists
-        const adminExists = await User.exists({ role: 'admin' });
+        const { name, email, password } = req.body;
 
-        // Only allow if the requesting user is an admin, or if no admin exists yet
-        if (adminExists && req.user.role !== 'admin') {
-            return res.status(403).json(ApiResponse.error('Access denied. Admin privileges required.', 403));
-        }
-
-        const { name, email, password, phone } = req.body;
-
-        // Validate required fields
+        // Validation
         if (!name || !email || !password) {
-            return res.status(400).json(ApiResponse.error('Name, email, and password are required.'));
+            return res.status(400).json(ApiResponse.error('Name, email, and password are required'));
         }
 
-        // Check if user already exists
+        // Check if an admin user already exists
+        const existingAdmin = await User.findOne({ role: 'admin' });
+        if (existingAdmin) {
+            return res.status(400).json(ApiResponse.error('An admin user already exists'));
+        }
+
+        // Check if user with this email already exists
         const existingUser = await User.findOne({ email });
         if (existingUser) {
-            return res.status(400).json(ApiResponse.error('User already exists with this email'));
+            return res.status(400).json(ApiResponse.error('A user with this email already exists'));
         }
 
-        // Hash password
-        const hashedPassword = await hashPassword(password);
-
         // Create new admin user
-        const user = new User({
+        const adminUser = new User({
             name,
             email,
-            password: hashedPassword,
-            phone,
-            role: 'admin' // Explicitly set role to admin
+            password,
+            role: 'admin'
         });
 
-        await user.save();
+        await adminUser.save();
+
+        // Generate token
+        const token = generateToken({ userId: adminUser._id, role: adminUser.role });
 
         res.status(201).json(
             ApiResponse.success({
+                token,
                 user: {
-                    id: user._id,
-                    email: user.email,
-                    name: user.name,
-                    role: user.role
+                    id: adminUser._id,
+                    email: adminUser.email,
+                    name: adminUser.name,
+                    role: adminUser.role
                 }
             }, 'Admin user created successfully')
         );
