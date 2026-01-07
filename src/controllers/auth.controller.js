@@ -21,9 +21,10 @@ const register = async (req, res, next) => {
         const user = new User({
             name,
             email,
-            password: hashedPassword,
+            password, // 👈 plain password
             phone
         });
+
 
         await user.save();
 
@@ -47,40 +48,112 @@ const register = async (req, res, next) => {
 };
 
 // Login user
+// const login = async (req, res, next) => {
+//     try {
+//         const { email, password } = req.body;
+
+//         // Find user by email
+//         const user = await User.findOne({ email });
+//         if (!user) {
+//             return res.status(401).json(ApiResponse.error('Invalid email or password', 401));
+//         }
+
+//         // Compare password
+//         const isMatch = await comparePassword(password, user.password);
+//         if (!isMatch) {
+//             return res.status(401).json(ApiResponse.error('Invalid email or password', 401));
+//         }
+
+//         // Generate token
+//         const token = generateToken({ userId: user._id, role: user.role });
+
+//         res.status(200).json(
+//             ApiResponse.success({
+//                 token,
+//                 user: {
+//                     id: user._id,
+//                     email: user.email,
+//                     name: user.name,
+//                     role: user.role
+//                 }
+//             }, 'Login successful')
+//         );
+//     } catch (error) {
+//         next(error);
+//     }
+// };
+
+// Login user
 const login = async (req, res, next) => {
     try {
+        console.log("🔐 Login attempt start");
+
         const { email, password } = req.body;
+        console.log("📩 Login request received for email:", email);
 
         // Find user by email
         const user = await User.findOne({ email });
         if (!user) {
-            return res.status(401).json(ApiResponse.error('Invalid email or password'));
+            console.warn("❌ Login failed: User not found:", email);
+            return res
+                .status(401)
+                .json(ApiResponse.error("Invalid email or password", 401));
         }
 
-        // Compare password
+        console.log("✅ User found:", {
+            id: user._id.toString(),
+            role: user.role,
+        });
+
+        // Check if password is properly hashed
+        if (!user.password || typeof user.password !== 'string' || user.password.length < 10) {
+            console.error('❌ Password validation failed - password might not be properly hashed:', user.password);
+            return res
+                .status(401)
+                .json(ApiResponse.error("Invalid email or password", 401));
+        }
+
         const isMatch = await comparePassword(password, user.password);
+
         if (!isMatch) {
-            return res.status(401).json(ApiResponse.error('Invalid email or password'));
+            return res
+                .status(401)
+                .json(ApiResponse.error("Invalid email or password", 401));
         }
 
         // Generate token
-        const token = generateToken({ userId: user._id, role: user.role });
+        const token = generateToken({
+            userId: user._id,
+            role: user.role,
+        });
+
+        console.log("🎟️ JWT token generated for user:", {
+            userId: user._id.toString(),
+            role: user.role,
+        });
 
         res.status(200).json(
-            ApiResponse.success({
-                token,
-                user: {
-                    id: user._id,
-                    email: user.email,
-                    name: user.name,
-                    role: user.role
-                }
-            }, 'Login successful')
+            ApiResponse.success(
+                {
+                    token,
+                    user: {
+                        id: user._id,
+                        email: user.email,
+                        name: user.name,
+                        role: user.role,
+                    },
+                },
+                "Login successful"
+            )
         );
+
+        console.log("🎉 Login successful for:", email);
     } catch (error) {
+        console.error("🔥 Login error:", error.message);
         next(error);
     }
 };
+
 
 // Logout user
 const logout = async (req, res, next) => {
