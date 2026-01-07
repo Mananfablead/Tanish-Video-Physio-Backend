@@ -14,6 +14,7 @@ const availabilityRoutes = require('./availability.routes');
 const reportRoutes = require('./reports.routes');
 const notificationRoutes = require('./notifications.routes');
 const chatRoutes = require('./chat.routes');
+const questionnaireRoutes = require('./questionnaires.routes');
 
 // Mount route modules
 router.use('/auth', authRoutes);
@@ -28,5 +29,6 @@ router.use('/availability', availabilityRoutes);
 router.use('/reports', reportRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/chat', chatRoutes);
+router.use('/questionnaires', questionnaireRoutes);
 
 module.exports = router;

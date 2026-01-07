@@ -10,6 +10,6 @@ router.post('/login', validateLogin, login);
 router.post('/logout', authenticateToken, logout);
 router.get('/profile', authenticateToken, getProfile);
 router.put('/profile', authenticateToken, updateProfile);
-router.post('/admin/create-first', createAdminUser);
+router.post('/admin/create', createAdminUser);
 
 module.exports = router;

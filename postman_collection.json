@@ -1183,6 +1183,189 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "Questionnaires",
+      "item": [
+        {
+          "name": "Get Active Questionnaire",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/questionnaires/active",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "questionnaires", "active"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Questionnaires (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/questionnaires",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "questionnaires"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Questionnaire (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"New Questionnaire\",\n  \"description\": \"A new questionnaire for patient assessment\",\n  \"questions\": [\n    {\n      \"id\": 1,\n      \"question\": \"What is your primary concern?\",\n      \"type\": \"text\",\n      \"required\": true\n    },\n    {\n      \"id\": 2,\n      \"question\": \"Rate your pain level\",\n      \"type\": \"number\",\n      \"required\": true,\n      \"min\": 1,\n      \"max\": 10\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/questionnaires",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "questionnaires"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Questionnaire (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated Questionnaire\",\n  \"description\": \"Updated questionnaire for patient assessment\",\n  \"questions\": [\n    {\n      \"id\": 1,\n      \"question\": \"What is your primary concern?\",\n      \"type\": \"text\",\n      \"required\": true\n    },\n    {\n      \"id\": 2,\n      \"question\": \"Rate your pain level\",\n      \"type\": \"number\",\n      \"required\": true,\n      \"min\": 1,\n      \"max\": 10\n    },\n    {\n      \"id\": 3,\n      \"question\": \"What activities worsen your condition?\",\n      \"type\": \"text\",\n      \"required\": false\n    }\n  ],\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/questionnaires/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "questionnaires", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "questionnaire_id_here"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Questions Array Only (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"questions\": [\n    {\n      \"id\": 1,\n      \"question\": \"What is your primary concern?\",\n      \"type\": \"text\",\n      \"required\": true\n    },\n    {\n      \"id\": 2,\n      \"question\": \"Rate your pain level\",\n      \"type\": \"number\",\n      \"required\": true,\n      \"min\": 1,\n      \"max\": 10\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/questionnaires/:id/questions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "questionnaires", ":id", "questions"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "questionnaire_id_here"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Activate Questionnaire (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/questionnaires/:id/activate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "questionnaires", ":id", "activate"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "questionnaire_id_here"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Questionnaire (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/questionnaires/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "questionnaires", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "questionnaire_id_here"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
     }
   ],
   "variable": [
