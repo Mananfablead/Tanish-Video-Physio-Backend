@@ -36,7 +36,6 @@ const validateRegister = [
 const validateLogin = [
     body('email')
         .isEmail()
-        .normalizeEmail()
         .withMessage('Please provide a valid email'),
     body('password')
         .exists()
