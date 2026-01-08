@@ -2,6 +2,9 @@ const User = require('../models/User.model');
 const { generateToken } = require('../config/jwt');
 const { hashPassword, comparePassword } = require('../utils/auth.utils');
 const ApiResponse = require('../utils/apiResponse');
+const crypto = require('crypto');
+const nodemailer = require('nodemailer');
+const { createTransport } = nodemailer;
 
 // Register a new user
 const register = async (req, res, next) => {
@@ -205,11 +208,160 @@ const createAdminUser = async (req, res, next) => {
     }
 };
 
+// Forgot password - initiate password reset
+const forgotPassword = async (req, res, next) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json(ApiResponse.error('Email is required'));
+        }
+
+        // Find user by email
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(404).json(ApiResponse.error('User not found with this email'));
+        }
+
+        // Generate password reset token
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        const resetTokenExpiry = Date.now() + 3600000; // 1 hour
+
+        // Save reset token and expiry to user
+        user.resetPasswordToken = resetToken;
+        user.resetPasswordExpires = resetTokenExpiry;
+        await user.save({ validateBeforeSave: false });
+
+        // Create transporter for sending email
+        const transporter = createTransport({
+            service: 'gmail',
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS
+            }
+        });
+
+        // Prepare email
+        const resetUrl = `${req.protocol}://${req.get('host')}/api/auth/reset-password/${resetToken}`;
+        const message = `
+You are receiving this email because you (or someone else) has requested the reset of a password. Please click on the following link, or paste this into your browser to complete the process:
+
+${resetUrl}
+
+If you did not request this, please ignore this email and your password will remain unchanged.
+`;
+
+        const mailOptions = {
+            to: user.email,
+            from: process.env.EMAIL_USER,
+            subject: 'Password Reset Request',
+            text: message
+        };
+
+        // Send email
+        await transporter.sendMail(mailOptions);
+
+        res.status(200).json(ApiResponse.success(null, 'Password reset email sent successfully'));
+    } catch (error) {
+        // Clear reset token if error occurs
+        if (req.user) {
+            req.user.resetPasswordToken = undefined;
+            req.user.resetPasswordExpires = undefined;
+            await req.user.save({ validateBeforeSave: false });
+        }
+
+        next(error);
+    }
+};
+
+// Reset password - complete password reset
+const resetPassword = async (req, res, next) => {
+    try {
+        const { token } = req.params;
+        const { password } = req.body;
+
+        if (!password) {
+            return res.status(400).json(ApiResponse.error('New password is required'));
+        }
+
+        if (password.length < 6) {
+            return res.status(400).json(ApiResponse.error('Password must be at least 6 characters long'));
+        }
+
+        // Find user by reset token
+        const user = await User.findOne({
+            resetPasswordToken: token,
+            resetPasswordExpires: { $gt: Date.now() }
+        });
+
+        if (!user) {
+            return res.status(400).json(ApiResponse.error('Password reset token is invalid or has expired'));
+        }
+
+        // Hash new password
+        const hashedPassword = await hashPassword(password);
+
+        // Update user password and clear reset token
+        user.password = hashedPassword;
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpires = undefined;
+
+        await user.save();
+
+        res.status(200).json(ApiResponse.success(null, 'Password reset successfully'));
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Update password for authenticated user
+const updatePassword = async (req, res, next) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json(ApiResponse.error('Current password and new password are required'));
+        }
+
+        if (newPassword.length < 6) {
+            return res.status(400).json(ApiResponse.error('New password must be at least 6 characters long'));
+        }
+
+        // Get user from token (req.user is populated by auth middleware)
+        const user = await User.findById(req.user.userId).select('+password');
+
+        if (!user) {
+            return res.status(404).json(ApiResponse.error('User not found'));
+        }
+
+        // Check current password
+        const isMatch = await comparePassword(currentPassword, user.password);
+
+        if (!isMatch) {
+            return res.status(400).json(ApiResponse.error('Current password is incorrect'));
+        }
+
+        // Hash new password
+        const hashedNewPassword = await hashPassword(newPassword);
+
+        // Update password
+        user.password = hashedNewPassword;
+        await user.save();
+
+        res.status(200).json(ApiResponse.success(null, 'Password updated successfully'));
+    } catch (error) {
+        next(error);
+    }
+};
+
 module.exports = {
     register,
     login,
     logout,
     getProfile,
     updateProfile,
-    createAdminUser
+    createAdminUser,
+    forgotPassword,
+    resetPassword,
+    updatePassword
 };
