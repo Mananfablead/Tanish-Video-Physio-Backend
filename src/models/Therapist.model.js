@@ -65,7 +65,7 @@ const therapistSchema = new mongoose.Schema({
     status: {
         type: String,
         enum: ['active', 'inactive', 'pending'],
-        default: 'pending'
+        default: 'active'
     },
     sessionTypes: [{
         type: String,
