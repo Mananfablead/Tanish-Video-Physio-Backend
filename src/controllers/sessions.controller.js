@@ -7,7 +7,7 @@ const getAllSessions = async (req, res, next) => {
     try {
         const sessions = await Session.find({ userId: req.user.userId })
             .populate('bookingId', 'serviceName therapistName date time')
-            .populate('therapistId', 'name specialty');
+            .populate('therapistId', 'name email role')
 
         res.status(200).json(ApiResponse.success({ sessions }, 'Sessions retrieved successfully'));
     } catch (error) {
@@ -25,7 +25,7 @@ const getUpcomingSessions = async (req, res, next) => {
             status: { $in: ['scheduled', 'live'] }
         })
             .populate('bookingId', 'serviceName therapistName date time')
-            .populate('therapistId', 'name specialty');
+            .populate('therapistId', 'name email role')
 
         res.status(200).json(ApiResponse.success({ sessions }, 'Upcoming sessions retrieved successfully'));
     } catch (error) {
@@ -38,7 +38,7 @@ const getSessionById = async (req, res, next) => {
     try {
         const session = await Session.findOne({ _id: req.params.id, userId: req.user.userId })
             .populate('bookingId', 'serviceName therapistName date time')
-            .populate('therapistId', 'name specialty');
+            .populate('therapistId', 'name email role')
 
         if (!session) {
             return res.status(404).json(ApiResponse.error('Session not found'));
@@ -53,7 +53,7 @@ const getSessionById = async (req, res, next) => {
 // Create a new session
 const createSession = async (req, res, next) => {
     try {
-        const { bookingId, therapistId, date, time, type, status } = req.body;
+        const { bookingId, date, time, type, status } = req.body;
 
         // Verify the booking belongs to the user
         const booking = await Booking.findOne({ _id: bookingId, userId: req.user.userId });
@@ -63,7 +63,7 @@ const createSession = async (req, res, next) => {
 
         const session = new Session({
             bookingId,
-            therapistId,
+            therapistId: booking.therapistId, // Use therapist from the booking
             userId: req.user.userId, // Assign current user
             date,
             time,
@@ -75,7 +75,7 @@ const createSession = async (req, res, next) => {
 
         // Populate the response
         await session.populate('bookingId', 'serviceName therapistName date time');
-        await session.populate('therapistId', 'name specialty');
+        await session.populate('therapistId', 'name email role');
 
         res.status(201).json(ApiResponse.success({ session }, 'Session created successfully'));
     } catch (error) {
@@ -95,7 +95,7 @@ const updateSession = async (req, res, next) => {
             { new: true, runValidators: true }
         )
             .populate('bookingId', 'serviceName therapistName date time')
-            .populate('therapistId', 'name specialty');
+            .populate('therapistId', 'name email role')
 
         if (!session) {
             return res.status(404).json(ApiResponse.error('Session not found'));
@@ -112,7 +112,7 @@ const deleteSession = async (req, res, next) => {
     try {
         const session = await Session.findOneAndDelete({ _id: req.params.id, userId: req.user.userId })
             .populate('bookingId', 'serviceName therapistName date time')
-            .populate('therapistId', 'name specialty');
+            .populate('therapistId', 'name email role')
 
         if (!session) {
             return res.status(404).json(ApiResponse.error('Session not found'));

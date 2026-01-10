@@ -8,7 +8,7 @@ const getAllUsers = async (req, res, next) => {
         const limit = parseInt(req.query.limit) || 10;
         const skip = (page - 1) * limit;
 
-        const filter = {};
+        const filter = { role: 'patient' }; // Only return patient users, not admins
         if (req.query.search) {
             filter.$or = [
                 { name: { $regex: req.query.search, $options: 'i' } },
@@ -25,6 +25,14 @@ const getAllUsers = async (req, res, next) => {
             .skip(skip)
             .limit(limit)
             .sort({ createdAt: -1 });
+
+        // Convert profile picture paths to full URLs
+        users.forEach(user => {
+            if (user.profilePicture && user.profilePicture.startsWith('/uploads/')) {
+                const baseUrl = `${req.protocol}://${req.get('host')}`;
+                user.profilePicture = `${baseUrl}${user.profilePicture}`;
+            }
+        });
 
         const total = await User.countDocuments(filter);
 
@@ -52,6 +60,12 @@ const getUserById = async (req, res, next) => {
             return res.status(404).json(ApiResponse.error('User not found'));
         }
 
+        // If user has a profile picture, convert to full URL
+        if (user.profilePicture && user.profilePicture.startsWith('/uploads/')) {
+            const baseUrl = `${req.protocol}://${req.get('host')}`;
+            user.profilePicture = `${baseUrl}${user.profilePicture}`;
+        }
+
         res.status(200).json(ApiResponse.success(user, 'User retrieved successfully'));
     } catch (error) {
         next(error);
@@ -71,6 +85,12 @@ const updateUser = async (req, res, next) => {
 
         if (!user) {
             return res.status(404).json(ApiResponse.error('User not found'));
+        }
+
+        // If user has a profile picture, convert to full URL
+        if (user.profilePicture && user.profilePicture.startsWith('/uploads/')) {
+            const baseUrl = `${req.protocol}://${req.get('host')}`;
+            user.profilePicture = `${baseUrl}${user.profilePicture}`;
         }
 
         res.status(200).json(ApiResponse.success(user, 'User updated successfully'));

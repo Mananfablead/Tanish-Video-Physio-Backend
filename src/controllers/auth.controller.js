@@ -130,6 +130,12 @@ const getProfile = async (req, res, next) => {
             return res.status(404).json(ApiResponse.error('User not found'));
         }
 
+        // If user has a profile picture, convert to full URL
+        if (user.profilePicture && user.profilePicture.startsWith('/uploads/')) {
+            const baseUrl = `${req.protocol}://${req.get('host')}`;
+            user.profilePicture = `${baseUrl}${user.profilePicture}`;
+        }
+
         res.status(200).json(ApiResponse.success(user, 'Profile retrieved successfully'));
     } catch (error) {
         next(error);
@@ -139,16 +145,62 @@ const getProfile = async (req, res, next) => {
 // Update user profile
 const updateProfile = async (req, res, next) => {
     try {
-        const { name, phone, healthProfile } = req.body;
+        const { name, phone } = req.body;
+
+        // Handle healthProfile - it may come as a JSON string when using form data
+        let healthProfile = req.body.healthProfile;
+        if (typeof healthProfile === 'string') {
+            try {
+                healthProfile = JSON.parse(healthProfile);
+            } catch (e) {
+                // If it's not JSON, create an object from individual fields
+                healthProfile = {};
+                Object.keys(req.body).forEach(key => {
+                    if (key.startsWith('healthProfile[')) {
+                        const field = key.match(/healthProfile\[(.*?)\]/)[1];
+                        if (!healthProfile[field]) {
+                            healthProfile[field] = req.body[key];
+
+                            // Convert numeric fields
+                            if (field === 'painIntensity') {
+                                healthProfile[field] = parseInt(req.body[key]) || null;
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        // Handle profile picture if uploaded
+        let profilePicture = null;
+        if (req.file) {
+            // Create full URL for the image
+            const baseUrl = `${req.protocol}://${req.get('host')}`;
+            profilePicture = `${baseUrl}/uploads/profile-pictures/${req.file.filename}`;
+        }
+
+        const updateData = { name, phone };
+        if (healthProfile && Object.keys(healthProfile).length > 0) {
+            updateData.healthProfile = healthProfile;
+        }
+        if (profilePicture) {
+            updateData.profilePicture = profilePicture;
+        }
 
         const user = await User.findByIdAndUpdate(
             req.user.userId,
-            { name, phone, healthProfile },
+            updateData,
             { new: true, runValidators: true }
         ).select('-password');
 
         if (!user) {
             return res.status(404).json(ApiResponse.error('User not found'));
+        }
+
+        // If user has a profile picture, convert to full URL
+        if (user.profilePicture && user.profilePicture.startsWith('/uploads/')) {
+            const baseUrl = `${req.protocol}://${req.get('host')}`;
+            user.profilePicture = `${baseUrl}${user.profilePicture}`;
         }
 
         res.status(200).json(ApiResponse.success(user, 'Profile updated successfully'));
@@ -235,6 +287,8 @@ const forgotPassword = async (req, res, next) => {
         // Create transporter for sending email
         const transporter = createTransport({
             service: 'gmail',
+            host: process.env.EMAIL_HOST,
+            port: process.env.EMAIL_PORT,
             auth: {
                 user: process.env.EMAIL_USER,
                 pass: process.env.EMAIL_PASS
@@ -244,18 +298,51 @@ const forgotPassword = async (req, res, next) => {
         // Prepare email
         const resetUrl = `${req.protocol}://${req.get('host')}/api/auth/reset-password/${resetToken}`;
         const message = `
-You are receiving this email because you (or someone else) has requested the reset of a password. Please click on the following link, or paste this into your browser to complete the process:
-
-${resetUrl}
-
-If you did not request this, please ignore this email and your password will remain unchanged.
-`;
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Password Reset Request</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f5f5f5; }
+        .container { max-width: 600px; margin: 0 auto; background-color: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-align: center; padding: 30px 20px; }
+        .content { padding: 30px; }
+        .button { display: inline-block; padding: 12px 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 4px; margin: 20px 0; }
+        .footer { padding: 20px; background-color: #f9f9f9; text-align: center; color: #666; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Tanish Physio</h1>
+            <p>Physical Therapy & Rehabilitation Center</p>
+        </div>
+        <div class="content">
+            <h2>Password Reset Request</h2>
+            <p>Hello ${user.name},</p>
+            <p>You are receiving this email because you (or someone else) has requested the reset of your password for your Tanish Physio account.</p>
+            <p>Please click the button below to reset your password:</p>
+            <p><a href="${resetUrl}" class="button">Reset Your Password</a></p>
+            <p>If the button doesn't work, copy and paste this link into your browser:</p>
+            <p><a href="${resetUrl}">${resetUrl}</a></p>
+            <p>This link will expire in 1 hour for security reasons.</p>
+            <p>If you did not request this password reset, please ignore this email and your password will remain unchanged. If you're concerned about your account security, please contact our support team.</p>
+            <p>Best regards,<br>The Tanish Physio Team</p>
+        </div>
+        <div class="footer">
+            <p>© 2024 Tanish Physio. All rights reserved.</p>
+            <p>This is an automated email, please do not reply to this message.</p>
+        </div>
+    </div>
+</body>
+</html>`;
 
         const mailOptions = {
             to: user.email,
             from: process.env.EMAIL_USER,
-            subject: 'Password Reset Request',
-            text: message
+            subject: 'Password Reset Request - Tanish Physio',
+            html: message
         };
 
         // Send email
@@ -341,11 +428,8 @@ const updatePassword = async (req, res, next) => {
             return res.status(400).json(ApiResponse.error('Current password is incorrect'));
         }
 
-        // Hash new password
-        const hashedNewPassword = await hashPassword(newPassword);
-
-        // Update password
-        user.password = hashedNewPassword;
+        // Set new password (will be hashed by pre-save hook)
+        user.password = newPassword;
         await user.save();
 
         res.status(200).json(ApiResponse.success(null, 'Password updated successfully'));

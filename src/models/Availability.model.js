@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const availabilitySchema = new mongoose.Schema({
     therapistId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Therapist',
+        ref: 'User',
         required: [true, 'Therapist ID is required']
     },
     date: {

@@ -100,16 +100,67 @@
                 "key": "Authorization",
                 "value": "Bearer {{token}}",
                 "type": "text"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
               }
             ],
             "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"John Doe Updated\",\n  \"phone\": \"+919876543210\",\n  \"healthProfile\": {\n    \"primaryConcern\": \"Lower back pain\",\n    \"painIntensity\": 6,\n    \"priorTreatments\": \"Physiotherapy, Massage\",\n    \"medicalHistory\": \"Hypertension, previous back injury\",\n    \"allergies\": \"Penicillin\",\n    \"medications\": \"Lisinopril 10mg daily\",\n    \"emergencyContact\": \"Jane Doe (Spouse) - +1 234 567 891\",\n    \"additionalNotes\": \"Patient responds well to manual therapy techniques. Avoid deep tissue massage on left side.\"\n  }\n}"
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "name",
+                  "value": "John Doe Updated",
+                  "type": "text"
+                },
+                {
+                  "key": "phone",
+                  "value": "+919876543210",
+                  "type": "text"
+                },
+                {
+                  "key": "healthProfile[primaryConcern]",
+                  "value": "Lower back pain",
+                  "type": "text"
+                },
+                {
+                  "key": "healthProfile[painIntensity]",
+                  "value": "6",
+                  "type": "text"
+                },
+                {
+                  "key": "healthProfile[priorTreatments]",
+                  "value": "Physiotherapy, Massage",
+                  "type": "text"
+                },
+                {
+                  "key": "healthProfile[medicalHistory]",
+                  "value": "Hypertension, previous back injury",
+                  "type": "text"
+                },
+                {
+                  "key": "healthProfile[allergies]",
+                  "value": "Penicillin",
+                  "type": "text"
+                },
+                {
+                  "key": "healthProfile[medications]",
+                  "value": "Lisinopril 10mg daily",
+                  "type": "text"
+                },
+                {
+                  "key": "healthProfile[emergencyContact]",
+                  "value": "Jane Doe (Spouse) - +1 234 567 891",
+                  "type": "text"
+                },
+                {
+                  "key": "healthProfile[additionalNotes]",
+                  "value": "Patient responds well to manual therapy techniques. Avoid deep tissue massage on left side.",
+                  "type": "text"
+                },
+                {
+                  "key": "profilePicture",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
             },
             "url": {
               "raw": "{{baseUrl}}/api/auth/profile",
@@ -575,6 +626,7 @@
         },
         {
           "name": "Create Booking",
+          "description": "Creates a new booking. The therapistId parameter is no longer required and will be automatically assigned based on service availability. An available admin user (therapist) will be automatically selected.",
           "request": {
             "method": "POST",
             "header": [
@@ -591,7 +643,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"serviceId\": \"service_id_here\",\n  \"therapistId\": \"therapist_id_here\",\n  \"date\": \"2024-03-25\",\n  \"time\": \"10:00\",\n  \"notes\": \"Patient has lower back pain, bring medical records.\"\n}"
+              "raw": "{\n  \"serviceId\": \"service_id_here\",\n  \"date\": \"2024-03-25\",\n  \"time\": \"10:00\",\n  \"notes\": \"Patient has lower back pain, bring medical records.\",\n  \"clientName\": \"John Doe\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/bookings",
@@ -730,6 +782,7 @@
         },
         {
           "name": "Create Session",
+          "description": "Creates a new session. The therapistId parameter is no longer required and will be automatically assigned from the associated booking.",
           "request": {
             "method": "POST",
             "header": [
@@ -746,7 +799,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"bookingId\": \"booking_id_here\",\n  \"therapistId\": \"therapist_id_here\",\n  \"date\": \"2024-03-25\",\n  \"time\": \"10:00\",\n  \"type\": \"1-on-1\",\n  \"status\": \"scheduled\"\n}"
+              "raw": "{\n  \"bookingId\": \"booking_id_here\",\n  \"date\": \"2024-03-25\",\n  \"time\": \"10:00\",\n  \"type\": \"1-on-1\",\n  \"status\": \"scheduled\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/sessions",
@@ -913,6 +966,260 @@
               "raw": "{{baseUrl}}/api/subscriptions/create-order",
               "host": ["{{baseUrl}}"],
               "path": ["api", "subscriptions", "create-order"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Subscription Plan (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"planId\": \"quarterly\",\n  \"name\": \"Quarterly Plan\",\n  \"price\": 4500,\n  \"description\": \"Access to quarterly physiotherapy sessions\",\n  \"features\": [\n    \"Quarterly 1-on-1 sessions\",\n    \"Unlimited access to resources\"\n  ],\n  \"duration\": \"quarterly\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/subscriptions/plans",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "subscriptions", "plans"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Subscription Plans (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/subscriptions/plans",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "subscriptions", "plans"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Subscription Plan By ID (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/subscriptions/plans/{{planId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "subscriptions", "plans", "{{planId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Subscription Plan (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Monthly Plan\",\n  \"price\": 2000,\n  \"description\": \"Updated access to monthly physiotherapy sessions\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/subscriptions/plans/{{planId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "subscriptions", "plans", "{{planId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Subscription Plan (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/subscriptions/plans/{{planId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "subscriptions", "plans", "{{planId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Subscription Order (Razorpay)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"planId\": \"monthly\",\n  \"amount\": 1800,\n  \"currency\": \"INR\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/subscriptions/create-order",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "subscriptions", "create-order"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Subscription Plan (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"planId\": \"quarterly\",\n  \"name\": \"Quarterly Plan\",\n  \"price\": 4500,\n  \"description\": \"Access to quarterly physiotherapy sessions\",\n  \"features\": [\n    \"Quarterly 1-on-1 sessions\",\n    \"Unlimited access to resources\"\n  ],\n  \"duration\": \"quarterly\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/subscriptions/plans",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "subscriptions", "plans"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Subscription Plans (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/subscriptions/plans",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "subscriptions", "plans"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Subscription Plan By ID (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/subscriptions/plans/{{planId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "subscriptions", "plans", "{{planId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Subscription Plan (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Monthly Plan\",\n  \"price\": 2000,\n  \"description\": \"Updated access to monthly physiotherapy sessions\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/subscriptions/plans/{{planId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "subscriptions", "plans", "{{planId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Subscription Plan (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/subscriptions/plans/{{planId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "subscriptions", "plans", "{{planId}}"]
             }
           },
           "response": []

@@ -4,7 +4,6 @@ const router = express.Router();
 // Import route modules
 const authRoutes = require('./auth.routes');
 const userRoutes = require('./users.routes');
-const therapistRoutes = require('./therapists.routes');
 const serviceRoutes = require('./services.routes');
 const bookingRoutes = require('./bookings.routes');
 const sessionRoutes = require('./sessions.routes');
@@ -19,7 +18,6 @@ const questionnaireRoutes = require('./questionnaires.routes');
 // Mount route modules
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
-router.use('/therapists', therapistRoutes);
 router.use('/services', serviceRoutes);
 router.use('/bookings', bookingRoutes);
 router.use('/sessions', sessionRoutes);

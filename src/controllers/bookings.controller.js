@@ -1,6 +1,6 @@
 const Booking = require('../models/Booking.model');
 const Service = require('../models/Service.model');
-const Therapist = require('../models/Therapist.model');
+const User = require('../models/User.model');
 const ApiResponse = require('../utils/apiResponse');
 
 // Get all bookings for authenticated user
@@ -8,7 +8,7 @@ const getAllBookings = async (req, res, next) => {
     try {
         const bookings = await Booking.find({ userId: req.user.userId })
             .populate('serviceId', 'name price duration')
-            .populate('therapistId', 'name specialty rating');
+            .populate('therapistId', 'name email role');
 
         res.status(200).json(ApiResponse.success({ bookings }, 'Bookings retrieved successfully'));
     } catch (error) {
@@ -21,7 +21,7 @@ const getBookingById = async (req, res, next) => {
     try {
         const booking = await Booking.findOne({ _id: req.params.id, userId: req.user.userId })
             .populate('serviceId', 'name price duration')
-            .populate('therapistId', 'name specialty rating');
+            .populate('therapistId', 'name email role');
 
         if (!booking) {
             return res.status(404).json(ApiResponse.error('Booking not found'));
@@ -36,23 +36,28 @@ const getBookingById = async (req, res, next) => {
 // Create a new booking
 const createBooking = async (req, res, next) => {
     try {
-        const { serviceId, therapistId, date, time, notes } = req.body;
+        const { serviceId, date, time, notes, clientName } = req.body;
 
-        // Validate service and therapist exist
+        // Validate service exists
         const service = await Service.findById(serviceId);
-        const therapist = await Therapist.findById(therapistId);
 
         if (!service || service.status !== 'active') {
             return res.status(404).json(ApiResponse.error('Service not found or not active'));
         }
 
-        if (!therapist || therapist.status !== 'active') {
-            return res.status(404).json(ApiResponse.error('Therapist not found or not active'));
+        // Automatically assign an available therapist (admin user)
+        const therapist = await User.findOne({
+            role: 'admin',
+            status: 'active'
+        });
+
+        if (!therapist) {
+            return res.status(404).json(ApiResponse.error('No active therapists available')); 
         }
 
         // Check if booking already exists for this date/time
         const existingBooking = await Booking.findOne({
-            therapistId,
+            therapistId: therapist._id,
             date,
             time,
             status: { $ne: 'cancelled' }
@@ -64,18 +69,22 @@ const createBooking = async (req, res, next) => {
 
         const booking = new Booking({
             serviceId,
-            therapistId,
-            userId: req.user.userId, // Assign current user
+            serviceName: service.name, // Get from service model
+            therapistId: therapist._id,
+            therapistName: therapist.name, // Get from therapist model
+            userId: req.user.userId, // Assign current user from auth middleware
+            clientName: clientName || req.user.name, // Use provided clientName or fall back to authenticated user's name
             date,
             time,
-            notes
+            notes,
+            amount: service.price // Get from service model
         });
 
         await booking.save();
 
         // Populate the response
         await booking.populate('serviceId', 'name price duration');
-        await booking.populate('therapistId', 'name specialty rating');
+        await booking.populate('therapistId', 'name email role');
 
         res.status(201).json(ApiResponse.success({ booking }, 'Booking created successfully'));
     } catch (error) {
@@ -95,7 +104,7 @@ const updateBooking = async (req, res, next) => {
             { new: true, runValidators: true }
         )
             .populate('serviceId', 'name price duration')
-            .populate('therapistId', 'name specialty rating');
+            .populate('therapistId', 'name email role');
 
         if (!booking) {
             return res.status(404).json(ApiResponse.error('Booking not found'));
@@ -116,7 +125,7 @@ const deleteBooking = async (req, res, next) => {
             { new: true }
         )
             .populate('serviceId', 'name price duration')
-            .populate('therapistId', 'name specialty rating');
+            .populate('therapistId', 'name email role');
 
         if (!booking) {
             return res.status(404).json(ApiResponse.error('Booking not found'));

@@ -2,7 +2,6 @@ const User = require('../models/User.model');
 const Session = require('../models/Session.model');
 const Booking = require('../models/Booking.model');
 const Payment = require('../models/Payment.model');
-const Therapist = require('../models/Therapist.model');
 const ApiResponse = require('../utils/apiResponse');
 
 // Get user reports
@@ -153,8 +152,8 @@ const getTherapistReport = async (req, res, next) => {
             if (endDate) filters.createdAt.$lte = new Date(endDate);
         }
 
-        // Get all therapists
-        const therapists = await Therapist.find({ status: 'active' });
+        // Get all therapists (admin users)
+        const therapists = await User.find({ role: 'admin', status: 'active' });
 
         // For each therapist, calculate their stats
         const therapistReports = await Promise.all(therapists.map(async (therapist) => {

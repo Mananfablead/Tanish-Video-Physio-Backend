@@ -1,12 +1,12 @@
 const Availability = require('../models/Availability.model');
-const Therapist = require('../models/Therapist.model');
+const User = require('../models/User.model');
 const ApiResponse = require('../utils/apiResponse');
 
 // Get all availability
 const getAvailability = async (req, res, next) => {
     try {
         const availability = await Availability.find()
-            .populate('therapistId', 'name specialty');
+            .populate('therapistId', 'name email role')
 
         res.status(200).json(ApiResponse.success({ availability }, 'Availability retrieved successfully'));
     } catch (error) {
@@ -19,14 +19,14 @@ const getAvailabilityByTherapist = async (req, res, next) => {
     try {
         const { therapistId } = req.params;
 
-        // Validate therapist exists
-        const therapist = await Therapist.findById(therapistId);
-        if (!therapist) {
+        // Validate therapist (admin user) exists
+        const therapist = await User.findById(therapistId);
+        if (!therapist || therapist.role !== 'admin') {
             return res.status(404).json(ApiResponse.error('Therapist not found'));
         }
 
         const availability = await Availability.find({ therapistId })
-            .populate('therapistId', 'name specialty');
+            .populate('therapistId', 'name email role')
 
         res.status(200).json(ApiResponse.success({ availability }, 'Therapist availability retrieved successfully'));
     } catch (error) {
@@ -39,9 +39,9 @@ const createAvailability = async (req, res, next) => {
     try {
         const { therapistId, date, availableTimes } = req.body;
 
-        // Validate therapist exists
-        const therapist = await Therapist.findById(therapistId);
-        if (!therapist) {
+        // Validate therapist (admin user) exists
+        const therapist = await User.findById(therapistId);
+        if (!therapist || therapist.role !== 'admin') {
             return res.status(404).json(ApiResponse.error('Therapist not found'));
         }
 
@@ -71,7 +71,7 @@ const updateAvailability = async (req, res, next) => {
             { availableTimes, status },
             { new: true, runValidators: true }
         )
-            .populate('therapistId', 'name specialty');
+            .populate('therapistId', 'name email role')
 
         if (!availability) {
             return res.status(404).json(ApiResponse.error('Availability not found'));
@@ -87,7 +87,7 @@ const updateAvailability = async (req, res, next) => {
 const deleteAvailability = async (req, res, next) => {
     try {
         const availability = await Availability.findByIdAndDelete(req.params.id)
-            .populate('therapistId', 'name specialty');
+            .populate('therapistId', 'name email role')
 
         if (!availability) {
             return res.status(404).json(ApiResponse.error('Availability not found'));
