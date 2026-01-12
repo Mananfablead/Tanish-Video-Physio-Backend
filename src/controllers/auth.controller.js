@@ -299,44 +299,104 @@ const forgotPassword = async (req, res, next) => {
         const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
         const message = `
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="utf-8">
-    <title>Password Reset Request</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f5f5f5; }
-        .container { max-width: 600px; margin: 0 auto; background-color: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-align: center; padding: 30px 20px; }
-        .content { padding: 30px; }
-        .button { display: inline-block; padding: 12px 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 4px; margin: 20px 0; }
-        .footer { padding: 20px; background-color: #f9f9f9; text-align: center; color: #666; font-size: 12px; }
-    </style>
+  <meta charset="UTF-8">
+  <title>Password Reset</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>Tanish Physio</h1>
-            <p>Physical Therapy & Rehabilitation Center</p>
-        </div>
-        <div class="content">
-            <h2>Password Reset Request</h2>
-            <p>Hello ${user.name},</p>
-            <p>You are receiving this email because you (or someone else) has requested the reset of your password for your Tanish Physio account.</p>
-            <p>Please click the button below to reset your password:</p>
-            <p><a href="${resetUrl}" class="button">Reset Your Password</a></p>
-            <p>If the button doesn't work, copy and paste this link into your browser:</p>
-            <p><a href="${resetUrl}">${resetUrl}</a></p>
-            <p>This link will expire in 1 hour for security reasons.</p>
-            <p>If you did not request this password reset, please ignore this email and your password will remain unchanged. If you're concerned about your account security, please contact our support team.</p>
-            <p>Best regards,<br>The Tanish Physio Team</p>
-        </div>
-        <div class="footer">
-            <p>© 2024 Tanish Physio. All rights reserved.</p>
-            <p>This is an automated email, please do not reply to this message.</p>
-        </div>
-    </div>
+
+<body style="margin:0; padding:0; background-color:#f4f6f8; font-family:Arial, Helvetica, sans-serif;">
+
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f6f8; padding:30px 0;">
+    <tr>
+      <td align="center">
+
+        <!-- Main Container -->
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff; border-radius:8px; overflow:hidden; box-shadow:0 6px 18px rgba(0,0,0,0.08);">
+
+          <!-- Header -->
+          <tr>
+            <td style="background:linear-gradient(135deg,#667eea,#764ba2); padding:30px; text-align:center; color:#ffffff;">
+              <h1 style="margin:0; font-size:26px;">Tanish Physio</h1>
+              <p style="margin:8px 0 0; font-size:14px; opacity:0.9;">
+                Physical Therapy & Rehabilitation Center
+              </p>
+            </td>
+          </tr>
+
+          <!-- Content -->
+          <tr>
+            <td style="padding:35px; color:#333333;">
+              <h2 style="margin-top:0; font-size:22px; color:#222;">
+                Password Reset Request
+              </h2>
+
+              <p style="font-size:15px; line-height:1.6;">
+                Hello <strong>${user.name}</strong>,
+              </p>
+
+              <p style="font-size:15px; line-height:1.6;">
+                We received a request to reset the password for your <strong>Tanish Physio</strong> account.
+                Click the button below to securely reset your password.
+              </p>
+
+              <!-- Button -->
+              <table cellpadding="0" cellspacing="0" width="100%" style="margin:25px 0;">
+                <tr>
+                  <td align="center">
+                    <a href="${resetUrl}"
+                       style="background:linear-gradient(135deg,#667eea,#764ba2);
+                              color:#ffffff;
+                              text-decoration:none;
+                              padding:14px 34px;
+                              border-radius:6px;
+                              font-size:15px;
+                              font-weight:bold;
+                              display:inline-block;">
+                      Reset Password
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="font-size:14px; color:#555; line-height:1.6;">
+                ⚠️ This password reset link will expire in <strong>1 hour</strong> for security reasons.
+              </p>
+
+              <p style="font-size:14px; color:#555; line-height:1.6;">
+                If you did not request this reset, you can safely ignore this email.
+                Your password will remain unchanged.
+              </p>
+
+              <p style="font-size:15px; margin-top:30px;">
+                Regards,<br>
+                <strong>Tanish Physio Team</strong>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background:#f1f3f6; padding:20px; text-align:center; font-size:12px; color:#777;">
+              <p style="margin:0;">
+                © 2024 Tanish Physio. All rights reserved.
+              </p>
+              <p style="margin:6px 0 0;">
+                This is an automated email. Please do not reply.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+
+      </td>
+    </tr>
+  </table>
+
 </body>
-</html>`;
+</html>
+`;
 
         const mailOptions = {
             to: user.email,
@@ -385,11 +445,9 @@ const resetPassword = async (req, res, next) => {
             return res.status(400).json(ApiResponse.error('Password reset token is invalid or has expired'));
         }
 
-        // Hash new password
-        const hashedPassword = await hashPassword(password);
-
         // Update user password and clear reset token
-        user.password = hashedPassword;
+        // The pre-save hook will hash the password automatically
+        user.password = password;
         user.resetPasswordToken = undefined;
         user.resetPasswordExpires = undefined;
 
