@@ -37,7 +37,7 @@ const getAvailabilityByTherapist = async (req, res, next) => {
 // Create availability
 const createAvailability = async (req, res, next) => {
     try {
-        const { therapistId, date, availableTimes } = req.body;
+        const { therapistId, date, availableTimes, status } = req.body;
 
         // Validate therapist (admin user) exists
         const therapist = await User.findById(therapistId);
@@ -54,7 +54,8 @@ const createAvailability = async (req, res, next) => {
         const availability = new Availability({
             therapistId,
             date,
-            availableTimes
+            availableTimes,
+            status
         });
 
         await availability.save();
