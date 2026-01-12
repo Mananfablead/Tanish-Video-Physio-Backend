@@ -2,7 +2,7 @@ const Questionnaire = require('../models/Questionnaire.model');
 const ApiResponse = require('../utils/apiResponse');
 
 // Get all questionnaires
-const getAllQuestionnaires = async (req, res) => {
+const getAllQuestionnaires = async (req, res, next) => {
     try {
         const questionnaires = await Questionnaire.find();
         res.status(200).json(
@@ -14,7 +14,7 @@ const getAllQuestionnaires = async (req, res) => {
 };
 
 // Get active questionnaire (for client use)
-const getActiveQuestionnaire = async (req, res) => {
+const getActiveQuestionnaire = async (req, res, next) => {
     try {
         const questionnaire = await Questionnaire.findOne({ isActive: true }).sort({ createdAt: -1 });
         if (!questionnaire) {
@@ -31,7 +31,7 @@ const getActiveQuestionnaire = async (req, res) => {
 };
 
 // Get single questionnaire by ID
-const getQuestionnaireById = async (req, res) => {
+const getQuestionnaireById = async (req, res, next) => {
     try {
         const { id } = req.params;
         const questionnaire = await Questionnaire.findById(id);
@@ -51,7 +51,7 @@ const getQuestionnaireById = async (req, res) => {
 };
 
 // Create new questionnaire
-const createQuestionnaire = async (req, res) => {
+const createQuestionnaire = async (req, res, next) => {
     try {
         const { title, description, questions, isActive } = req.body;
 
@@ -89,7 +89,7 @@ const createQuestionnaire = async (req, res) => {
 };
 
 // Update questionnaire
-const updateQuestionnaire = async (req, res) => {
+const updateQuestionnaire = async (req, res, next) => {
     try {
         const { id } = req.params;
         const { title, description, questions, isActive } = req.body;
@@ -126,7 +126,7 @@ const updateQuestionnaire = async (req, res) => {
 };
 
 // Update questions in existing questionnaire (for admin interface)
-const updateQuestions = async (req, res) => {
+const updateQuestions = async (req, res, next) => {
     try {
         const { id } = req.params;
         const { questions } = req.body;
@@ -167,7 +167,7 @@ const updateQuestions = async (req, res) => {
 };
 
 // Delete questionnaire
-const deleteQuestionnaire = async (req, res) => {
+const deleteQuestionnaire = async (req, res, next) => {
     try {
         const { id } = req.params;
 
@@ -188,7 +188,7 @@ const deleteQuestionnaire = async (req, res) => {
 };
 
 // Activate a questionnaire
-const activateQuestionnaire = async (req, res) => {
+const activateQuestionnaire = async (req, res, next) => {
     try {
         const { id } = req.params;
 
