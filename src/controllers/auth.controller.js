@@ -296,7 +296,7 @@ const forgotPassword = async (req, res, next) => {
         });
 
         // Prepare email
-        const resetUrl = `${req.protocol}://${req.get('host')}/api/auth/reset-password/${resetToken}`;
+        const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
         const message = `
 <!DOCTYPE html>
 <html>
