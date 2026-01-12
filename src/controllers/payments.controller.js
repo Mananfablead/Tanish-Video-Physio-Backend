@@ -39,11 +39,76 @@ const createOrder = async (req, res, next) => {
         res.status(200).json(
             ApiResponse.success({
                 orderId: order.id,
-                key: process.env.RAZORPAY_KEY_ID, // Frontend needs this to initialize Razorpay
+                key: process.env.RAZORPAY_KEY_ID,
                 amount: order.amount,
                 currency: order.currency
             }, 'Payment order created successfully')
         );
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Verify payment after successful transaction
+const verifyPayment = async (req, res, next) => {
+    try {
+        const { paymentId, orderId, signature } = req.body;
+        const userId = req.user.userId;
+
+        // Fetch payment details from our database
+        const payment = await Payment.findOne({ orderId, userId });
+        if (!payment) {
+            return res.status(404).json(ApiResponse.error('Payment not found'));
+        }
+
+        // Verify the payment with Razorpay
+        const crypto = require('crypto');
+        const secret = process.env.RAZORPAY_SECRET;
+
+        // Create the expected signature
+        const expectedSignature = crypto
+            .createHmac('sha256', secret)
+            .update(orderId + '|' + paymentId)
+            .digest('hex');
+
+        // Compare signatures
+        if (expectedSignature === signature) {
+            // Payment verified successfully
+            await Payment.findOneAndUpdate(
+                { orderId },
+                {
+                    paymentId,
+                    status: 'verified',
+                    verifiedAt: new Date()
+                }
+            );
+
+            // Update the booking status as well
+            await Booking.findByIdAndUpdate(
+                payment.bookingId,
+                { paymentStatus: 'verified' }
+            );
+
+            res.status(200).json(
+                ApiResponse.success({
+                    paymentId,
+                    orderId,
+                    status: 'verified'
+                }, 'Payment verified successfully')
+            );
+        } else {
+            // Invalid signature
+            await Payment.findOneAndUpdate(
+                { orderId },
+                {
+                    paymentId,
+                    status: 'failed',
+                    failureReason: 'Invalid signature'
+                }
+            );
+
+            return res.status(400).json(ApiResponse.error('Payment verification failed'));
+        }
     } catch (error) {
         next(error);
     }
@@ -100,5 +165,6 @@ const handleWebhook = async (req, res) => {
 
 module.exports = {
     createOrder,
+    verifyPayment,
     handleWebhook
 };
