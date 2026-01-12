@@ -45,6 +45,12 @@ const createAvailability = async (req, res, next) => {
             return res.status(404).json(ApiResponse.error('Therapist not found'));
         }
 
+        // Check if availability already exists for the same therapist and date
+        const existingAvailability = await Availability.findOne({ therapistId, date });
+        if (existingAvailability) {
+            return res.status(409).json(ApiResponse.error('Availability already exists for this date and therapist'));
+        }
+
         const availability = new Availability({
             therapistId,
             date,
