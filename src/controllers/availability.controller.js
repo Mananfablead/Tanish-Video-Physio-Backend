@@ -106,10 +106,111 @@ const deleteAvailability = async (req, res, next) => {
     }
 };
 
+// Bulk update availability for a month
+const bulkUpdateAvailability = async (req, res, next) => {
+    try {
+        const { therapistId, month, year, availableTimes, status } = req.body;
+
+        // Validate required fields
+        if (!therapistId || month === undefined || year === undefined) {
+            return res.status(400).json(ApiResponse.error('Missing required fields: therapistId, month, and year'));
+        }
+
+        // Validate therapist exists
+        console.log('Looking for therapistId:', therapistId);
+        console.log('TherapistId type:', typeof therapistId);
+
+        const therapist = await User.findById(therapistId);
+        console.log('Therapist found:', therapist);
+
+        if (!therapist) {
+            console.log('No therapist found with ID:', therapistId);
+            return res.status(404).json(ApiResponse.error(`Therapist not found with ID: ${therapistId}`));
+        }
+
+        // Check if user has appropriate role
+        if (!therapist.role) {
+            return res.status(403).json(ApiResponse.error('Insufficient permissions'));
+        }
+
+        // Validate month and year - accept both numeric and string formats
+        const monthNum = parseInt(month);
+        const yearNum = parseInt(year);
+        if (isNaN(monthNum) || monthNum < 1 || monthNum > 12 || isNaN(yearNum) || yearNum < 1970) {
+            return res.status(400).json(ApiResponse.error('Invalid month or year'));
+        }
+
+        // Ensure availableTimes is an array if provided
+        let validatedAvailableTimes = [];
+        if (availableTimes !== undefined) {
+            if (Array.isArray(availableTimes)) {
+                validatedAvailableTimes = availableTimes;
+            } else {
+                // If it's not an array, try to convert to array or set as empty array
+                validatedAvailableTimes = [];
+            }
+        }
+
+        // Ensure status is valid if provided
+        let validatedStatus = status;
+        if (status !== undefined) {
+            const validStatuses = ['available', 'unavailable', 'booked'];
+            if (!validStatuses.includes(status)) {
+                validatedStatus = 'available'; // default to available
+            }
+        }
+
+        // Calculate the number of days in the specified month
+        const daysInMonth = new Date(yearNum, monthNum, 0).getDate();
+
+        // Generate all dates for the month
+        const datesToUpdate = [];
+        for (let day = 1; day <= daysInMonth; day++) {
+            const dateStr = `${yearNum}-${monthNum.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+            datesToUpdate.push(dateStr);
+        }
+
+        // Update or create availability records for each date
+        const updatedAvailabilities = [];
+        for (const date of datesToUpdate) {
+            let availability = await Availability.findOne({ therapistId, date });
+
+            if (availability) {
+                // Update existing availability
+                availability.availableTimes = availableTimes !== undefined ? validatedAvailableTimes : availability.availableTimes;
+                availability.status = validatedStatus !== undefined ? validatedStatus : availability.status;
+                await availability.save();
+            } else {
+                // Create new availability
+                availability = new Availability({
+                    therapistId,
+                    date,
+                    availableTimes: validatedAvailableTimes,
+                    status: validatedStatus || 'available'
+                });
+                await availability.save();
+            }
+
+            await availability.populate('therapistId', 'name specialty');
+            updatedAvailabilities.push(availability);
+        }
+
+        res.status(200).json(ApiResponse.success({
+            count: updatedAvailabilities.length,
+            availabilities: updatedAvailabilities
+        }, `Availability updated for ${updatedAvailabilities.length} days in ${monthNum}/${yearNum}`));
+    } catch (error) {
+        // Log the error for debugging
+        console.error('Bulk update availability error:', error);
+        next(error);
+    }
+};
+
 module.exports = {
     getAvailability,
     getAvailabilityByTherapist,
     createAvailability,
     updateAvailability,
-    deleteAvailability
+    deleteAvailability,
+    bulkUpdateAvailability
 };

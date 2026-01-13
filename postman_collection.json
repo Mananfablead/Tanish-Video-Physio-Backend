@@ -1288,6 +1288,34 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "Bulk Update Availability (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"therapistId\": \"therapist_id_here\",\n  \"month\": 3,\n  \"year\": 2024,\n  \"availableTimes\": [\"09:00\", \"10:00\", \"11:00\", \"14:00\", \"15:00\"],\n  \"status\": \"available\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/availability/bulk-update",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "availability", "bulk-update"]
+            }
+          },
+          "response": []
         }
       ]
     },
@@ -1704,7 +1732,7 @@
   "variable": [
     {
       "key": "baseUrl",
-      "value": "http://localhost:3001"
+      "value": "http://localhost:5000"
     },
     {
       "key": "token",

@@ -92,12 +92,12 @@ app.use('*', (req, res) => {
     });
 });
 
-const PORT = config.PORT || 3001;
-
 const startServer = async () => {
     try {
         await connectDB();
         console.log(`Database connected successfully`);
+
+        const PORT = config.PORT || 5001;
 
         app.listen(PORT, () => {
             console.log(`Server running on port ${PORT}`);

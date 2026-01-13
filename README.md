@@ -46,7 +46,7 @@ Create a `.env` file in the root of the backend directory with the following var
 
 ```
 NODE_ENV=development
-PORT=3001
+PORT=5000
 MONGODB_URI=mongodb://localhost:27017/tanish-physio
 JWT_SECRET=your_jwt_secret_here
 JWT_EXPIRE=24h
