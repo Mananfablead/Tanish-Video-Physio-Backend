@@ -864,6 +864,62 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "Create Subscription Payment Order (Razorpay)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"planId\": \"monthly\",\n  \"amount\": 1800,\n  \"currency\": \"INR\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/create-subscription-order",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payments", "create-subscription-order"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Verify Subscription Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"paymentId\": \"pay_...\",\n  \"orderId\": \"order_...\",\n  \"signature\": \"signature_here\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/verify-subscription",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payments", "verify-subscription"]
+            }
+          },
+          "response": []
         }
       ]
     },

@@ -1,11 +1,10 @@
 const express = require('express');
-const { getSubscriptionPlans, createSubscriptionOrder, createSubscriptionPlan, getAllSubscriptionPlans, getSubscriptionPlan, updateSubscriptionPlan, deleteSubscriptionPlan } = require('../controllers/subscriptions.controller');
+const { getSubscriptionPlans, createSubscriptionPlan, getAllSubscriptionPlans, getSubscriptionPlan, updateSubscriptionPlan, deleteSubscriptionPlan } = require('../controllers/subscriptions.controller');
 const { authenticateToken, authorizeRoles } = require('../middlewares/auth.middleware');
 
 const router = express.Router();
 
 router.get('/', getSubscriptionPlans);
-router.post('/create-order', authenticateToken, createSubscriptionOrder);
 
 // Admin routes for subscription plan management
 router.post('/plans', authenticateToken, authorizeRoles('admin'), createSubscriptionPlan);

@@ -1,6 +1,8 @@
 const razorpay = require('../config/razorpay');
 const Booking = require('../models/Booking.model');
 const Payment = require('../models/Payment.model');
+const Subscription = require('../models/Subscription.model');
+const SubscriptionPlan = require('../models/SubscriptionPlan.model');
 const ApiResponse = require('../utils/apiResponse');
 
 // Create a payment order for Razorpay
@@ -163,8 +165,119 @@ const handleWebhook = async (req, res) => {
     }
 };
 
+// Create a subscription payment order for Razorpay
+const createSubscriptionOrder = async (req, res, next) => {
+    try {
+        const { planId, amount, currency = 'INR' } = req.body;
+
+        // Validate plan exists in the database
+        const plan = await SubscriptionPlan.findOne({ planId, status: 'active' });
+        if (!plan) {
+            return res.status(400).json(ApiResponse.error('Invalid or inactive plan ID'));
+        }
+
+        // Use the actual plan price instead of the provided amount
+        const planAmount = plan.price;
+
+        // Create order in Razorpay
+        const options = {
+            amount: planAmount * 100, // Razorpay expects amount in paise
+            currency: currency,
+            receipt: `sub_${planId}_${req.user.userId}`,
+            payment_capture: 1 // Auto-capture payment
+        };
+
+        const order = await razorpay.orders.create(options);
+
+        // Create subscription record in our database
+        const subscription = new Subscription({
+            userId: req.user.userId,
+            planId,
+            planName: plan.name,
+            amount: planAmount,
+            currency,
+            orderId: order.id,
+            status: 'created'
+        });
+
+        await subscription.save();
+
+        res.status(200).json(
+            ApiResponse.success({
+                orderId: order.id,
+                key: process.env.RAZORPAY_KEY_ID, // Frontend needs this to initialize Razorpay
+                amount: order.amount,
+                currency: order.currency
+            }, 'Subscription order created successfully')
+        );
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Verify subscription payment after successful transaction
+const verifySubscriptionPayment = async (req, res, next) => {
+    try {
+        const { paymentId, orderId, signature } = req.body;
+        const userId = req.user.userId;
+
+        // Fetch subscription details from our database
+        const subscription = await Subscription.findOne({ orderId, userId });
+        if (!subscription) {
+            return res.status(404).json(ApiResponse.error('Subscription not found'));
+        }
+
+        // Verify the payment with Razorpay
+        const crypto = require('crypto');
+        const secret = process.env.RAZORPAY_SECRET;
+
+        // Create the expected signature
+        const expectedSignature = crypto
+            .createHmac('sha256', secret)
+            .update(orderId + '|' + paymentId)
+            .digest('hex');
+
+        // Compare signatures
+        if (expectedSignature === signature) {
+            // Payment verified successfully
+            await Subscription.findOneAndUpdate(
+                { orderId },
+                {
+                    paymentId,
+                    status: 'verified',
+                    verifiedAt: new Date()
+                }
+            );
+
+            res.status(200).json(
+                ApiResponse.success({
+                    paymentId,
+                    orderId,
+                    status: 'verified'
+                }, 'Subscription payment verified successfully')
+            );
+        } else {
+            // Invalid signature
+            await Subscription.findOneAndUpdate(
+                { orderId },
+                {
+                    paymentId,
+                    status: 'failed',
+                    failureReason: 'Invalid signature'
+                }
+            );
+
+            return res.status(400).json(ApiResponse.error('Subscription payment verification failed'));
+        }
+    } catch (error) {
+        next(error);
+    }
+};
+
 module.exports = {
     createOrder,
     verifyPayment,
-    handleWebhook
+    handleWebhook,
+    createSubscriptionOrder,
+    verifySubscriptionPayment
 };

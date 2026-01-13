@@ -14,55 +14,7 @@ const getSubscriptionPlans = async (req, res, next) => {
     }
 };
 
-// Create a subscription payment order for Razorpay
-const createSubscriptionOrder = async (req, res, next) => {
-    try {
-        const { planId, amount, currency = 'INR' } = req.body;
 
-        // Validate plan exists in the database
-        const plan = await SubscriptionPlan.findOne({ planId, status: 'active' });
-        if (!plan) {
-            return res.status(400).json(ApiResponse.error('Invalid or inactive plan ID'));
-        }
-
-        // Use the actual plan price instead of the provided amount
-        const planAmount = plan.price;
-
-        // Create order in Razorpay
-        const options = {
-            amount: planAmount * 100, // Razorpay expects amount in paise
-            currency: currency,
-            receipt: `sub_${planId}_${req.user.userId}`,
-            payment_capture: 1 // Auto-capture payment
-        };
-
-        const order = await razorpay.orders.create(options);
-
-        // Create subscription record in our database
-        const subscription = new Subscription({
-            userId: req.user.userId,
-            planId,
-            planName: plan.name,
-            amount: planAmount,
-            currency,
-            orderId: order.id,
-            status: 'created'
-        });
-
-        await subscription.save();
-
-        res.status(200).json(
-            ApiResponse.success({
-                orderId: order.id,
-                key: process.env.RAZORPAY_KEY_ID, // Frontend needs this to initialize Razorpay
-                amount: order.amount,
-                currency: order.currency
-            }, 'Subscription order created successfully')
-        );
-    } catch (error) {
-        next(error);
-    }
-};
 
 // Create a new subscription plan (admin only)
 const createSubscriptionPlan = async (req, res, next) => {
@@ -156,7 +108,6 @@ const deleteSubscriptionPlan = async (req, res, next) => {
 
 module.exports = {
     getSubscriptionPlans,
-    createSubscriptionOrder,
     createSubscriptionPlan,
     getAllSubscriptionPlans,
     getSubscriptionPlan,
