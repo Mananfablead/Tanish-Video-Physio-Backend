@@ -61,12 +61,16 @@ const createSession = async (req, res, next) => {
             return res.status(404).json(ApiResponse.error('Booking not found'));
         }
 
+        // Auto-generate startTime from date and time
+        const startTime = new Date(`${date}T${time}:00`);
+
         const session = new Session({
             bookingId,
             therapistId: booking.therapistId, // Use therapist from the booking
             userId: req.user.userId, // Assign current user
             date,
             time,
+            startTime, // Add the required startTime field
             type,
             status
         });

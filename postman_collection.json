@@ -668,6 +668,92 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "Get Bookings by Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings/status/:status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bookings", "status", ":status"],
+              "variable": [
+                {
+                  "key": "status",
+                  "value": "confirmed",
+                  "description": "Status: pending, confirmed, completed, cancelled"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Bookings with Filter",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings/filter?status=confirmed",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bookings", "filter"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "confirmed",
+                  "description": "Optional: pending, confirmed, completed, cancelled"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Booking Status",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"confirmed\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings/:id/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bookings", ":id", "status"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "booking_id_here"
+                }
+              ]
+            }
+          },
+          "response": []
         }
       ]
     },

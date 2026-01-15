@@ -52,7 +52,7 @@ const createBooking = async (req, res, next) => {
         });
 
         if (!therapist) {
-            return res.status(404).json(ApiResponse.error('No active therapists available')); 
+            return res.status(404).json(ApiResponse.error('No active therapists available'));
         }
 
         // Check if booking already exists for this date/time
@@ -69,9 +69,9 @@ const createBooking = async (req, res, next) => {
 
         const booking = new Booking({
             serviceId,
-            serviceName: service.name, // Get from service model
+            // serviceName: service.name, // Get from service model
             therapistId: therapist._id,
-            therapistName: therapist.name, // Get from therapist model
+            // therapistName: therapist.name, // Get from therapist model
             userId: req.user.userId, // Assign current user from auth middleware
             clientName: clientName || req.user.name, // Use provided clientName or fall back to authenticated user's name
             date,
@@ -116,6 +116,36 @@ const updateBooking = async (req, res, next) => {
     }
 };
 
+// Update booking status by ID
+const updateBookingStatus = async (req, res, next) => {
+    try {
+        const { status } = req.body;
+
+        // Validate status
+        const validStatuses = ['pending', 'confirmed', 'completed', 'cancelled'];
+        if (!validStatuses.includes(status)) {
+            return res.status(400).json(ApiResponse.error('Invalid status. Valid statuses: pending, confirmed, completed, cancelled'));
+        }
+
+        // Check if booking belongs to user
+        const booking = await Booking.findOneAndUpdate(
+            { _id: req.params.id, userId: req.user.userId },
+            { status },
+            { new: true, runValidators: true }
+        )
+            .populate('serviceId', 'name price duration')
+            .populate('therapistId', 'name email role');
+
+        if (!booking) {
+            return res.status(404).json(ApiResponse.error('Booking not found'));
+        }
+
+        res.status(200).json(ApiResponse.success({ booking }, `Booking status updated to ${status} successfully`));
+    } catch (error) {
+        next(error);
+    }
+};
+
 // Delete/cancel booking by ID
 const deleteBooking = async (req, res, next) => {
     try {
@@ -137,10 +167,31 @@ const deleteBooking = async (req, res, next) => {
     }
 };
 
+// Get bookings by status
+const getBookingsByStatus = async (req, res, next) => {
+    try {
+        const { status } = req.params;
+
+        const bookings = await Booking.find({
+            userId: req.user.userId,
+            status: status
+        })
+            .populate('serviceId', 'name price duration')
+            .populate('therapistId', 'name email role');
+
+        res.status(200).json(ApiResponse.success({ bookings }, `Bookings with status '${status}' retrieved successfully`));
+    } catch (error) {
+        next(error);
+    }
+};
+
+
 module.exports = {
     getAllBookings,
     getBookingById,
     createBooking,
     updateBooking,
-    deleteBooking
+    updateBookingStatus,
+    deleteBooking,
+    getBookingsByStatus,
 };

@@ -19,7 +19,7 @@ const sessionSchema = new mongoose.Schema({
     sessionId: {
         type: String,
         unique: true,
-        required: [true, 'Session ID is required']
+        // required: [true, 'Session ID is required']
     },
     date: {
         type: String, // Format: YYYY-MM-DD
