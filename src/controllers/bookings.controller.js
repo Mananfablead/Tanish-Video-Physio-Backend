@@ -69,9 +69,9 @@ const createBooking = async (req, res, next) => {
 
         const booking = new Booking({
             serviceId,
-            // serviceName: service.name, // Get from service model
+            serviceName: service.name, // Get from service model
             therapistId: therapist._id,
-            // therapistName: therapist.name, // Get from therapist model
+            therapistName: therapist.name, // Get from therapist model
             userId: req.user.userId, // Assign current user from auth middleware
             clientName: clientName || req.user.name, // Use provided clientName or fall back to authenticated user's name
             date,
