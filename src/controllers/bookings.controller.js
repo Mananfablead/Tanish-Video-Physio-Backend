@@ -63,9 +63,9 @@ const createBooking = async (req, res, next) => {
             status: { $ne: 'cancelled' }
         });
 
-        if (existingBooking) {
-            return res.status(400).json(ApiResponse.error('Slot already booked'));
-        }
+        // if (existingBooking) {
+        //     return res.status(400).json(ApiResponse.error('Slot already booked'));
+        // }
 
         const booking = new Booking({
             serviceId,
