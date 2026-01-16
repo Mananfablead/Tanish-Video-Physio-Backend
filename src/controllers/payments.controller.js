@@ -286,6 +286,19 @@ const verifySubscriptionPayment = async (req, res, next) => {
     }
 };
 
+// Get payments for authenticated user
+const getUserPayments = async (req, res, next) => {
+    try {
+        const payments = await Payment.find({ userId: req.user.userId })
+            .populate('bookingId', 'serviceName therapistName date time')
+            .sort({ createdAt: -1 });
+
+        res.status(200).json(ApiResponse.success({ payments }, 'User payments retrieved successfully'));
+    } catch (error) {
+        next(error);
+    }
+};
+
 // Get all payments (Admin only)
 const getAllPayments = async (req, res, next) => {
     try {
@@ -306,5 +319,6 @@ module.exports = {
     handleWebhook,
     createSubscriptionOrder,
     verifySubscriptionPayment,
+    getUserPayments,
     getAllPayments
 };

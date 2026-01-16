@@ -1018,6 +1018,25 @@
           "response": []
         },
         {
+          "name": "Get User Payments",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/user",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payments", "user"]
+            }
+          },
+          "response": []
+        },
+        {
           "name": "Get All Payments (Admin)",
           "request": {
             "method": "GET",
@@ -1332,6 +1351,25 @@
               "raw": "{{baseUrl}}/api/subscriptions/plans/{{planId}}",
               "host": ["{{baseUrl}}"],
               "path": ["api", "subscriptions", "plans", "{{planId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get User Subscriptions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/subscriptions/user",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "subscriptions", "user"]
             }
           },
           "response": []

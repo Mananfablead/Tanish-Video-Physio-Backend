@@ -1,5 +1,5 @@
 const express = require('express');
-const { createOrder, verifyPayment, handleWebhook, createSubscriptionOrder, verifySubscriptionPayment, getAllPayments } = require('../controllers/payments.controller');
+const { createOrder, verifyPayment, handleWebhook, createSubscriptionOrder, verifySubscriptionPayment, getUserPayments, getAllPayments } = require('../controllers/payments.controller');
 const { authenticateToken, authorizeRoles } = require('../middlewares/auth.middleware');
 
 const router = express.Router();
@@ -11,6 +11,9 @@ router.post('/webhook', handleWebhook); // This endpoint should be accessible wi
 // Subscription payment routes
 router.post('/create-subscription-order', authenticateToken, createSubscriptionOrder);
 router.post('/verify-subscription', authenticateToken, verifySubscriptionPayment);
+
+// Route to get user's payments
+router.get('/user', authenticateToken, getUserPayments);
 
 // Admin route to get all payments
 router.get('/admin/all', authenticateToken, authorizeRoles('admin'), getAllPayments);
