@@ -62,6 +62,12 @@ const login = async (req, res, next) => {
                 .json(ApiResponse.error("Invalid email or password", 401));
         }
 
+        // Check if user is active
+        if (user.status !== 'active') {
+            return res
+                .status(401)
+                .json(ApiResponse.error("Account is not active. Please contact support.", 401));
+        }
 
         // Check if password is properly hashed
         if (!user.password || typeof user.password !== 'string' || user.password.length < 10) {

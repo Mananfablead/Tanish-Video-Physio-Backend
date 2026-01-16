@@ -720,40 +720,6 @@
             }
           },
           "response": []
-        },
-        {
-          "name": "Update Booking Status",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}",
-                "type": "text"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"status\": \"confirmed\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/bookings/:id/status",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "bookings", ":id", "status"],
-              "variable": [
-                {
-                  "key": "id",
-                  "value": "booking_id_here"
-                }
-              ]
-            }
-          },
-          "response": []
         }
       ]
     },
@@ -1047,6 +1013,25 @@
               "raw": "{{baseUrl}}/api/payments/verify-subscription",
               "host": ["{{baseUrl}}"],
               "path": ["api", "payments", "verify-subscription"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Payments (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/admin/all",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payments", "admin", "all"]
             }
           },
           "response": []
@@ -1347,6 +1332,25 @@
               "raw": "{{baseUrl}}/api/subscriptions/plans/{{planId}}",
               "host": ["{{baseUrl}}"],
               "path": ["api", "subscriptions", "plans", "{{planId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Subscriptions (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/subscriptions/admin/all",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "subscriptions", "admin", "all"]
             }
           },
           "response": []
@@ -1821,6 +1825,41 @@
                 {
                   "key": "id",
                   "value": "questionnaire_id_here"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Single Question by Index (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/questionnaires/:id/questions/:questionIndex",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "questionnaires",
+                ":id",
+                "questions",
+                ":questionIndex"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "questionnaire_id_here"
+                },
+                {
+                  "key": "questionIndex",
+                  "value": "0"
                 }
               ]
             }

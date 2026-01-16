@@ -274,10 +274,25 @@ const verifySubscriptionPayment = async (req, res, next) => {
     }
 };
 
+// Get all payments (Admin only)
+const getAllPayments = async (req, res, next) => {
+    try {
+        const payments = await Payment.find()
+            .populate('userId', 'name email')
+            .populate('bookingId', 'serviceName therapistName date time')
+            .sort({ createdAt: -1 });
+
+        res.status(200).json(ApiResponse.success({ payments }, 'All payments retrieved successfully'));
+    } catch (error) {
+        next(error);
+    }
+};
+
 module.exports = {
     createOrder,
     verifyPayment,
     handleWebhook,
     createSubscriptionOrder,
-    verifySubscriptionPayment
+    verifySubscriptionPayment,
+    getAllPayments
 };

@@ -106,11 +106,26 @@ const deleteSubscriptionPlan = async (req, res, next) => {
     }
 };
 
+// Get all subscriptions (admin only)
+const getAllSubscriptions = async (req, res, next) => {
+    try {
+        const subscriptions = await Subscription.find()
+            .populate('userId', 'name email')
+            .populate('planId')
+            .sort({ createdAt: -1 });
+
+        res.status(200).json(ApiResponse.success({ subscriptions }, 'All subscriptions retrieved successfully'));
+    } catch (error) {
+        next(error);
+    }
+};
+
 module.exports = {
     getSubscriptionPlans,
     createSubscriptionPlan,
     getAllSubscriptionPlans,
     getSubscriptionPlan,
     updateSubscriptionPlan,
-    deleteSubscriptionPlan
+    deleteSubscriptionPlan,
+    getAllSubscriptions
 };

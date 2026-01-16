@@ -8,7 +8,8 @@ const {
     updateQuestionnaire,
     updateQuestions,
     deleteQuestionnaire,
-    activateQuestionnaire
+    activateQuestionnaire,
+    deleteSingleQuestion  // Add the new function
 } = require('../controllers/questionnaire.controller');
 const { authenticateToken } = require('../middlewares/auth.middleware');
 const { isAdmin } = require('../middlewares/role.middleware');
@@ -32,5 +33,8 @@ router.route('/:id')
 // Specific routes for questions management
 router.put('/:id/questions', updateQuestions);
 router.put('/:id/activate', activateQuestionnaire);
+
+// Route to delete a single question by its index
+router.delete('/:id/questions/:questionIndex', deleteSingleQuestion);
 
 module.exports = router;

@@ -216,6 +216,55 @@ const activateQuestionnaire = async (req, res, next) => {
     }
 };
 
+// Delete a single question by its index
+const deleteSingleQuestion = async (req, res, next) => {
+    try {
+        const { id, questionIndex } = req.params;
+
+        // Convert questionIndex to integer
+        const index = parseInt(questionIndex, 10);
+
+        if (isNaN(index) || index < 0) {
+            return res.status(400).json(
+                ApiResponse.error('Invalid question index', 400)
+            );
+        }
+
+        const questionnaire = await Questionnaire.findById(id);
+
+        if (!questionnaire) {
+            return res.status(404).json(
+                ApiResponse.error('Questionnaire not found', 404)
+            );
+        }
+
+        if (!questionnaire.questions || questionnaire.questions.length <= index) {
+            return res.status(404).json(
+                ApiResponse.error('Question not found at the specified index', 404)
+            );
+        }
+
+        // Remove the question at the specified index
+        const removedQuestion = questionnaire.questions.splice(index, 1)[0];
+
+        // Update the order property of remaining questions to maintain sequential numbering
+        questionnaire.questions.forEach((question, idx) => {
+            question.order = idx + 1;
+        });
+
+        const updatedQuestionnaire = await questionnaire.save();
+
+        res.status(200).json(
+            ApiResponse.success(
+                { removedQuestion, updatedQuestionnaire },
+                'Question deleted successfully'
+            )
+        );
+    } catch (error) {
+        next(error);
+    }
+};
+
 module.exports = {
     getAllQuestionnaires,
     getActiveQuestionnaire,
@@ -224,5 +273,6 @@ module.exports = {
     updateQuestionnaire,
     updateQuestions,
     deleteQuestionnaire,
-    activateQuestionnaire
+    activateQuestionnaire,
+    deleteSingleQuestion  // Export the new function
 };

@@ -1,5 +1,5 @@
 const express = require('express');
-const { getSubscriptionPlans, createSubscriptionPlan, getAllSubscriptionPlans, getSubscriptionPlan, updateSubscriptionPlan, deleteSubscriptionPlan } = require('../controllers/subscriptions.controller');
+const { getSubscriptionPlans, createSubscriptionPlan, getAllSubscriptionPlans, getSubscriptionPlan, updateSubscriptionPlan, deleteSubscriptionPlan, getAllSubscriptions } = require('../controllers/subscriptions.controller');
 const { authenticateToken, authorizeRoles } = require('../middlewares/auth.middleware');
 
 const router = express.Router();
@@ -12,5 +12,8 @@ router.get('/plans', authenticateToken, authorizeRoles('admin'), getAllSubscript
 router.get('/plans/:id', authenticateToken, authorizeRoles('admin'), getSubscriptionPlan);
 router.put('/plans/:id', authenticateToken, authorizeRoles('admin'), updateSubscriptionPlan);
 router.delete('/plans/:id', authenticateToken, authorizeRoles('admin'), deleteSubscriptionPlan);
+
+// Admin route to get all subscriptions
+router.get('/admin/all', authenticateToken, authorizeRoles('admin'), getAllSubscriptions);
 
 module.exports = router;

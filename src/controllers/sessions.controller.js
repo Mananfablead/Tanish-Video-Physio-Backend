@@ -55,19 +55,28 @@ const createSession = async (req, res, next) => {
     try {
         const { bookingId, date, time, type, status } = req.body;
 
-        // Verify the booking belongs to the user
+        // Verify the booking belongs to the user and has been paid
         const booking = await Booking.findOne({ _id: bookingId, userId: req.user.userId });
         if (!booking) {
             return res.status(404).json(ApiResponse.error('Booking not found'));
         }
 
+        // Check if the booking has been paid
+        if (booking.paymentStatus !== 'paid') {
+            return res.status(400).json(ApiResponse.error('Cannot create session: Booking payment status is not paid'));
+        }
+
         // Auto-generate startTime from date and time
         const startTime = new Date(`${date}T${time}:00`);
+
+        // Generate a unique sessionId
+        const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
         const session = new Session({
             bookingId,
             therapistId: booking.therapistId, // Use therapist from the booking
             userId: req.user.userId, // Assign current user
+            sessionId, // Add the unique sessionId
             date,
             time,
             startTime, // Add the required startTime field
@@ -128,11 +137,50 @@ const deleteSession = async (req, res, next) => {
     }
 };
 
+// Reschedule session
+const rescheduleSession = async (req, res, next) => {
+    try {
+        const { date, time } = req.body;
+
+        // Find the session and verify ownership
+        const session = await Session.findOne({ _id: req.params.id, userId: req.user.userId });
+        if (!session) {
+            return res.status(404).json(ApiResponse.error('Session not found'));
+        }
+
+        // Check if session can be rescheduled (should not be live or completed)
+        if (session.status === 'live' || session.status === 'completed') {
+            return res.status(400).json(ApiResponse.error('Cannot reschedule live or completed session'));
+        }
+
+        // Auto-generate new startTime from date and time
+        const startTime = new Date(`${date}T${time}:00`);
+
+        // Update session with new date, time, and startTime
+        const updatedSession = await Session.findByIdAndUpdate(
+            req.params.id,
+            {
+                date,
+                time,
+                startTime,
+                status: 'scheduled' // Reset status to scheduled
+            },
+            { new: true, runValidators: true }
+        ).populate('bookingId', 'serviceName therapistName date time')
+            .populate('therapistId', 'name email role');
+
+        res.status(200).json(ApiResponse.success({ session: updatedSession }, 'Session rescheduled successfully'));
+    } catch (error) {
+        next(error);
+    }
+};
+
 module.exports = {
     getAllSessions,
     getUpcomingSessions,
     getSessionById,
     createSession,
     updateSession,
-    deleteSession
+    deleteSession,
+    rescheduleSession
 };
