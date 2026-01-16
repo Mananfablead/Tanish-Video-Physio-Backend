@@ -12,6 +12,10 @@ const serviceSchema = new mongoose.Schema({
         required: [true, 'Service description is required'],
         maxlength: [500, 'Description cannot exceed 500 characters']
     },
+    about: {
+        type: String,
+        maxlength: [2000, 'About section cannot exceed 2000 characters']
+    },
     price: {
         type: Number,
         required: [true, 'Price is required'],
@@ -22,10 +26,12 @@ const serviceSchema = new mongoose.Schema({
         required: [true, 'Duration is required'],
         match: [/^([0-9]+) (min|mins|minutes)$/, 'Duration must be in format: "X min/mins/minutes"']
     },
-    image: {
-        type: String, // URL to the image
-        default: null
-    },
+    images: [{
+        type: String // URLs to the images
+    }],
+    videos: [{
+        type: String // URLs to the videos
+    }],
     category: {
         type: String,
         required: [true, 'Category is required'],

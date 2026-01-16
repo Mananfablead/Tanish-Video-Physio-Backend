@@ -531,6 +531,159 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "Create Service with Media (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "name",
+                  "value": "Physical Therapy Session",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "Comprehensive physical therapy session for rehabilitation",
+                  "type": "text"
+                },
+                {
+                  "key": "about",
+                  "value": "This detailed service provides comprehensive physical therapy including assessment, treatment planning, and personalized exercises to help restore mobility and reduce pain. Our experienced therapists use evidence-based techniques tailored to your specific condition and goals.",
+                  "type": "text"
+                },
+                {
+                  "key": "price",
+                  "value": "600",
+                  "type": "text"
+                },
+                {
+                  "key": "duration",
+                  "value": "60 minutes",
+                  "type": "text"
+                },
+                {
+                  "key": "category",
+                  "value": "Therapy",
+                  "type": "text"
+                },
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "videos",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/services",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "services"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Service with Media (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "name",
+                  "value": "Updated Physical Therapy Session",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "Updated comprehensive physical therapy session for rehabilitation",
+                  "type": "text"
+                },
+                {
+                  "key": "about",
+                  "value": "Updated detailed service description with enhanced therapeutic approaches and advanced treatment techniques for optimal recovery outcomes.",
+                  "type": "text"
+                },
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "videos",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/services/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "services", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "service_id_here"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Remove Media from Service (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mediaType\": \"image\",\n  \"mediaIndex\": 0\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/services/:id/remove-media",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "services", ":id", "remove-media"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "service_id_here"
+                }
+              ]
+            }
+          },
+          "response": []
         }
       ]
     },
@@ -867,6 +1020,40 @@
               "raw": "{{baseUrl}}/api/sessions/:id",
               "host": ["{{baseUrl}}"],
               "path": ["api", "sessions", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "session_id_here"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reschedule Session",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"2024-03-26\",\n  \"time\": \"14:00\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/sessions/:id/reschedule",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "sessions", ":id", "reschedule"],
               "variable": [
                 {
                   "key": "id",

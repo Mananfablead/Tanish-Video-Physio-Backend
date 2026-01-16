@@ -291,6 +291,7 @@ const getUserPayments = async (req, res, next) => {
     try {
         const payments = await Payment.find({ userId: req.user.userId })
             .populate('bookingId', 'serviceName therapistName date time')
+            .select('-userId') // Don't expose user ID in response for security
             .sort({ createdAt: -1 });
 
         res.status(200).json(ApiResponse.success({ payments }, 'User payments retrieved successfully'));
