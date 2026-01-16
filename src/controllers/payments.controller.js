@@ -65,7 +65,13 @@ const verifyPayment = async (req, res, next) => {
 
         // Verify the payment with Razorpay
         const crypto = require('crypto');
-        const secret = process.env.RAZORPAY_SECRET;
+        
+        // Check if the required environment variable is available
+        if (!process.env.RAZORPAY_KEY_SECRET) {
+            return res.status(500).json(ApiResponse.error('Server configuration error: Razorpay secret is not set'));
+        }
+        
+        const secret = process.env.RAZORPAY_KEY_SECRET; // Using the correct environment variable name
 
         // Create the expected signature
         const expectedSignature = crypto
@@ -229,7 +235,13 @@ const verifySubscriptionPayment = async (req, res, next) => {
 
         // Verify the payment with Razorpay
         const crypto = require('crypto');
-        const secret = process.env.RAZORPAY_SECRET;
+        
+        // Check if the required environment variable is available
+        if (!process.env.RAZORPAY_KEY_SECRET) {
+            return res.status(500).json(ApiResponse.error('Server configuration error: Razorpay secret is not set'));
+        }
+        
+        const secret = process.env.RAZORPAY_KEY_SECRET; // Using the correct environment variable name
 
         // Create the expected signature
         const expectedSignature = crypto
