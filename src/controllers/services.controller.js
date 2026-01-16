@@ -2,12 +2,47 @@ const Service = require('../models/Service.model');
 const ApiResponse = require('../utils/apiResponse');
 const path = require('path');
 const fs = require('fs');
+const config = require('../config/env');
+
+// Helper function to convert relative paths to absolute URLs
+const convertToAbsoluteUrls = (service) => {
+    if (service.images && Array.isArray(service.images)) {
+        service.images = service.images.map(imagePath =>
+            imagePath.startsWith('http') ? imagePath : `${config.BASE_URL}${imagePath}`
+        );
+    }
+    if (service.videos && Array.isArray(service.videos)) {
+        service.videos = service.videos.map(videoPath =>
+            videoPath.startsWith('http') ? videoPath : `${config.BASE_URL}${videoPath}`
+        );
+    }
+    return service;
+};
+
+// Helper function to safely parse JSON
+const safeJsonParse = (str, defaultValue = []) => {
+    if (!str) return defaultValue;
+    if (typeof str === 'string') {
+        try {
+            return JSON.parse(str);
+        } catch (e) {
+            // If it's not JSON, return as single-item array or split by common delimiters
+            if (str.includes(',') || str.includes(';')) {
+                return str.split(/[;,]/).map(item => item.trim()).filter(item => item);
+            }
+            return [str]; // Return as single-item array
+        }
+    }
+    return str;
+};
 
 // Get all services
 const getAllServices = async (req, res, next) => {
     try {
         const services = await Service.find({ status: 'active' });
-        res.status(200).json(ApiResponse.success({ services }, 'Services retrieved successfully'));
+        // Convert relative paths to absolute URLs
+        const servicesWithAbsoluteUrls = services.map(service => convertToAbsoluteUrls(service.toObject()));
+        res.status(200).json(ApiResponse.success({ services: servicesWithAbsoluteUrls }, 'Services retrieved successfully'));
     } catch (error) {
         next(error);
     }
@@ -21,7 +56,9 @@ const getServiceById = async (req, res, next) => {
             return res.status(404).json(ApiResponse.error('Service not found'));
         }
 
-        res.status(200).json(ApiResponse.success({ service }, 'Service retrieved successfully'));
+        // Convert relative paths to absolute URLs
+        const serviceWithAbsoluteUrls = convertToAbsoluteUrls(service.toObject());
+        res.status(200).json(ApiResponse.success({ service: serviceWithAbsoluteUrls }, 'Service retrieved successfully'));
     } catch (error) {
         next(error);
     }
@@ -31,7 +68,9 @@ const getServiceById = async (req, res, next) => {
 const getAllServicesAdmin = async (req, res, next) => {
     try {
         const services = await Service.find();
-        res.status(200).json(ApiResponse.success({ services }, 'All services retrieved successfully'));
+        // Convert relative paths to absolute URLs
+        const servicesWithAbsoluteUrls = services.map(service => convertToAbsoluteUrls(service.toObject()));
+        res.status(200).json(ApiResponse.success({ services: servicesWithAbsoluteUrls }, 'All services retrieved successfully'));
     } catch (error) {
         next(error);
     }
@@ -46,7 +85,9 @@ const getServiceByIdAdmin = async (req, res, next) => {
             return res.status(404).json(ApiResponse.error('Service not found'));
         }
 
-        res.status(200).json(ApiResponse.success({ service }, 'Service retrieved successfully'));
+        // Convert relative paths to absolute URLs
+        const serviceWithAbsoluteUrls = convertToAbsoluteUrls(service.toObject());
+        res.status(200).json(ApiResponse.success({ service: serviceWithAbsoluteUrls }, 'Service retrieved successfully'));
     } catch (error) {
         next(error);
     }
@@ -66,10 +107,10 @@ const createService = async (req, res, next) => {
             duration,
             category,
             status,
-            features: features ? JSON.parse(features) : [],
-            prerequisites: prerequisites ? JSON.parse(prerequisites) : [],
-            benefits: benefits ? JSON.parse(benefits) : [],
-            contraindications: contraindications ? JSON.parse(contraindications) : []
+            features: safeJsonParse(features, []),
+            prerequisites: safeJsonParse(prerequisites, []),
+            benefits: safeJsonParse(benefits, []),
+            contraindications: safeJsonParse(contraindications, [])
         };
 
         // Process uploaded files if they exist
@@ -98,7 +139,9 @@ const createService = async (req, res, next) => {
         const service = new Service(serviceData);
         await service.save();
 
-        res.status(201).json(ApiResponse.success({ service }, 'Service created successfully'));
+        // Convert relative paths to absolute URLs
+        const serviceWithAbsoluteUrls = convertToAbsoluteUrls(service.toObject());
+        res.status(201).json(ApiResponse.success({ service: serviceWithAbsoluteUrls }, 'Service created successfully'));
     } catch (error) {
         next(error);
     }
@@ -119,10 +162,10 @@ const updateService = async (req, res, next) => {
         if (duration) updateData.duration = duration;
         if (category) updateData.category = category;
         if (status) updateData.status = status;
-        if (features) updateData.features = JSON.parse(features);
-        if (prerequisites) updateData.prerequisites = JSON.parse(prerequisites);
-        if (benefits) updateData.benefits = JSON.parse(benefits);
-        if (contraindications) updateData.contraindications = JSON.parse(contraindications);
+        if (features) updateData.features = safeJsonParse(features);
+        if (prerequisites) updateData.prerequisites = safeJsonParse(prerequisites);
+        if (benefits) updateData.benefits = safeJsonParse(benefits);
+        if (contraindications) updateData.contraindications = safeJsonParse(contraindications);
 
         // Process uploaded files if they exist
         if (req.files && Object.keys(req.files).length > 0) {
@@ -160,7 +203,9 @@ const updateService = async (req, res, next) => {
             return res.status(404).json(ApiResponse.error('Service not found'));
         }
 
-        res.status(200).json(ApiResponse.success({ service }, 'Service updated successfully'));
+        // Convert relative paths to absolute URLs
+        const serviceWithAbsoluteUrls = convertToAbsoluteUrls(service.toObject());
+        res.status(200).json(ApiResponse.success({ service: serviceWithAbsoluteUrls }, 'Service updated successfully'));
     } catch (error) {
         next(error);
     }
@@ -210,7 +255,9 @@ const removeMediaFromService = async (req, res, next) => {
 
         await service.save();
 
-        res.status(200).json(ApiResponse.success({ service }, 'Media removed successfully'));
+        // Convert relative paths to absolute URLs
+        const serviceWithAbsoluteUrls = convertToAbsoluteUrls(service.toObject());
+        res.status(200).json(ApiResponse.success({ service: serviceWithAbsoluteUrls }, 'Media removed successfully'));
     } catch (error) {
         next(error);
     }
