@@ -74,6 +74,7 @@
         },
         {
           "name": "Get User Profile",
+          "description": "Retrieves user profile information including subscription data. Returns subscriptionData with active/paid subscription details, or the most recent subscription if none are active.",
           "request": {
             "method": "GET",
             "header": [
@@ -1157,7 +1158,7 @@
         },
         {
           "name": "Create Guest Payment Order",
-          "description": "Creates a payment order for guest users. An account will be created for the user, but login credentials will only be sent after successful payment verification.",
+          "description": "Creates a payment order for guest users. Guest information is stored temporarily and user account is only created after successful payment verification.",
           "request": {
             "method": "POST",
             "header": [
@@ -1261,7 +1262,7 @@
         },
         {
           "name": "Create Guest Subscription Payment Order",
-          "description": "Creates a subscription payment order for guest users. An account will be created for the user, but login credentials will only be sent after successful payment verification.",
+          "description": "Creates a subscription payment order for guest users. Guest information is stored temporarily and user account is only created after successful payment verification.",
           "request": {
             "method": "POST",
             "header": [
@@ -1285,6 +1286,7 @@
         },
         {
           "name": "Verify Subscription Payment",
+          "description": "Verifies subscription payment and automatically activates subscription with calculated end date based on planId. Returns updated subscription details including startDate, endDate, and nextBillingDate.",
           "request": {
             "method": "POST",
             "header": [
@@ -1375,7 +1377,7 @@
         },
         {
           "name": "Verify Guest Subscription Payment",
-          "description": "Verifies a guest subscription payment and sends login credentials to the user's email after successful payment verification.",
+          "description": "Verifies a guest subscription payment, activates subscription with calculated end date based on planId, and sends login credentials to the user's email after successful payment verification.",
           "request": {
             "method": "POST",
             "header": [

@@ -3,7 +3,55 @@ const Booking = require('../models/Booking.model');
 const Payment = require('../models/Payment.model');
 const Subscription = require('../models/Subscription.model');
 const SubscriptionPlan = require('../models/SubscriptionPlan.model');
+const User = require('../models/User.model');
 const ApiResponse = require('../utils/apiResponse');
+
+// Utility function to calculate end date based on plan ID
+function calculateEndDate(planId, startDate = new Date()) {
+    const endDate = new Date(startDate);
+
+    switch (planId.toLowerCase()) {
+        case 'daily':
+            endDate.setDate(endDate.getDate() + 1);
+            break;
+        case 'weekly':
+            endDate.setDate(endDate.getDate() + 7);
+            break;
+        case 'monthly':
+            endDate.setMonth(endDate.getMonth() + 1);
+            break;
+        default:
+            // Default to monthly if planId is not recognized
+            endDate.setMonth(endDate.getMonth() + 1);
+    }
+
+    return endDate;
+}
+
+// Utility function to update subscription status and dates
+async function activateSubscription(subscriptionId) {
+    const subscription = await Subscription.findById(subscriptionId);
+    if (!subscription) {
+        throw new Error('Subscription not found');
+    }
+
+    // Calculate end date based on plan
+    const endDate = calculateEndDate(subscription.planId, new Date());
+
+    // Calculate next billing date (same as end date for now)
+    const nextBillingDate = new Date(endDate);
+
+    // Update subscription
+    await Subscription.findByIdAndUpdate(subscriptionId, {
+        status: 'active',
+        startDate: new Date(),
+        endDate: endDate,
+        nextBillingDate: nextBillingDate,
+        activatedAt: new Date()
+    });
+
+    return await Subscription.findById(subscriptionId);
+}
 
 // Create a payment order for Razorpay
 const createOrder = async (req, res, next) => {
@@ -68,35 +116,20 @@ const createGuestOrder = async (req, res, next) => {
         }
 
         // Check if user already exists
-        let user = await User.findOne({ email: clientEmail });
+        const existingUser = await User.findOne({ email: clientEmail });
 
-        if (user) {
-            // If user exists, return a message indicating they should log in
-            return res.status(409).json(ApiResponse.error(`User with email ${clientEmail} already exists. Please log in to make a payment.`));
+        if (existingUser) {
+        // If user exists, check if they have any unpaid orders or bookings
+        // If they do, we might want to link the payment to those
+        // For now, we'll allow them to proceed with guest payment
+        // This addresses the issue where paid users couldn't make additional payments
         }
-
-        // Create a new user account with temporary password
-        const tempPassword = Math.random().toString(36).slice(-8) + 'Temp1!'; // Generate temporary password
-
-        user = new User({
-            name: clientName,
-            email: clientEmail,
-            password: tempPassword, // Will be hashed by the pre-save hook
-            phone: clientPhone,
-            role: 'patient',
-            status: 'active'
-        });
-
-        await user.save();
 
         // Find the booking to associate with this payment
         const booking = await Booking.findById(bookingId);
         if (!booking) {
             return res.status(404).json(ApiResponse.error('Booking not found'));
         }
-
-        // Update the booking to assign the new user
-        await Booking.findByIdAndUpdate(bookingId, { userId: user._id });
 
         // Create order in Razorpay
         const options = {
@@ -109,13 +142,16 @@ const createGuestOrder = async (req, res, next) => {
         const order = await razorpay.orders.create(options);
 
         // Create payment record in our database
+        // Store guest info temporarily without creating user account yet
         const payment = new Payment({
             bookingId,
-            userId: user._id, // Assign to the newly created user
             amount,
             currency,
             orderId: order.id,
-            status: 'created'
+            status: 'created',
+            guestName: clientName,
+            guestEmail: clientEmail,
+            guestPhone: clientPhone
         });
 
         await payment.save();
@@ -126,7 +162,7 @@ const createGuestOrder = async (req, res, next) => {
                 key: process.env.RAZORPAY_KEY_ID,
                 amount: order.amount,
                 currency: order.currency,
-                message: 'Account created and payment order made successfully. Login credentials will be sent after payment verification.'
+                message: 'Payment order created successfully. Account will be created after payment verification.'
             }, 'Guest payment order created successfully')
         );
     } catch (error) {
@@ -236,6 +272,35 @@ const verifyGuestPayment = async (req, res, next) => {
         // Compare signatures
         if (expectedSignature === signature) {
             // Payment verified successfully
+
+            // If this is a guest payment, create the user account first
+            if (payment.guestName && payment.guestEmail && payment.guestPhone) {
+                // Check if user already exists (shouldn't happen, but just in case)
+                const existingUser = await User.findOne({ email: payment.guestEmail });
+
+                if (!existingUser) {
+                    // Create the user account with temporary password
+                    const tempPassword = Math.random().toString(36).slice(-8) + 'Temp1!';
+
+                    const newUser = new User({
+                        name: payment.guestName,
+                        email: payment.guestEmail,
+                        password: tempPassword,
+                        phone: payment.guestPhone,
+                        role: 'patient',
+                        status: 'active'
+                    });
+
+                    await newUser.save();
+
+                    // Update the payment record with the new user ID
+                    await Payment.findByIdAndUpdate(payment._id, { userId: newUser._id });
+
+                    // Update the booking to assign the new user
+                    await Booking.findByIdAndUpdate(payment.bookingId, { userId: newUser._id });
+                }
+            }
+
             await Payment.findOneAndUpdate(
                 { orderId },
                 {
@@ -418,6 +483,34 @@ const handleWebhook = async (req, res) => {
             // You might want to update the booking status as well
             const payment = await Payment.findOne({ orderId });
             if (payment) {
+                // If this is a guest payment, create the user account first
+                if (payment.guestName && payment.guestEmail && payment.guestPhone) {
+                    // Check if user already exists (shouldn't happen, but just in case)
+                    const existingUser = await User.findOne({ email: payment.guestEmail });
+
+                    if (!existingUser) {
+                        // Create the user account with temporary password
+                        const tempPassword = Math.random().toString(36).slice(-8) + 'Temp1!';
+
+                        const newUser = new User({
+                            name: payment.guestName,
+                            email: payment.guestEmail,
+                            password: tempPassword,
+                            phone: payment.guestPhone,
+                            role: 'patient',
+                            status: 'active'
+                        });
+
+                        await newUser.save();
+
+                        // Update the payment record with the new user ID
+                        await Payment.findByIdAndUpdate(payment._id, { userId: newUser._id });
+
+                        // Update the booking to assign the new user
+                        await Booking.findByIdAndUpdate(payment.bookingId, { userId: newUser._id });
+                    }
+                }
+
                 await Booking.findByIdAndUpdate(
                     payment.bookingId,
                     { paymentStatus: 'paid' }
@@ -429,6 +522,47 @@ const handleWebhook = async (req, res) => {
                     // Send welcome email with login credentials to the user
                     await sendWelcomeEmailWithCredentials(booking.userId.email, booking.userId.name, booking.userId.email, booking.userId.password);
                 }
+            }
+
+            // Check if this is a subscription payment
+            const subscription = await Subscription.findOne({ orderId });
+            if (subscription) {
+                // If this is a guest subscription, create the user account first
+                if (subscription.guestName && subscription.guestEmail && subscription.guestPhone) {
+                    // Check if user already exists (shouldn't happen, but just in case)
+                    const existingUser = await User.findOne({ email: subscription.guestEmail });
+
+                    if (!existingUser) {
+                        // Create the user account with temporary password
+                        const tempPassword = Math.random().toString(36).slice(-8) + 'Temp1!';
+
+                        const newUser = new User({
+                            name: subscription.guestName,
+                            email: subscription.guestEmail,
+                            password: tempPassword,
+                            phone: subscription.guestPhone,
+                            role: 'patient',
+                            status: 'active'
+                        });
+
+                        await newUser.save();
+
+                        // Update the subscription record with the new user ID
+                        await Subscription.findByIdAndUpdate(subscription._id, { userId: newUser._id });
+                    }
+                }
+
+                await Subscription.findOneAndUpdate(
+                    { orderId },
+                    {
+                        paymentId,
+                        status: 'paid',
+                        captured: true
+                    }
+                );
+
+                // Activate the subscription with calculated end date
+                await activateSubscription(subscription._id);
             }
         } else if (event === 'payment.failed') {
             // Payment failed
@@ -524,26 +658,12 @@ const createGuestSubscriptionOrder = async (req, res, next) => {
         }
 
         // Check if user already exists
-        let user = await User.findOne({ email: clientEmail });
+        const existingUser = await User.findOne({ email: clientEmail });
 
-        if (user) {
-            // If user exists, return a message indicating they should log in
-            return res.status(409).json(ApiResponse.error(`User with email ${clientEmail} already exists. Please log in to subscribe.`));
+        if (existingUser) {
+        // If user exists, allow them to proceed with guest subscription
+        // This addresses the issue where paid users couldn't subscribe again
         }
-
-        // Create a new user account with temporary password
-        const tempPassword = Math.random().toString(36).slice(-8) + 'Temp1!'; // Generate temporary password
-
-        user = new User({
-            name: clientName,
-            email: clientEmail,
-            password: tempPassword, // Will be hashed by the pre-save hook
-            phone: clientPhone,
-            role: 'patient',
-            status: 'active'
-        });
-
-        await user.save();
 
         // Use the actual plan price instead of the provided amount
         const planAmount = plan.price;
@@ -552,21 +672,24 @@ const createGuestSubscriptionOrder = async (req, res, next) => {
         const options = {
             amount: planAmount * 100, // Razorpay expects amount in paise
             currency: currency,
-            receipt: `sub_guest_${planId}_${user._id}`,
+            receipt: `sub_guest_${planId}`,
             payment_capture: 1 // Auto-capture payment
         };
 
         const order = await razorpay.orders.create(options);
 
         // Create subscription record in our database
+        // Store guest info temporarily without creating user account yet
         const subscription = new Subscription({
-            userId: user._id, // Assign the newly created user
             planId,
             planName: plan.name,
             amount: planAmount,
             currency,
             orderId: order.id,
-            status: 'created'
+            status: 'created',
+            guestName: clientName,
+            guestEmail: clientEmail,
+            guestPhone: clientPhone
         });
 
         await subscription.save();
@@ -577,7 +700,7 @@ const createGuestSubscriptionOrder = async (req, res, next) => {
                 key: process.env.RAZORPAY_KEY_ID, // Frontend needs this to initialize Razorpay
                 amount: order.amount,
                 currency: order.currency,
-                message: 'Account created and subscription order made successfully. Login credentials will be sent after payment verification.'
+                message: 'Subscription order created successfully. Account will be created after payment verification.'
             }, 'Guest subscription order created successfully')
         );
     } catch (error) {
@@ -620,17 +743,29 @@ const verifySubscriptionPayment = async (req, res, next) => {
                 { orderId },
                 {
                     paymentId,
-                    status: 'verified',
+                    status: 'paid',
                     verifiedAt: new Date()
                 }
             );
+
+            // Activate the subscription with calculated end date
+            const updatedSubscription = await activateSubscription(subscription._id);
 
             res.status(200).json(
                 ApiResponse.success({
                     paymentId,
                     orderId,
-                    status: 'verified'
-                }, 'Subscription payment verified successfully')
+                    status: 'verified',
+                    subscription: {
+                        id: updatedSubscription._id,
+                        planId: updatedSubscription.planId,
+                        planName: updatedSubscription.planName,
+                        status: updatedSubscription.status,
+                        startDate: updatedSubscription.startDate,
+                        endDate: updatedSubscription.endDate,
+                        nextBillingDate: updatedSubscription.nextBillingDate
+                    }
+                }, 'Subscription payment verified and activated successfully')
             );
         } else {
             // Invalid signature
@@ -661,9 +796,6 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
             return res.status(404).json(ApiResponse.error('Subscription not found'));
         }
 
-        // Get user details to potentially send credentials (if this is for a guest who needs them)
-        const user = await User.findById(subscription.userId);
-
         // Verify the payment with Razorpay
         const crypto = require('crypto');
 
@@ -683,14 +815,46 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
         // Compare signatures
         if (expectedSignature === signature) {
             // Payment verified successfully
+
+            // If this is a guest subscription, create the user account first
+            if (subscription.guestName && subscription.guestEmail && subscription.guestPhone) {
+                // Check if user already exists (shouldn't happen, but just in case)
+                const existingUser = await User.findOne({ email: subscription.guestEmail });
+
+                if (!existingUser) {
+                    // Create the user account with temporary password
+                    const tempPassword = Math.random().toString(36).slice(-8) + 'Temp1!';
+
+                    const newUser = new User({
+                        name: subscription.guestName,
+                        email: subscription.guestEmail,
+                        password: tempPassword,
+                        phone: subscription.guestPhone,
+                        role: 'patient',
+                        status: 'active'
+                    });
+
+                    await newUser.save();
+
+                    // Update the subscription record with the new user ID
+                    await Subscription.findByIdAndUpdate(subscription._id, { userId: newUser._id });
+                }
+            }
+
             await Subscription.findOneAndUpdate(
                 { orderId },
                 {
                     paymentId,
-                    status: 'verified',
+                    status: 'paid',
                     verifiedAt: new Date()
                 }
             );
+
+            // Activate the subscription with calculated end date
+            const updatedSubscription = await activateSubscription(subscription._id);
+
+            // Get user details to potentially send credentials (if this is for a guest who needs them)
+            const user = await User.findById(updatedSubscription.userId);
 
             // If this was related to a guest account creation scenario, send login credentials
             // This would typically be for cases where account was created during subscription purchase
@@ -703,8 +867,17 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
                 ApiResponse.success({
                     paymentId,
                     orderId,
-                    status: 'verified'
-                }, 'Guest subscription payment verified successfully')
+                    status: 'verified',
+                    subscription: {
+                        id: updatedSubscription._id,
+                        planId: updatedSubscription.planId,
+                        planName: updatedSubscription.planName,
+                        status: updatedSubscription.status,
+                        startDate: updatedSubscription.startDate,
+                        endDate: updatedSubscription.endDate,
+                        nextBillingDate: updatedSubscription.nextBillingDate
+                    }
+                }, 'Guest subscription payment verified and activated successfully')
             );
         } else {
             // Invalid signature

@@ -185,9 +185,6 @@ const getBookingsByStatus = async (req, res, next) => {
     }
 };
 
-const { hashPassword } = require("../utils/auth.utils");
-const { generateToken } = require("../config/jwt");
-
 // Create a new booking for guest users
 const createGuestBooking = async (req, res, next) => {
     try {
@@ -215,23 +212,37 @@ const createGuestBooking = async (req, res, next) => {
         let user = await User.findOne({ email: clientEmail });
 
         if (user) {
-            // If user exists, return a message indicating they should log in
-            return res.status(409).json(ApiResponse.error(`User with email ${clientEmail} already exists. Please log in to make a booking.`));
+            // Check if there's already a booking with paid status for this user for the same slot
+            const existingPaidBooking = await Booking.findOne({
+                userId: user._id,
+                paymentStatus: 'paid',
+                serviceId: serviceId,
+                date: date,
+                time: time
+            });
+
+            if (existingPaidBooking) {
+                // If there's already a paid booking for this slot, return appropriate message
+                return res.status(409).json(ApiResponse.error(`You already have a paid booking for this time slot.`));
+            }
+
+            // If user exists but doesn't have a paid booking for this slot, use existing user
+            // This allows users to make additional bookings
+        } else {
+            // Create a new user account with temporary password
+            const tempPassword = Math.random().toString(36).slice(-8) + 'Temp1!'; // Generate temporary password
+
+            user = new User({
+                name: clientName,
+                email: clientEmail,
+                password: tempPassword, // Will be hashed by the pre-save hook
+                phone: clientPhone,
+                role: 'patient',
+                status: 'active'
+            });
+
+            await user.save();
         }
-
-        // Create a new user account with temporary password
-        const tempPassword = Math.random().toString(36).slice(-8) + 'Temp1!'; // Generate temporary password
-
-        user = new User({
-            name: clientName,
-            email: clientEmail,
-            password: tempPassword, // Will be hashed by the pre-save hook
-            phone: clientPhone,
-            role: 'patient',
-            status: 'active'
-        });
-
-        await user.save();
 
         // Automatically assign an available therapist (admin user)
         const therapist = await User.findOne({

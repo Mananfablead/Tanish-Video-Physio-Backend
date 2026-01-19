@@ -143,16 +143,40 @@ const getProfile = async (req, res, next) => {
             user.profilePicture = `${baseUrl}${user.profilePicture}`;
         }
 
-        // Get user's active subscription
-        const activeSubscription = await Subscription.findOne({
-            userId: req.user.userId,
-            status: { $in: ['active', 'paid'] }
-        }).sort({ createdAt: -1 });
+        // Get user's subscriptions (both active and recent ones)
+        const subscriptions = await Subscription.find({
+            userId: req.user.userId
+        })
+            .sort({ createdAt: -1 })
+            .limit(5); // Get last 5 subscriptions
+
+        // Find the most relevant subscription (active/paid or most recent)
+        let activeSubscription = null;
+
+        // First check for active subscriptions
+        activeSubscription = subscriptions.find(sub =>
+            sub.status === 'active' || sub.status === 'paid'
+        ) || null;
+
+        // If no active subscription found, get the most recent one
+        if (!activeSubscription && subscriptions.length > 0) {
+            activeSubscription = subscriptions[0];
+        }
 
         // Add subscription data to the response
         const responseData = {
             ...user.toObject(),
-            subscriptionData: activeSubscription || null
+            subscriptionData: activeSubscription ? {
+                id: activeSubscription._id,
+                planId: activeSubscription.planId,
+                planName: activeSubscription.planName,
+                amount: activeSubscription.amount,
+                currency: activeSubscription.currency,
+                status: activeSubscription.status,
+                startDate: activeSubscription.startDate,
+                endDate: activeSubscription.endDate,
+                createdAt: activeSubscription.createdAt
+            } : null,
         };
 
         res.status(200).json(ApiResponse.success(responseData, 'Profile retrieved successfully'));

@@ -4,7 +4,7 @@ const subscriptionSchema = new mongoose.Schema({
     userId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
-        required: [true, 'User ID is required']
+        required: false // May be empty initially for guest subscriptions
     },
     planId: {
         type: String,
@@ -55,6 +55,18 @@ const subscriptionSchema = new mongoose.Schema({
     },
     nextBillingDate: {
         type: Date
+    },
+    guestName: {
+        type: String,
+        required: false // Only for guest subscriptions
+    },
+    guestEmail: {
+        type: String,
+        required: false // Only for guest subscriptions
+    },
+    guestPhone: {
+        type: String,
+        required: false // Only for guest subscriptions
     }
 }, {
     timestamps: true
