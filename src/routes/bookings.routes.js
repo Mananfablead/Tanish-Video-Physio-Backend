@@ -1,5 +1,5 @@
 const express = require('express');
-const { getAllBookings, getBookingById, createBooking, createGuestBooking, updateBooking, updateBookingStatus, deleteBooking, getBookingsByStatus } = require('../controllers/bookings.controller');
+const { getAllBookings, getBookingById, createBooking, createGuestBooking, updateBooking, updateBookingStatus, updateGuestBookingStatus, deleteBooking, getBookingsByStatus } = require('../controllers/bookings.controller');
 const { authenticateToken } = require('../middlewares/auth.middleware');
 
 const router = express.Router();
@@ -12,6 +12,8 @@ router.post('/', authenticateToken, createBooking);
 router.post('/guest', createGuestBooking);
 router.put('/:id', authenticateToken, updateBooking);
 router.put('/:id/status', authenticateToken, updateBookingStatus);
+// Public route for guest users to update booking status
+router.put('/:id/guest-status', updateGuestBookingStatus);
 router.delete('/:id', authenticateToken, deleteBooking);
 
 module.exports = router;

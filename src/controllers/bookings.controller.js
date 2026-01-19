@@ -167,6 +167,88 @@ const deleteBooking = async (req, res, next) => {
     }
 };
 
+// Update booking status by ID for guest users
+const updateGuestBookingStatus = async (req, res, next) => {
+    try {
+        const { status } = req.body;
+        const { id: bookingId } = req.params; // Changed from bookingId to id to match the route parameter
+
+        // Validate status
+        const validStatuses = ['pending', 'confirmed', 'completed', 'cancelled'];
+        if (!validStatuses.includes(status)) {
+            return res.status(400).json(ApiResponse.error('Invalid status. Valid statuses: pending, confirmed, completed, cancelled'));
+        }
+
+        // For guest users, we'll identify the booking by ID and require some identifying information
+        // Since guest bookings might be associated with an email, we'll accept email in the request body
+        const { clientEmail } = req.body;
+
+        if (!clientEmail) {
+            return res.status(400).json(ApiResponse.error('Client email is required for guest booking status update'));
+        }
+
+        // Find the booking by ID
+        const booking = await Booking.findById(bookingId);
+        if (!booking) {
+            return res.status(404).json(ApiResponse.error('Booking not found'));
+        }
+
+        // Verify that the booking is associated with the provided email
+        // This can be done by checking if the user with the provided email owns this booking
+        const user = await User.findOne({ email: clientEmail });
+
+        if (user && booking.userId.equals(user._id)) {
+            // If the user exists and the booking belongs to them, allow status update
+            const updatedBooking = await Booking.findOneAndUpdate(
+                { _id: bookingId, userId: user._id },
+                { status },
+                { new: true, runValidators: true }
+            );
+
+            if (!updatedBooking) {
+                return res.status(404).json(ApiResponse.error('Booking not found or unauthorized'));
+            }
+
+            // Populate the booking before sending response
+            await updatedBooking.populate('serviceId', 'name price duration');
+            await updatedBooking.populate('therapistId', 'name email role');
+
+            res.status(200).json(ApiResponse.success({ booking: updatedBooking }, `Booking status updated to ${status} successfully`));
+        } else {
+            // If it's a guest booking, we need to check if the booking contains the client's email information
+            // For guest bookings, we might have stored the client's email in the booking record itself
+            if (booking.clientEmail === clientEmail || booking.clientName) {
+                // Update the booking status for guest bookings
+                // Only allow certain status changes for guest bookings
+                if (['cancelled'].includes(status)) {
+                    // Only allow cancelling for guest bookings to prevent unauthorized status changes
+                    const updatedBooking = await Booking.findByIdAndUpdate(
+                        bookingId,
+                        { status },
+                        { new: true, runValidators: true }
+                    );
+
+                    if (!updatedBooking) {
+                        return res.status(404).json(ApiResponse.error('Booking not found'));
+                    }
+
+                    // Populate the booking before sending response
+                    await updatedBooking.populate('serviceId', 'name price duration');
+                    await updatedBooking.populate('therapistId', 'name email role');
+
+                    res.status(200).json(ApiResponse.success({ booking: updatedBooking }, `Booking status updated to ${status} successfully`));
+                } else {
+                    return res.status(403).json(ApiResponse.error('Unauthorized to update booking status to this value for guest bookings'));
+                }
+            } else {
+                return res.status(403).json(ApiResponse.error('Unauthorized to update this booking status'));
+            }
+        }
+    } catch (error) {
+        next(error);
+    }
+};
+
 // Get bookings by status
 const getBookingsByStatus = async (req, res, next) => {
     try {
@@ -402,6 +484,7 @@ module.exports = {
     createGuestBooking, // Add the new function
     updateBooking,
     updateBookingStatus,
+    updateGuestBookingStatus,
     deleteBooking,
     getBookingsByStatus,
 };
