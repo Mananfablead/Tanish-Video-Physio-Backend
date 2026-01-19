@@ -1,4 +1,5 @@
 const User = require('../models/User.model');
+const Subscription = require('../models/Subscription.model');
 const { generateToken } = require('../config/jwt');
 const { hashPassword, comparePassword } = require('../utils/auth.utils');
 const ApiResponse = require('../utils/apiResponse');
@@ -142,7 +143,19 @@ const getProfile = async (req, res, next) => {
             user.profilePicture = `${baseUrl}${user.profilePicture}`;
         }
 
-        res.status(200).json(ApiResponse.success(user, 'Profile retrieved successfully'));
+        // Get user's active subscription
+        const activeSubscription = await Subscription.findOne({
+            userId: req.user.userId,
+            status: { $in: ['active', 'paid'] }
+        }).sort({ createdAt: -1 });
+
+        // Add subscription data to the response
+        const responseData = {
+            ...user.toObject(),
+            subscriptionData: activeSubscription || null
+        };
+
+        res.status(200).json(ApiResponse.success(responseData, 'Profile retrieved successfully'));
     } catch (error) {
         next(error);
     }
