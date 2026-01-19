@@ -51,6 +51,89 @@ const createOrder = async (req, res, next) => {
     }
 };
 
+// Create a payment order for Razorpay for guest users
+const createGuestOrder = async (req, res, next) => {
+    try {
+        const { bookingId, amount, currency = 'INR', clientName, clientEmail, clientPhone } = req.body;
+
+        // Validate required fields for guest payment
+        if (!clientName || !clientEmail || !clientPhone) {
+            return res.status(400).json(ApiResponse.error("Name, email, and phone are required for guest payment"));
+        }
+
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(clientEmail)) {
+            return res.status(400).json(ApiResponse.error("Invalid email format"));
+        }
+
+        // Check if user already exists
+        let user = await User.findOne({ email: clientEmail });
+
+        if (user) {
+            // If user exists, return a message indicating they should log in
+            return res.status(409).json(ApiResponse.error(`User with email ${clientEmail} already exists. Please log in to make a payment.`));
+        }
+
+        // Create a new user account with temporary password
+        const tempPassword = Math.random().toString(36).slice(-8) + 'Temp1!'; // Generate temporary password
+
+        user = new User({
+            name: clientName,
+            email: clientEmail,
+            password: tempPassword, // Will be hashed by the pre-save hook
+            phone: clientPhone,
+            role: 'patient',
+            status: 'active'
+        });
+
+        await user.save();
+
+        // Find the booking to associate with this payment
+        const booking = await Booking.findById(bookingId);
+        if (!booking) {
+            return res.status(404).json(ApiResponse.error('Booking not found'));
+        }
+
+        // Update the booking to assign the new user
+        await Booking.findByIdAndUpdate(bookingId, { userId: user._id });
+
+        // Create order in Razorpay
+        const options = {
+            amount: amount * 100, // Razorpay expects amount in paise
+            currency: currency,
+            receipt: `booking_${bookingId}_guest`,
+            payment_capture: 1 // Auto-capture payment
+        };
+
+        const order = await razorpay.orders.create(options);
+
+        // Create payment record in our database
+        const payment = new Payment({
+            bookingId,
+            userId: user._id, // Assign to the newly created user
+            amount,
+            currency,
+            orderId: order.id,
+            status: 'created'
+        });
+
+        await payment.save();
+
+        res.status(200).json(
+            ApiResponse.success({
+                orderId: order.id,
+                key: process.env.RAZORPAY_KEY_ID,
+                amount: order.amount,
+                currency: order.currency,
+                message: 'Account created and payment order made successfully. Login credentials will be sent after payment verification.'
+            }, 'Guest payment order created successfully')
+        );
+    } catch (error) {
+        next(error);
+    }
+};
+
 // Verify payment after successful transaction
 const verifyPayment = async (req, res, next) => {
     try {
@@ -65,12 +148,12 @@ const verifyPayment = async (req, res, next) => {
 
         // Verify the payment with Razorpay
         const crypto = require('crypto');
-        
+
         // Check if the required environment variable is available
         if (!process.env.RAZORPAY_KEY_SECRET) {
             return res.status(500).json(ApiResponse.error('Server configuration error: Razorpay secret is not set'));
         }
-        
+
         const secret = process.env.RAZORPAY_KEY_SECRET; // Using the correct environment variable name
 
         // Create the expected signature
@@ -199,112 +282,6 @@ const verifyGuestPayment = async (req, res, next) => {
         next(error);
     }
 };
-
-// Helper function to send booking confirmation email
-async function sendBookingConfirmationEmail(email, name, bookingId) {
-    const nodemailer = require('nodemailer');
-    const { createTransport } = nodemailer;
-
-    const transporter = createTransport({
-        service: 'gmail',
-        host: process.env.EMAIL_HOST,
-        port: process.env.EMAIL_PORT,
-        auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS
-        }
-    });
-
-    const message = `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Booking Confirmation</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-
-<body style="margin:0; padding:0; background-color:#f4f6f8; font-family:Arial, Helvetica, sans-serif;">
-
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f6f8; padding:30px 0;">
-    <tr>
-      <td align="center">
-
-        <!-- Main Container -->
-        <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff; border-radius:8px; overflow:hidden; box-shadow:0 6px 18px rgba(0,0,0,0.08);">
-
-          <!-- Header -->
-          <tr>
-            <td style="background:linear-gradient(135deg,#667eea,#764ba2); padding:30px; text-align:center; color:#ffffff;">
-              <h1 style="margin:0; font-size:26px;">Tanish Physio</h1>
-              <p style="margin:8px 0 0; font-size:14px; opacity:0.9;">
-                Physical Therapy & Rehabilitation Center
-              </p>
-            </td>
-          </tr>
-
-          <!-- Content -->
-          <tr>
-            <td style="padding:35px; color:#333333;">
-              <h2 style="margin-top:0; font-size:22px; color:#222;">
-                Booking Confirmed Successfully!
-              </h2>
-
-              <p style="font-size:15px; line-height:1.6;">
-                Hello <strong>${name}</strong>,
-              </p>
-
-              <p style="font-size:15px; line-height:1.6;">
-                Your booking has been confirmed successfully! Here are the details:
-              </p>
-              
-              <p style="font-size:15px; line-height:1.6;">
-                <strong>Booking ID:</strong> ${bookingId}<br>
-              </p>
-
-              <p style="font-size:15px; line-height:1.6;">
-                Thank you for choosing Tanish Physio. You can log in to your account to manage your bookings.
-              </p>
-
-              <p style="font-size:15px; margin-top:30px;">
-                Regards,<br>
-                <strong>Tanish Physio Team</strong>
-              </p>
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td style="background:#f1f3f6; padding:20px; text-align:center; font-size:12px; color:#777;">
-              <p style="margin:0;">
-                © 2024 Tanish Physio. All rights reserved.
-              </p>
-              <p style="margin:6px 0 0;">
-                This is an automated email. Please do not reply.
-              </p>
-            </td>
-          </tr>
-
-        </table>
-
-      </td>
-    </tr>
-  </table>
-
-</body>
-</html>
-`;
-
-    const mailOptions = {
-        to: email,
-        from: process.env.EMAIL_USER,
-        subject: 'Booking Confirmed - Tanish Physio',
-        html: message
-    };
-
-    // Send email
-    await transporter.sendMail(mailOptions);
-}
 
 // Helper function to send welcome email with login credentials
 async function sendWelcomeEmailWithCredentials(email, name, username, password) {
@@ -524,6 +501,90 @@ const createSubscriptionOrder = async (req, res, next) => {
     }
 };
 
+// Create a subscription payment order for Razorpay for guest users
+const createGuestSubscriptionOrder = async (req, res, next) => {
+    try {
+        const { planId, amount, currency = 'INR', clientName, clientEmail, clientPhone } = req.body;
+
+        // Validate required fields for guest subscription
+        if (!clientName || !clientEmail || !clientPhone) {
+            return res.status(400).json(ApiResponse.error("Name, email, and phone are required for guest subscription"));
+        }
+
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(clientEmail)) {
+            return res.status(400).json(ApiResponse.error("Invalid email format"));
+        }
+
+        // Validate plan exists in the database
+        const plan = await SubscriptionPlan.findOne({ planId, status: 'active' });
+        if (!plan) {
+            return res.status(400).json(ApiResponse.error('Invalid or inactive plan ID'));
+        }
+
+        // Check if user already exists
+        let user = await User.findOne({ email: clientEmail });
+
+        if (user) {
+            // If user exists, return a message indicating they should log in
+            return res.status(409).json(ApiResponse.error(`User with email ${clientEmail} already exists. Please log in to subscribe.`));
+        }
+
+        // Create a new user account with temporary password
+        const tempPassword = Math.random().toString(36).slice(-8) + 'Temp1!'; // Generate temporary password
+
+        user = new User({
+            name: clientName,
+            email: clientEmail,
+            password: tempPassword, // Will be hashed by the pre-save hook
+            phone: clientPhone,
+            role: 'patient',
+            status: 'active'
+        });
+
+        await user.save();
+
+        // Use the actual plan price instead of the provided amount
+        const planAmount = plan.price;
+
+        // Create order in Razorpay
+        const options = {
+            amount: planAmount * 100, // Razorpay expects amount in paise
+            currency: currency,
+            receipt: `sub_guest_${planId}_${user._id}`,
+            payment_capture: 1 // Auto-capture payment
+        };
+
+        const order = await razorpay.orders.create(options);
+
+        // Create subscription record in our database
+        const subscription = new Subscription({
+            userId: user._id, // Assign the newly created user
+            planId,
+            planName: plan.name,
+            amount: planAmount,
+            currency,
+            orderId: order.id,
+            status: 'created'
+        });
+
+        await subscription.save();
+
+        res.status(200).json(
+            ApiResponse.success({
+                orderId: order.id,
+                key: process.env.RAZORPAY_KEY_ID, // Frontend needs this to initialize Razorpay
+                amount: order.amount,
+                currency: order.currency,
+                message: 'Account created and subscription order made successfully. Login credentials will be sent after payment verification.'
+            }, 'Guest subscription order created successfully')
+        );
+    } catch (error) {
+        next(error);
+    }
+};
+
 // Verify subscription payment after successful transaction
 const verifySubscriptionPayment = async (req, res, next) => {
     try {
@@ -538,12 +599,12 @@ const verifySubscriptionPayment = async (req, res, next) => {
 
         // Verify the payment with Razorpay
         const crypto = require('crypto');
-        
+
         // Check if the required environment variable is available
         if (!process.env.RAZORPAY_KEY_SECRET) {
             return res.status(500).json(ApiResponse.error('Server configuration error: Razorpay secret is not set'));
         }
-        
+
         const secret = process.env.RAZORPAY_KEY_SECRET; // Using the correct environment variable name
 
         // Create the expected signature
@@ -589,6 +650,80 @@ const verifySubscriptionPayment = async (req, res, next) => {
     }
 };
 
+// Verify guest subscription payment after successful transaction
+const verifyGuestSubscriptionPayment = async (req, res, next) => {
+    try {
+        const { paymentId, orderId, signature } = req.body;
+
+        // Fetch subscription details from our database (no user authentication required)
+        const subscription = await Subscription.findOne({ orderId });
+        if (!subscription) {
+            return res.status(404).json(ApiResponse.error('Subscription not found'));
+        }
+
+        // Get user details to potentially send credentials (if this is for a guest who needs them)
+        const user = await User.findById(subscription.userId);
+
+        // Verify the payment with Razorpay
+        const crypto = require('crypto');
+
+        // Check if the required environment variable is available
+        if (!process.env.RAZORPAY_KEY_SECRET) {
+            return res.status(500).json(ApiResponse.error('Server configuration error: Razorpay secret is not set'));
+        }
+
+        const secret = process.env.RAZORPAY_KEY_SECRET; // Using the correct environment variable name
+
+        // Create the expected signature
+        const expectedSignature = crypto
+            .createHmac('sha256', secret)
+            .update(orderId + '|' + paymentId)
+            .digest('hex');
+
+        // Compare signatures
+        if (expectedSignature === signature) {
+            // Payment verified successfully
+            await Subscription.findOneAndUpdate(
+                { orderId },
+                {
+                    paymentId,
+                    status: 'verified',
+                    verifiedAt: new Date()
+                }
+            );
+
+            // If this was related to a guest account creation scenario, send login credentials
+            // This would typically be for cases where account was created during subscription purchase
+            if (user) {
+                // Send welcome email with login credentials to the user
+                await sendWelcomeEmailWithCredentials(user.email, user.name, user.email, user.password);
+            }
+
+            res.status(200).json(
+                ApiResponse.success({
+                    paymentId,
+                    orderId,
+                    status: 'verified'
+                }, 'Guest subscription payment verified successfully')
+            );
+        } else {
+            // Invalid signature
+            await Subscription.findOneAndUpdate(
+                { orderId },
+                {
+                    paymentId,
+                    status: 'failed',
+                    failureReason: 'Invalid signature'
+                }
+            );
+
+            return res.status(400).json(ApiResponse.error('Guest subscription payment verification failed'));
+        }
+    } catch (error) {
+        next(error);
+    }
+};
+
 // Get payments for authenticated user
 const getUserPayments = async (req, res, next) => {
     try {
@@ -619,11 +754,14 @@ const getAllPayments = async (req, res, next) => {
 
 module.exports = {
     createOrder,
+    createGuestOrder,
     verifyPayment,
     verifyGuestPayment,
     handleWebhook,
     createSubscriptionOrder,
+    createGuestSubscriptionOrder,
     verifySubscriptionPayment,
+    verifyGuestSubscriptionPayment,
     getUserPayments,
     getAllPayments
 };
