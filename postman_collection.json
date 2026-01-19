@@ -873,6 +873,64 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "Create Guest Booking",
+          "description": "Creates a new booking for guest users. An account will be created for the user, but login credentials will only be sent after successful payment verification.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serviceId\": \"service_id_here\",\n  \"date\": \"2024-03-25\",\n  \"time\": \"10:00\",\n  \"notes\": \"Patient has lower back pain, bring medical records.\",\n  \"clientName\": \"John Doe\",\n  \"clientEmail\": \"john@example.com\",\n  \"clientPhone\": \"+919876543210\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings/guest",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bookings", "guest"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Booking Status",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"confirmed\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings/:id/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bookings", ":id", "status"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "booking_id_here"
+                }
+              ]
+            }
+          },
+          "response": []
         }
       ]
     },
@@ -1099,6 +1157,7 @@
         },
         {
           "name": "Payment Webhook",
+          "description": "Handles payment webhooks from Razorpay. When payment is captured, login credentials will be sent to the user's email for guest bookings.",
           "request": {
             "method": "POST",
             "header": [
@@ -1238,6 +1297,30 @@
               "raw": "{{baseUrl}}/api/payments/admin/all",
               "host": ["{{baseUrl}}"],
               "path": ["api", "payments", "admin", "all"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Verify Guest Payment",
+          "description": "Verifies a guest payment and sends login credentials to the user's email after successful payment verification.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"paymentId\": \"pay_...\",\n  \"orderId\": \"order_...\",\n  \"signature\": \"signature_here\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/verify-guest",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payments", "verify-guest"]
             }
           },
           "response": []
@@ -1728,6 +1811,82 @@
               "raw": "{{baseUrl}}/api/availability/bulk-update",
               "host": ["{{baseUrl}}"],
               "path": ["api", "availability", "bulk-update"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get User Reports (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "reports", "users"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Session Reports (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/sessions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "reports", "sessions"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Revenue Reports (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/revenue",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "reports", "revenue"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Therapist Reports (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/therapists",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "reports", "therapists"]
             }
           },
           "response": []

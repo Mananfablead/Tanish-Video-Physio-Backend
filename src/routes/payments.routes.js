@@ -1,11 +1,13 @@
 const express = require('express');
-const { createOrder, verifyPayment, handleWebhook, createSubscriptionOrder, verifySubscriptionPayment, getUserPayments, getAllPayments } = require('../controllers/payments.controller');
+const { createOrder, verifyPayment, verifyGuestPayment, handleWebhook, createSubscriptionOrder, verifySubscriptionPayment, getUserPayments, getAllPayments } = require('../controllers/payments.controller');
 const { authenticateToken, authorizeRoles } = require('../middlewares/auth.middleware');
 
 const router = express.Router();
 
 router.post('/create-order', authenticateToken, createOrder);
 router.post('/verify', authenticateToken, verifyPayment);
+// Public route for guest payment verification
+router.post('/verify-guest', verifyGuestPayment);
 router.post('/webhook', handleWebhook); // This endpoint should be accessible without authentication for Razorpay webhooks
 
 // Subscription payment routes
