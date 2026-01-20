@@ -2327,6 +2327,1030 @@
       ]
     },
     {
+      "name": "CMS",
+      "item": [
+        {
+          "name": "Hero Section",
+          "item": [
+            {
+              "name": "Get Hero (Public)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/cms/public/hero",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cms", "public", "hero"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Hero (Admin)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/cms/admin/hero",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cms", "admin", "hero"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Add Hero (Admin)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "heading",
+                      "value": "Welcome to Our Physiotherapy Clinic",
+                      "type": "text"
+                    },
+                    {
+                      "key": "subHeading",
+                      "value": "Expert Care for Your Recovery",
+                      "type": "text"
+                    },
+                    {
+                      "key": "description",
+                      "value": "Professional physiotherapy services to help you recover faster and stronger",
+                      "type": "text"
+                    },
+                    {
+                      "key": "ctaText",
+                      "value": "Book Appointment",
+                      "type": "text"
+                    },
+                    {
+                      "key": "secondaryCtaText",
+                      "value": "Learn More",
+                      "type": "text"
+                    },
+                    {
+                      "key": "trustedBy",
+                      "value": "Trusted by 1000+ patients",
+                      "type": "text"
+                    },
+                    {
+                      "key": "rating",
+                      "value": "4.9/5",
+                      "type": "text"
+                    },
+                    {
+                      "key": "features",
+                      "value": "[\"Expert Therapists\",\"Personalized Care\",\"Advanced Equipment\"]",
+                      "type": "text"
+                    },
+                    {
+                      "key": "isPublic",
+                      "value": "true",
+                      "type": "text"
+                    },
+                    {
+                      "key": "heroImage",
+                      "type": "file",
+                      "src": ""
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/cms/admin/hero",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cms", "admin", "hero"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update Hero (Admin)",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "heading",
+                      "value": "Updated Welcome to Our Physiotherapy Clinic",
+                      "type": "text"
+                    },
+                    {
+                      "key": "subHeading",
+                      "value": "Expert Care for Your Recovery",
+                      "type": "text"
+                    },
+                    {
+                      "key": "description",
+                      "value": "Professional physiotherapy services to help you recover faster and stronger",
+                      "type": "text"
+                    },
+                    {
+                      "key": "ctaText",
+                      "value": "Book Appointment",
+                      "type": "text"
+                    },
+                    {
+                      "key": "secondaryCtaText",
+                      "value": "Learn More",
+                      "type": "text"
+                    },
+                    {
+                      "key": "heroImage",
+                      "type": "file",
+                      "src": ""
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/cms/admin/hero",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cms", "admin", "hero"]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Why Us Section",
+          "item": [
+            {
+              "name": "Get Why Us (Public)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/cms/public/whyUs",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cms", "public", "whyUs"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Why Us (Admin)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/cms/admin/whyUs",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cms", "admin", "whyUs"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Add Why Us (Admin)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"heading\": \"Why Choose Us\",\n  \"subHeading\": \"Exceptional care with proven results\",\n  \"description\": \"We provide personalized treatment plans designed specifically for your needs\",\n  \"features\": [\n    {\n      \"title\": \"Expert Team\",\n      \"description\": \"Certified therapists with years of experience\"\n    },\n    {\n      \"title\": \"Modern Equipment\",\n      \"description\": \"State-of-the-art facilities for optimal recovery\"\n    },\n    {\n      \"title\": \"Personalized Care\",\n      \"description\": \"Customized treatment plans for each patient\"\n    }\n  ],\n  \"stats\": [\n    {\n      \"value\": \">1000\",\n      \"label\": \"Patients Treated\"\n    },\n    {\n      \"value\": \">95%\",\n      \"label\": \"Success Rate\"\n    },\n    {\n      \"value\": \">15\",\n      \"label\": \"Years Experience\"\n    }\n  ],\n  \"isPublic\": true\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/cms/admin/whyUs",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cms", "admin", "whyUs"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update Why Us (Admin)",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"heading\": \"Why Choose Us Updated\",\n  \"subHeading\": \"Exceptional care with proven results\",\n  \"description\": \"We provide personalized treatment plans designed specifically for your needs\",\n  \"features\": [\n    {\n      \"title\": \"Expert Team\",\n      \"description\": \"Certified therapists with years of experience\"\n    },\n    {\n      \"title\": \"Modern Equipment\",\n      \"description\": \"State-of-the-art facilities for optimal recovery\"\n    },\n    {\n      \"title\": \"Personalized Care\",\n      \"description\": \"Customized treatment plans for each patient\"\n    }\n  ],\n  \"stats\": [\n    {\n      \"value\": \">1000\",\n      \"label\": \"Patients Treated\"\n    },\n    {\n      \"value\": \">95%\",\n      \"label\": \"Success Rate\"\n    },\n    {\n      \"value\": \">15\",\n      \"label\": \"Years Experience\"\n    }\n  ],\n  \"isPublic\": true\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/cms/admin/whyUs",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cms", "admin", "whyUs"]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "FAQs Section",
+          "item": [
+            {
+              "name": "Get FAQs (Public)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/cms/public/faqs",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cms", "public", "faqs"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get FAQs (Admin)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/cms/admin/faqs",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cms", "admin", "faqs"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Add FAQ (Admin)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"question\": \"What should I wear to my physiotherapy appointment?\",\n  \"answer\": \"Wear comfortable, loose-fitting clothing that allows easy movement. If you're having a lower body injury treated, bring shorts. For upper body issues, a tank top might be helpful.\",\n  \"category\": \"Appointments\",\n  \"isPublic\": true\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/cms/admin/faqs",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cms", "admin", "faqs"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update FAQ (Admin)",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"question\": \"What should I wear to my physiotherapy appointment? (Updated)\",\n  \"answer\": \"Wear comfortable, loose-fitting clothing that allows easy movement. If you're having a lower body injury treated, bring shorts. For upper body issues, a tank top might be helpful.\",\n  \"category\": \"Appointments\",\n  \"isPublic\": true\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/cms/admin/faqs/1",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cms", "admin", "faqs", "1"],
+                  "variable": [
+                    {
+                      "key": "faqId",
+                      "value": "1"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete FAQ (Admin)",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/cms/admin/faqs/1",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cms", "admin", "faqs", "1"],
+                  "variable": [
+                    {
+                      "key": "faqId",
+                      "value": "1"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "About Section",
+          "item": [
+            {
+              "name": "Get About (Public)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/cms/public/about",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cms", "public", "about"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get About (Admin)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/cms/admin/about",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cms", "admin", "about"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Add About (Admin)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "heading",
+                      "value": "About Our Clinic",
+                      "type": "text"
+                    },
+                    {
+                      "key": "subHeading",
+                      "value": "Dedicated to your health and wellness",
+                      "type": "text"
+                    },
+                    {
+                      "key": "description",
+                      "value": "Our clinic has been serving the community with quality physiotherapy services for over a decade. We combine traditional techniques with modern technology to provide the best care.",
+                      "type": "text"
+                    },
+                    {
+                      "key": "mission",
+                      "value": "Our mission is to provide exceptional physiotherapy services that help our patients achieve optimal health and wellness.",
+                      "type": "text"
+                    },
+                    {
+                      "key": "vision",
+                      "value": "To be the leading provider of physiotherapy services in the region, known for our excellence and patient-centered approach.",
+                      "type": "text"
+                    },
+                    {
+                      "key": "values",
+                      "value": "[\"Patient-centered care\",\"Excellence\",\"Integrity\",\"Innovation\"]",
+                      "type": "text"
+                    },
+                    {
+                      "key": "isPublic",
+                      "value": "true",
+                      "type": "text"
+                    },
+                    {
+                      "key": "aboutImage",
+                      "type": "file",
+                      "src": ""
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/cms/admin/about",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cms", "admin", "about"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update About (Admin)",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "heading",
+                      "value": "About Our Clinic Updated",
+                      "type": "text"
+                    },
+                    {
+                      "key": "subHeading",
+                      "value": "Dedicated to your health and wellness",
+                      "type": "text"
+                    },
+                    {
+                      "key": "description",
+                      "value": "Our clinic has been serving the community with quality physiotherapy services for over a decade. We combine traditional techniques with modern technology to provide the best care.",
+                      "type": "text"
+                    },
+                    {
+                      "key": "aboutImage",
+                      "type": "file",
+                      "src": ""
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/cms/admin/about",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cms", "admin", "about"]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Contact Section",
+          "item": [
+            {
+              "name": "Get Contact (Public)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/cms/public/contact",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cms", "public", "contact"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Contact (Admin)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/cms/admin/contact",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cms", "admin", "contact"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Add Contact (Admin)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"heading\": \"Contact Us\",\n  \"subHeading\": \"We're here to help you\",\n  \"description\": \"Have questions or ready to book an appointment? Reach out to us today.\",\n  \"phone\": \"+91-9876543210\",\n  \"email\": \"info@clinic.com\",\n  \"address\": \"123 Health Street, Wellness City, WC 12345\",\n  \"businessHours\": [\n    {\n      \"day\": \"Monday-Friday\",\n      \"hours\": \"9:00 AM - 8:00 PM\"\n    },\n    {\n      \"day\": \"Saturday\",\n      \"hours\": \"9:00 AM - 6:00 PM\"\n    },\n    {\n      \"day\": \"Sunday\",\n      \"hours\": \"10:00 AM - 4:00 PM\"\n    }\n  ],\n  \"socialLinks\": {\n    \"facebook\": \"https://facebook.com/clinic\",\n    \"twitter\": \"https://twitter.com/clinic\",\n    \"instagram\": \"https://instagram.com/clinic\"\n  },\n  \"isPublic\": true\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/cms/admin/contact",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cms", "admin", "contact"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update Contact (Admin)",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"heading\": \"Contact Us Updated\",\n  \"subHeading\": \"We're here to help you\",\n  \"description\": \"Have questions or ready to book an appointment? Reach out to us today.\",\n  \"phone\": \"+91-9876543210\",\n  \"email\": \"info@clinic.com\",\n  \"address\": \"123 Health Street, Wellness City, WC 12345\",\n  \"businessHours\": [\n    {\n      \"day\": \"Monday-Friday\",\n      \"hours\": \"9:00 AM - 8:00 PM\"\n    },\n    {\n      \"day\": \"Saturday\",\n      \"hours\": \"9:00 AM - 6:00 PM\"\n    },\n    {\n      \"day\": \"Sunday\",\n      \"hours\": \"10:00 AM - 4:00 PM\"\n    }\n  ],\n  \"socialLinks\": {\n    \"facebook\": \"https://facebook.com/clinic\",\n    \"twitter\": \"https://twitter.com/clinic\",\n    \"instagram\": \"https://instagram.com/clinic\"\n  },\n  \"isPublic\": true\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/cms/admin/contact",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cms", "admin", "contact"]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Conditions Section",
+          "item": [
+            {
+              "name": "Get Conditions (Public)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/cms/public/conditions",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cms", "public", "conditions"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Conditions (Admin)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/cms/admin/conditions",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cms", "admin", "conditions"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Add Conditions (Admin)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"Terms and Conditions\",\n  \"content\": \"These terms and conditions govern your use of our physiotherapy services...\",\n  \"sections\": [\n    {\n      \"title\": \"Service Agreement\",\n      \"content\": \"By using our services, you agree to the terms outlined...\",\n      \"order\": 1\n    },\n    {\n      \"title\": \"Payment Terms\",\n      \"content\": \"All services must be paid for in advance unless otherwise agreed...\",\n      \"order\": 2\n    },\n    {\n      \"title\": \"Cancellation Policy\",\n      \"content\": \"Cancellations must be made at least 24 hours in advance...\",\n      \"order\": 3\n    }\n  ],\n  \"lastUpdated\": \"2024-01-20T00:00:00.000Z\",\n  \"isPublic\": true\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/cms/admin/conditions",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cms", "admin", "conditions"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update Conditions (Admin)",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"Updated Terms and Conditions\",\n  \"content\": \"These updated terms and conditions govern your use of our physiotherapy services...\",\n  \"sections\": [\n    {\n      \"title\": \"Service Agreement\",\n      \"content\": \"By using our services, you agree to the terms outlined...\",\n      \"order\": 1\n    },\n    {\n      \"title\": \"Payment Terms\",\n      \"content\": \"All services must be paid for in advance unless otherwise agreed...\",\n      \"order\": 2\n    },\n    {\n      \"title\": \"Cancellation Policy\",\n      \"content\": \"Cancellations must be made at least 24 hours in advance...\",\n      \"order\": 3\n    }\n  ],\n  \"isPublic\": true\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/cms/admin/conditions",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cms", "admin", "conditions"]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Terms Section",
+          "item": [
+            {
+              "name": "Get Terms (Public)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/cms/public/terms",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cms", "public", "terms"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Terms (Admin)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/cms/admin/terms",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cms", "admin", "terms"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Add Terms (Admin)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"Terms of Service\",\n  \"content\": \"These terms govern your use of our physiotherapy services...\",\n  \"sections\": [\n    {\n      \"title\": \"Service Agreement\",\n      \"content\": \"By using our services, you agree to the terms outlined...\",\n      \"order\": 1\n    },\n    {\n      \"title\": \"Cancellation Policy\",\n      \"content\": \"Cancellations must be made at least 24 hours in advance...\",\n      \"order\": 2\n    }\n  ],\n  \"lastUpdated\": \"2024-01-20T00:00:00.000Z\",\n  \"isPublic\": true\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/cms/admin/terms",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cms", "admin", "terms"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update Terms (Admin)",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"Terms of Service Updated\",\n  \"content\": \"These terms govern your use of our physiotherapy services...\",\n  \"sections\": [\n    {\n      \"title\": \"Service Agreement\",\n      \"content\": \"By using our services, you agree to the terms outlined...\",\n      \"order\": 1\n    },\n    {\n      \"title\": \"Cancellation Policy\",\n      \"content\": \"Cancellations must be made at least 24 hours in advance...\",\n      \"order\": 2\n    }\n  ],\n  \"isPublic\": true\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/cms/admin/terms",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "cms", "admin", "terms"]
+                }
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Steps Section",
+      "item": [
+        {
+          "name": "Get Steps (Public)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/cms/public/steps",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cms", "public", "steps"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Steps (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/cms/admin/steps",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cms", "admin", "steps"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Add Step (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Initial Consultation\",\n  \"description\": \"Schedule your first appointment with our expert physiotherapist\",\n  \"icon\": \"consultation-icon\",\n  \"order\": 1,\n  \"isPublic\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/cms/admin/steps",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cms", "admin", "steps"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Step (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated Initial Consultation\",\n  \"description\": \"Schedule your first appointment with our expert physiotherapist\",\n  \"icon\": \"consultation-icon\",\n  \"order\": 1,\n  \"isPublic\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/cms/admin/steps/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cms", "admin", "steps", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "step_id_here"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Step (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/cms/admin/steps/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cms", "admin", "steps", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "step_id_here"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Featured Therapist Section",
+      "item": [
+        {
+          "name": "Get Featured Therapist (Public)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/cms/public/featuredTherapist",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cms", "public", "featuredTherapist"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Featured Therapist (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/cms/admin/featuredTherapist",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cms", "admin", "featuredTherapist"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Featured Therapist (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Dr. Jane Smith\",\n  \"title\": \"Senior Physiotherapist\",\n  \"specialty\": \"Sports Injury Rehabilitation\",\n  \"bio\": \"Experienced physiotherapist specializing in sports injury recovery\",\n  \"image\": \"therapist-image-url\",\n  \"isPublic\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/cms/admin/featuredTherapist",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cms", "admin", "featuredTherapist"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Get All CMS Data (Admin)",
+      "item": [
+        {
+          "name": "Get All CMS Data",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/cms/admin/all",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cms", "admin", "all"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "Password Reset",
       "item": [
         {
