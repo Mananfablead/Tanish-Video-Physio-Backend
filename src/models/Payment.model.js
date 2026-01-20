@@ -12,7 +12,7 @@ const paymentSchema = new mongoose.Schema({
     userId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
-        required: [true, 'User ID is required']
+        required: false // May be empty initially for guest payments
     },
     amount: {
         type: Number,
@@ -58,6 +58,18 @@ const paymentSchema = new mongoose.Schema({
     notes: {
         type: String,
         maxlength: [500, 'Notes cannot exceed 500 characters']
+    },
+    guestName: {
+        type: String,
+        required: false // Only for guest payments
+    },
+    guestEmail: {
+        type: String,
+        required: false // Only for guest payments
+    },
+    guestPhone: {
+        type: String,
+        required: false // Only for guest payments
     }
 }, {
     timestamps: true

@@ -15,7 +15,6 @@ const getSubscriptionPlans = async (req, res, next) => {
 };
 
 
-
 // Create a new subscription plan (admin only)
 const createSubscriptionPlan = async (req, res, next) => {
     try {
