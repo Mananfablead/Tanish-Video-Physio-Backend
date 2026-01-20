@@ -205,7 +205,7 @@ const verifyPayment = async (req, res, next) => {
                 { orderId },
                 {
                     paymentId,
-                    status: 'verified',
+                    status: 'paid',
                     verifiedAt: new Date()
                 }
             );
@@ -213,14 +213,14 @@ const verifyPayment = async (req, res, next) => {
             // Update the booking status as well
             await Booking.findByIdAndUpdate(
                 payment.bookingId,
-                { paymentStatus: 'verified' }
+                { paymentStatus: 'paid' }
             );
 
             res.status(200).json(
                 ApiResponse.success({
                     paymentId,
                     orderId,
-                    status: 'verified'
+                    status: 'paid'
                 }, 'Payment verified successfully')
             );
         } else {
@@ -313,7 +313,7 @@ const verifyGuestPayment = async (req, res, next) => {
             // Update the booking status as well
             await Booking.findByIdAndUpdate(
                 payment.bookingId,
-                { paymentStatus: 'verified' }
+                { paymentStatus: 'paid' }
             );
 
             // If this was a guest booking, send login credentials to the user's email
@@ -327,7 +327,7 @@ const verifyGuestPayment = async (req, res, next) => {
                 ApiResponse.success({
                     paymentId,
                     orderId,
-                    status: 'verified'
+                    status: 'paid'
                 }, 'Payment verified successfully')
             );
         } else {
@@ -755,7 +755,7 @@ const verifySubscriptionPayment = async (req, res, next) => {
                 ApiResponse.success({
                     paymentId,
                     orderId,
-                    status: 'verified',
+                    status: 'paid',
                     subscription: {
                         id: updatedSubscription._id,
                         planId: updatedSubscription.planId,
@@ -867,7 +867,7 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
                 ApiResponse.success({
                     paymentId,
                     orderId,
-                    status: 'verified',
+                    status: 'paid',
                     subscription: {
                         id: updatedSubscription._id,
                         planId: updatedSubscription.planId,
