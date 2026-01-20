@@ -4,6 +4,8 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const morgan = require('morgan');
 const path = require('path');
+const http = require('http');
+const { Server } = require('socket.io');
 const connectDB = require('./config/db');
 const config = require('./config/env');
 const routes = require('./routes');
@@ -125,10 +127,70 @@ const startServer = async () => {
         console.log(`Database connected successfully`);
 
         const PORT = config.PORT || 5001;
+        
+        // Create HTTP server
+        const server = http.createServer(app);
+        
+        // Initialize Socket.IO server
+        const io = new Server(server, {
+            cors: {
+                origin: config.ALLOWED_ORIGINS,
+                methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+                credentials: true
+            },
+            transports: ['websocket', 'polling']
+        });
+        
+        // Middleware to authenticate socket connections
+        io.use(async (socket, next) => {
+            try {
+                // Extract token from handshake auth
+                const token = socket.handshake.auth.token || socket.handshake.query.token;
+                
+                if (!token) {
+                    return next(new Error('Authentication error: No token provided'));
+                }
+                
+                // Verify JWT token
+                const jwt = require('jsonwebtoken');
+                const config = require('./config/env');
+                
+                const decoded = jwt.verify(token, config.JWT_SECRET);
+                
+                // Attach user info to socket
+                socket.user = {
+                    userId: decoded.userId,
+                    role: decoded.role,
+                    sessionId: decoded.sessionId
+                };
+                
+                next();
+            } catch (error) {
+                console.error('Socket authentication error:', error);
+                next(new Error('Authentication error')); 
+            }
+        });
+        
+        // Socket connection handler
+        io.on('connection', (socket) => {
+            console.log('New client connected:', socket.id);
+            
+            // Load chat and video call handlers
+            const setupChatHandlers = require('./sockets/chat.socket');
+            const setupVideoCallHandlers = require('./sockets/videoCall.socket');
+            
+            setupChatHandlers(io, socket);
+            setupVideoCallHandlers(io, socket);
+            
+            socket.on('disconnect', () => {
+                console.log('Client disconnected:', socket.id);
+            });
+        });
 
-        app.listen(PORT, () => {
+        server.listen(PORT, () => {
             console.log(`Server running on port ${PORT}`);
             console.log(`Environment: ${config.NODE_ENV}`);
+            console.log(`WebSocket server running on port ${PORT}`);
         });
     } catch (error) {
         console.error('Failed to start server:', error);
