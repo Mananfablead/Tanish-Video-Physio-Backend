@@ -15,6 +15,7 @@ const notificationRoutes = require('./notifications.routes');
 const chatRoutes = require('./chat.routes');
 const questionnaireRoutes = require('./questionnaires.routes');
 const cmsRoutes = require('./cms.routes');
+const testimonialRoutes = require('./testimonial.routes');
 
 // Mount route modules
 router.use('/auth', authRoutes);
@@ -30,5 +31,6 @@ router.use('/notifications', notificationRoutes);
 router.use('/chat', chatRoutes);
 router.use('/questionnaires', questionnaireRoutes);
 router.use('/cms', cmsRoutes);
+router.use('/testimonials', testimonialRoutes);
 
 module.exports = router;

@@ -3351,6 +3351,246 @@
       ]
     },
     {
+      "name": "Testimonials",
+      "item": [
+        {
+          "name": "Get All Testimonials (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/testimonials",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "testimonials"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Testimonial Stats (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/testimonials/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "testimonials", "stats"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Testimonial By ID (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/testimonials/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "testimonials", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "testimonial_id_here"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Testimonial (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientName\": \"John Doe\",\n  \"clientEmail\": \"john@example.com\",\n  \"rating\": 5,\n  \"content\": \"Excellent service! Highly recommend.\",\n  \"serviceUsed\": \"Physical Therapy\",\n  \"problem\": \"Back pain\",\n  \"status\": \"pending\",\n  \"featured\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/testimonials",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "testimonials"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Testimonial (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientName\": \"John Doe Updated\",\n  \"rating\": 4,\n  \"content\": \"Great service!\",\n  \"status\": \"approved\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/testimonials/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "testimonials", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "testimonial_id_here"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Testimonial Status (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"approved\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/testimonials/:id/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "testimonials", ":id", "status"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "testimonial_id_here"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Toggle Featured Status (Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/testimonials/:id/featured",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "testimonials", ":id", "featured"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "testimonial_id_here"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Testimonial (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/testimonials/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "testimonials", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "testimonial_id_here"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Public Testimonials",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/testimonials/public",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "testimonials", "public"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Featured Testimonials",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/testimonials/public/featured",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "testimonials", "public", "featured"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "Password Reset",
       "item": [
         {
