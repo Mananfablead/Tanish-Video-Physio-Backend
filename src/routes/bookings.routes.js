@@ -1,10 +1,11 @@
 const express = require('express');
-const { getAllBookings, getBookingById, createBooking, createGuestBooking, updateBooking, updateBookingStatus, updateGuestBookingStatus, deleteBooking, getBookingsByStatus } = require('../controllers/bookings.controller');
+const { getAllBookings, getBookingById, createBooking, createGuestBooking, updateBooking, updateBookingStatus, updateGuestBookingStatus, deleteBooking, getBookingsByStatus, getAllBookingsForAdmin } = require('../controllers/bookings.controller');
 const { authenticateToken } = require('../middlewares/auth.middleware');
 
 const router = express.Router();
 
 router.get('/', authenticateToken, getAllBookings);
+router.get('/admin/all', authenticateToken, getAllBookingsForAdmin);
 router.get('/status/:status', authenticateToken, getBookingsByStatus);
 router.get('/:id', authenticateToken, getBookingById);
 router.post('/', authenticateToken, createBooking);
