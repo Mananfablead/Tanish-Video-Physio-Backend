@@ -19,12 +19,22 @@ const getAllBookings = async (req, res, next) => {
 // Get booking by ID
 const getBookingById = async (req, res, next) => {
     try {
-        const booking = await Booking.findOne({ _id: req.params.id, userId: req.user.userId })
+        // Build query based on user role
+        let query;
+        if (req.user.role === 'admin') {
+            // Admin can access any booking
+            query = { _id: req.params.id };
+        } else {
+            // Regular user can only access their own bookings
+            query = { _id: req.params.id, userId: req.user.userId };
+        }
+        
+        const booking = await Booking.findOne(query)
             .populate('serviceId', 'name price duration')
             .populate('therapistId', 'name email role');
 
         if (!booking) {
-            return res.status(404).json(ApiResponse.error('Booking not found'));
+            return res.status(404).json(ApiResponse.error('Booking not found or unauthorized'));
         }
 
         res.status(200).json(ApiResponse.success({ booking }, 'Booking retrieved successfully'));
@@ -95,19 +105,39 @@ const createBooking = async (req, res, next) => {
 // Update booking by ID
 const updateBooking = async (req, res, next) => {
     try {
-        const { date, time, notes } = req.body;
+        const { date, time, notes, status } = req.body;
 
-        // Check if booking belongs to user
+        // Build query based on user role
+        let query;
+        if (req.user.role === 'admin') {
+            // Admin can update any booking
+            query = { _id: req.params.id };
+        } else {
+            // Regular user can only update their own bookings
+            query = { _id: req.params.id, userId: req.user.userId };
+        }
+
+        // Prepare update data
+        const updateData = { date, time, notes };
+        if (status !== undefined) {
+            // Validate status if provided
+            const validStatuses = ['pending', 'confirmed', 'completed', 'cancelled'];
+            if (!validStatuses.includes(status)) {
+                return res.status(400).json(ApiResponse.error('Invalid status. Valid statuses: pending, confirmed, completed, cancelled'));
+            }
+            updateData.status = status;
+        }
+
         const booking = await Booking.findOneAndUpdate(
-            { _id: req.params.id, userId: req.user.userId },
-            { date, time, notes },
+            query,
+            updateData,
             { new: true, runValidators: true }
         )
             .populate('serviceId', 'name price duration')
             .populate('therapistId', 'name email role');
 
         if (!booking) {
-            return res.status(404).json(ApiResponse.error('Booking not found'));
+            return res.status(404).json(ApiResponse.error('Booking not found or unauthorized'));
         }
 
         res.status(200).json(ApiResponse.success({ booking }, 'Booking updated successfully'));
@@ -127,9 +157,18 @@ const updateBookingStatus = async (req, res, next) => {
             return res.status(400).json(ApiResponse.error('Invalid status. Valid statuses: pending, confirmed, completed, cancelled'));
         }
 
-        // Check if booking belongs to user
+        // Build query based on user role
+        let query;
+        if (req.user.role === 'admin') {
+            // Admin can update status of any booking
+            query = { _id: req.params.id };
+        } else {
+            // Regular user can only update status of their own bookings
+            query = { _id: req.params.id, userId: req.user.userId };
+        }
+        
         const booking = await Booking.findOneAndUpdate(
-            { _id: req.params.id, userId: req.user.userId },
+            query,
             { status },
             { new: true, runValidators: true }
         )
@@ -137,7 +176,7 @@ const updateBookingStatus = async (req, res, next) => {
             .populate('therapistId', 'name email role');
 
         if (!booking) {
-            return res.status(404).json(ApiResponse.error('Booking not found'));
+            return res.status(404).json(ApiResponse.error('Booking not found or unauthorized'));
         }
 
         res.status(200).json(ApiResponse.success({ booking }, `Booking status updated to ${status} successfully`));
@@ -149,8 +188,18 @@ const updateBookingStatus = async (req, res, next) => {
 // Delete/cancel booking by ID
 const deleteBooking = async (req, res, next) => {
     try {
+        // Build query based on user role
+        let query;
+        if (req.user.role === 'admin') {
+            // Admin can delete/cancel any booking
+            query = { _id: req.params.id };
+        } else {
+            // Regular user can only delete/cancel their own bookings
+            query = { _id: req.params.id, userId: req.user.userId };
+        }
+        
         const booking = await Booking.findOneAndUpdate(
-            { _id: req.params.id, userId: req.user.userId },
+            query,
             { status: 'cancelled' },
             { new: true }
         )
@@ -158,7 +207,7 @@ const deleteBooking = async (req, res, next) => {
             .populate('therapistId', 'name email role');
 
         if (!booking) {
-            return res.status(404).json(ApiResponse.error('Booking not found'));
+            return res.status(404).json(ApiResponse.error('Booking not found or unauthorized'));
         }
 
         res.status(200).json(ApiResponse.success({ booking }, 'Booking cancelled successfully'));
@@ -249,15 +298,41 @@ const updateGuestBookingStatus = async (req, res, next) => {
     }
 };
 
+// Get all bookings for admin
+const getAllBookingsForAdmin = async (req, res, next) => {
+    try {
+        // Only allow admin users to access all bookings
+        if (req.user.role !== 'admin') {
+            return res.status(403).json(ApiResponse.error('Access denied. Admin access only.'));
+        }
+
+        const bookings = await Booking.find()
+            .populate('serviceId', 'name price duration')
+            .populate('therapistId', 'name email role')
+            .populate('userId', 'name email phone');
+
+        res.status(200).json(ApiResponse.success({ bookings }, 'All bookings retrieved successfully')); 
+    } catch (error) {
+        next(error);
+    }
+};
+
 // Get bookings by status
 const getBookingsByStatus = async (req, res, next) => {
     try {
         const { status } = req.params;
 
-        const bookings = await Booking.find({
-            userId: req.user.userId,
-            status: status
-        })
+        // Build query based on user role
+        let query;
+        if (req.user.role === 'admin') {
+            // Admin can see all bookings with the specified status
+            query = { status: status };
+        } else {
+            // Regular user can only see their own bookings with the specified status
+            query = { userId: req.user.userId, status: status };
+        }
+        
+        const bookings = await Booking.find(query)
             .populate('serviceId', 'name price duration')
             .populate('therapistId', 'name email role');
 
@@ -487,4 +562,5 @@ module.exports = {
     updateGuestBookingStatus,
     deleteBooking,
     getBookingsByStatus,
+    getAllBookingsForAdmin,
 };
