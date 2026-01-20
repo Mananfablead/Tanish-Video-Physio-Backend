@@ -93,4 +93,5 @@ dist
 Thumbs.db
 ehthumbs.db
 Icon?
-.apdisk
+.apdisklogs/
+*.log
