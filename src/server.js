@@ -11,7 +11,26 @@ const errorHandler = require('./middlewares/error.middleware');
 
 const app = express();
 // Security middleware
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: {
+      policy: "cross-origin",
+    },
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        imgSrc: [
+          "'self'",
+          "data:",
+          "blob:",
+          "http://localhost:5000", // backend
+          "http://localhost:8081", // frontend
+        ],
+      },
+    },
+  })
+);
+
 // CORS configuration
 const corsOptions = {
     origin: function (origin, callback) {
@@ -67,7 +86,15 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Serve static files
-app.use('/uploads', express.static(path.join(__dirname, '..', 'public', 'uploads')));
+app.use(
+  "/uploads",
+  express.static(path.join(__dirname, "..", "public", "uploads"), {
+    setHeaders: (res) => {
+      res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    },
+  })
+);
+
 
 // Routes
 app.use('/api', routes);
