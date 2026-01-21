@@ -22,7 +22,7 @@ const cmsHeroSchema = new mongoose.Schema({
     },
     secondaryCtaText: {
         type: String,
-        required: true,
+        required: false,
         trim: true
     },
     image: {

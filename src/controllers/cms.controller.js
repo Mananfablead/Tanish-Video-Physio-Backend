@@ -49,8 +49,16 @@ exports.getHeroAdmin = async (req, res) => {
 
 exports.updateHero = async (req, res) => {
     try {
-        const heroData = req.body;
-
+        // Clean up the request body to remove any problematic id fields
+        const heroData = { ...req.body };
+        delete heroData._id;
+        delete heroData.id;
+        
+        // If there's an uploaded file, update the image field with the file path
+        if (req.file) {
+            heroData.image = `/uploads/cms-images/${req.file.filename}`;
+        }
+        
         // Check if hero exists
         let hero = await CmsHero.findOne().sort({ createdAt: -1 });
 
@@ -113,13 +121,47 @@ exports.getStepsAdmin = async (req, res) => {
 
 exports.createStep = async (req, res) => {
     try {
-        const step = new CmsStep(req.body);
-        await step.save();
-        res.status(201).json({
-            success: true,
-            message: 'Step created successfully',
-            data: step
-        });
+        // Check if multiple steps are being sent
+        if (Array.isArray(req.body)) {
+            // Handle multiple steps creation
+            const createdSteps = [];
+            
+            for (const stepData of req.body) {
+                // Clean up the request body to remove any problematic id fields
+                const cleanedStepData = { ...stepData };
+                delete cleanedStepData._id;
+                delete cleanedStepData.id;
+                
+                const step = new CmsStep(cleanedStepData);
+                await step.save();
+                createdSteps.push(step);
+            }
+            
+            res.status(201).json({
+                success: true,
+                message: `${createdSteps.length} step(s) created successfully`,
+                data: createdSteps
+            });
+        } else {
+            // Handle single step creation
+            // Clean up the request body to remove any problematic id fields
+            const stepData = { ...req.body };
+            delete stepData._id;
+            delete stepData.id;
+            
+            // If there's an uploaded file, update the image field with the file path
+            if (req.file) {
+                stepData.image = `/uploads/cms-images/${req.file.filename}`;
+            }
+            
+            const step = new CmsStep(stepData);
+            await step.save();
+            res.status(201).json({
+                success: true,
+                message: 'Step created successfully',
+                data: step
+            });
+        }
     } catch (error) {
         res.status(500).json({
             success: false,
@@ -132,7 +174,17 @@ exports.createStep = async (req, res) => {
 exports.updateStep = async (req, res) => {
     try {
         const { id } = req.params;
-        const step = await CmsStep.findByIdAndUpdate(id, req.body, { new: true });
+        // Clean up the request body to remove any problematic id fields
+        const stepData = { ...req.body };
+        delete stepData._id;
+        delete stepData.id;
+        
+        // If there's an uploaded file, update the image field with the file path
+        if (req.file) {
+            stepData.image = `/uploads/cms-images/${req.file.filename}`;
+        }
+        
+        const step = await CmsStep.findByIdAndUpdate(id, stepData, { new: true });
 
         if (!step) {
             return res.status(404).json({
@@ -215,8 +267,49 @@ exports.getConditionsAdmin = async (req, res) => {
 
 exports.updateConditions = async (req, res) => {
     try {
-        const conditionsData = req.body;
-
+        // Clean up the request body to remove any problematic id fields
+        const conditionsData = { ...req.body };
+        delete conditionsData._id;
+        delete conditionsData.id;
+        
+        // Handle file uploads
+        if (req.files) {
+            // Process main image
+            if (req.files['image'] && req.files['image'].length > 0) {
+                conditionsData.image = `/uploads/cms-images/${req.files['image'][0].filename}`;
+            }
+            
+            // Process condition images if any
+            if (req.files['conditions']) {
+                // This assumes the conditions images are sent separately
+                // If conditions array is being updated, we need to handle it differently
+                const conditionImages = req.files['conditions'];
+                
+                // If conditions data contains an array, we need to map images to the conditions
+                if (conditionsData.conditions) {
+                    const conditionsArray = JSON.parse(conditionsData.conditions);
+                    
+                    // Update conditions with images if files are available
+                    for (let i = 0; i < conditionsArray.length && i < conditionImages.length; i++) {
+                        if (conditionImages[i]) {
+                            conditionsArray[i].image = `/uploads/cms-condition-images/${conditionImages[i].filename}`;
+                        }
+                    }
+                    
+                    conditionsData.conditions = conditionsArray;
+                }
+            }
+        }
+        
+        // If conditions data is a string (from form data), parse it
+        if (typeof conditionsData.conditions === 'string') {
+            try {
+                conditionsData.conditions = JSON.parse(conditionsData.conditions);
+            } catch (e) {
+                // If it's not JSON, leave it as is
+            }
+        }
+        
         let conditions = await CmsConditionsSection.findOne().sort({ createdAt: -1 });
 
         if (conditions) {
@@ -276,8 +369,11 @@ exports.getWhyUsAdmin = async (req, res) => {
 
 exports.updateWhyUs = async (req, res) => {
     try {
-        const whyUsData = req.body;
-
+        // Clean up the request body to remove any problematic id fields
+        const whyUsData = { ...req.body };
+        delete whyUsData._id;
+        delete whyUsData.id;
+        
         let whyUs = await CmsWhyUs.findOne().sort({ createdAt: -1 });
 
         if (whyUs) {
@@ -337,7 +433,12 @@ exports.getFaqsAdmin = async (req, res) => {
 
 exports.createFaq = async (req, res) => {
     try {
-        const faq = new CmsFaq(req.body);
+        // Clean up the request body to remove any problematic id fields
+        const faqData = { ...req.body };
+        delete faqData._id;
+        delete faqData.id;
+        
+        const faq = new CmsFaq(faqData);
         await faq.save();
         res.status(201).json({
             success: true,
@@ -356,7 +457,12 @@ exports.createFaq = async (req, res) => {
 exports.updateFaq = async (req, res) => {
     try {
         const { id } = req.params;
-        const faq = await CmsFaq.findByIdAndUpdate(id, req.body, { new: true });
+        // Clean up the request body to remove any problematic id fields
+        const faqData = { ...req.body };
+        delete faqData._id;
+        delete faqData.id;
+        
+        const faq = await CmsFaq.findByIdAndUpdate(id, faqData, { new: true });
 
         if (!faq) {
             return res.status(404).json({
@@ -439,8 +545,11 @@ exports.getTermsAdmin = async (req, res) => {
 
 exports.updateTerms = async (req, res) => {
     try {
-        const termsData = req.body;
-
+        // Clean up the request body to remove any problematic id fields
+        const termsData = { ...req.body };
+        delete termsData._id;
+        delete termsData.id;
+        
         let terms = await CmsTerms.findOne().sort({ createdAt: -1 });
 
         if (terms) {
@@ -500,8 +609,16 @@ exports.getFeaturedTherapistAdmin = async (req, res) => {
 
 exports.updateFeaturedTherapist = async (req, res) => {
     try {
-        const therapistData = req.body;
-
+        // Clean up the request body to remove any problematic id fields
+        const therapistData = { ...req.body };
+        delete therapistData._id;
+        delete therapistData.id;
+        
+        // If there's an uploaded file, update the image field with the file path
+        if (req.file) {
+            therapistData.image = `/uploads/cms-images/${req.file.filename}`;
+        }
+        
         let therapist = await CmsFeaturedTherapist.findOne().sort({ createdAt: -1 });
 
         if (therapist) {
@@ -561,8 +678,11 @@ exports.getContactAdmin = async (req, res) => {
 
 exports.updateContact = async (req, res) => {
     try {
-        const contactData = req.body;
-
+        // Clean up the request body to remove any problematic id fields
+        const contactData = { ...req.body };
+        delete contactData._id;
+        delete contactData.id;
+        
         let contact = await CmsContact.findOne().sort({ createdAt: -1 });
 
         if (contact) {
@@ -622,8 +742,16 @@ exports.getAboutAdmin = async (req, res) => {
 
 exports.updateAbout = async (req, res) => {
     try {
-        const aboutData = req.body;
-
+        // Clean up the request body to remove any problematic id fields
+        const aboutData = { ...req.body };
+        delete aboutData._id;
+        delete aboutData.id;
+        
+        // If there's an uploaded file, update the image field with the file path
+        if (req.file) {
+            aboutData.image = `/uploads/cms-images/${req.file.filename}`;
+        }
+        
         let about = await CmsAbout.findOne().sort({ createdAt: -1 });
 
         if (about) {

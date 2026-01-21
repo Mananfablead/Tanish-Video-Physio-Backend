@@ -1,6 +1,16 @@
 const mongoose = require('mongoose');
 
 const cmsStepSchema = new mongoose.Schema({
+    heading: {
+        type: String,
+        required: false, // Made optional to align with frontend expectations
+        trim: true
+    },
+    subHeading: {
+        type: String,
+        required: false, // Made optional to align with frontend expectations
+        trim: true
+    },
     title: {
         type: String,
         required: true,
@@ -13,12 +23,12 @@ const cmsStepSchema = new mongoose.Schema({
     },
     icon: {
         type: String,
-        required: true,
+        required: false, // Added to align with frontend expectations
         trim: true
     },
     image: {
         type: String,
-        required: true
+        required: false // Made optional to allow for steps without images
     },
     isPublic: {
         type: Boolean,

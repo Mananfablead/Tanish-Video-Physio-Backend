@@ -6,11 +6,10 @@ const cmsConditionSchema = new mongoose.Schema({
         required: true,
         trim: true
     },
-    icon: {
+    image: {
         type: String,
-        required: true,
-        trim: true
-    }
+        default: ''
+    },
 });
 
 const cmsConditionsSectionSchema = new mongoose.Schema({
