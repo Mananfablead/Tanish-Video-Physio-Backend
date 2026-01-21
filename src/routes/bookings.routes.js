@@ -14,7 +14,7 @@ router.post('/guest', createGuestBooking);
 router.put('/:id', authenticateToken, updateBooking);
 router.put('/:id/status', authenticateToken, updateBookingStatus);
 // Public route for guest users to update booking status
-router.put('/:id/guest-status', updateGuestBookingStatus);
+router.put('/guest-status/:id', updateGuestBookingStatus);
 router.delete('/:id', authenticateToken, deleteBooking);
 
 module.exports = router;
