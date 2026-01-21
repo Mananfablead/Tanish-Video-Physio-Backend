@@ -4,7 +4,12 @@ const sessionSchema = new mongoose.Schema({
     bookingId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Booking',
-        required: [true, 'Booking ID is required']
+        required: false // Not required when using subscription
+    },
+    subscriptionId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Subscription',
+        required: false // Not required when using booking
     },
     therapistId: {
         type: mongoose.Schema.Types.ObjectId,
@@ -70,7 +75,13 @@ const sessionSchema = new mongoose.Schema({
         type: String
     }
 }, {
-    timestamps: true
+    timestamps: true,
+    validate: {
+        validator: function () {
+            return this.bookingId || this.subscriptionId;
+        },
+        message: 'Either bookingId or subscriptionId must be provided'
+    }
 });
 
 module.exports = mongoose.model('Session', sessionSchema);

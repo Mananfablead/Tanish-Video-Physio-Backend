@@ -29,6 +29,10 @@ const subscriptionPlanSchema = new mongoose.Schema({
         required: [true, 'Duration is required'],
        enum: ["daily", "weekly", "monthly", "quarterly", "yearly"]
     },
+    sessions: {
+        type: Number,
+        default: 0 // 0 means unlimited sessions
+    },
     status: {
         type: String,
         enum: ['active', 'inactive'],
