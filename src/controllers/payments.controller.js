@@ -5,6 +5,7 @@ const Subscription = require('../models/Subscription.model');
 const SubscriptionPlan = require('../models/SubscriptionPlan.model');
 const User = require('../models/User.model');
 const ApiResponse = require('../utils/apiResponse');
+const { hashPassword } = require('../utils/auth.utils');
 
 // Utility function to calculate end date based on plan ID
 function calculateEndDate(planId, startDate = new Date()) {
@@ -119,10 +120,10 @@ const createGuestOrder = async (req, res, next) => {
         const existingUser = await User.findOne({ email: clientEmail });
 
         if (existingUser) {
-        // If user exists, check if they have any unpaid orders or bookings
-        // If they do, we might want to link the payment to those
-        // For now, we'll allow them to proceed with guest payment
-        // This addresses the issue where paid users couldn't make additional payments
+            // If user exists, check if they have any unpaid orders or bookings
+            // If they do, we might want to link the payment to those
+            // For now, we'll allow them to proceed with guest payment
+            // This addresses the issue where paid users couldn't make additional payments
         }
 
         // Find the booking to associate with this payment
@@ -273,6 +274,8 @@ const verifyGuestPayment = async (req, res, next) => {
         if (expectedSignature === signature) {
             // Payment verified successfully
 
+            let tempPassword = null; // Initialize to track if we created a new user with temp password
+
             // If this is a guest payment, create the user account first
             if (payment.guestName && payment.guestEmail && payment.guestPhone) {
                 // Check if user already exists (shouldn't happen, but just in case)
@@ -280,7 +283,8 @@ const verifyGuestPayment = async (req, res, next) => {
 
                 if (!existingUser) {
                     // Create the user account with temporary password
-                    const tempPassword = Math.random().toString(36).slice(-8) + 'Temp1!';
+                    tempPassword = Math.random().toString(36).slice(-8) + 'Temp1!';
+                    const hashedPassword = await hashPassword(tempPassword);
 
                     const newUser = new User({
                         name: payment.guestName,
@@ -317,10 +321,10 @@ const verifyGuestPayment = async (req, res, next) => {
             );
 
             // If this was a guest booking, send login credentials to the user's email
-            const booking = await Booking.findById(payment.bookingId).populate('userId', 'email name password');
-            if (booking && booking.userId) {
+            // Since we know the temporary password, we pass it instead of the hashed one
+            if (payment.guestEmail && tempPassword) {
                 // Send welcome email with login credentials to the user
-                await sendWelcomeEmailWithCredentials(booking.userId.email, booking.userId.name, booking.userId.email, booking.userId.password);
+                await sendWelcomeEmailWithCredentials(payment.guestEmail, payment.guestName, payment.guestEmail, tempPassword);
             }
 
             res.status(200).json(
@@ -483,6 +487,8 @@ const handleWebhook = async (req, res) => {
             // You might want to update the booking status as well
             const payment = await Payment.findOne({ orderId });
             if (payment) {
+                let tempPassword = null; // Initialize to track if we created a new user with temp password
+
                 // If this is a guest payment, create the user account first
                 if (payment.guestName && payment.guestEmail && payment.guestPhone) {
                     // Check if user already exists (shouldn't happen, but just in case)
@@ -490,7 +496,8 @@ const handleWebhook = async (req, res) => {
 
                     if (!existingUser) {
                         // Create the user account with temporary password
-                        const tempPassword = Math.random().toString(36).slice(-8) + 'Temp1!';
+                        tempPassword = Math.random().toString(36).slice(-8) + 'Temp1!';
+                        const hashedPassword = await hashPassword(tempPassword);
 
                         const newUser = new User({
                             name: payment.guestName,
@@ -517,16 +524,18 @@ const handleWebhook = async (req, res) => {
                 );
 
                 // If this was a guest booking, send login credentials to the user's email
-                const booking = await Booking.findById(payment.bookingId).populate('userId', 'email name password');
-                if (booking && booking.userId) {
+                // Since we know the temporary password, we pass it instead of the hashed one
+                if (payment.guestEmail && tempPassword) {
                     // Send welcome email with login credentials to the user
-                    await sendWelcomeEmailWithCredentials(booking.userId.email, booking.userId.name, booking.userId.email, booking.userId.password);
+                    await sendWelcomeEmailWithCredentials(payment.guestEmail, payment.guestName, payment.guestEmail, tempPassword);
                 }
             }
 
             // Check if this is a subscription payment
             const subscription = await Subscription.findOne({ orderId });
             if (subscription) {
+                let tempPassword = null; // Initialize to track if we created a new user with temp password
+
                 // If this is a guest subscription, create the user account first
                 if (subscription.guestName && subscription.guestEmail && subscription.guestPhone) {
                     // Check if user already exists (shouldn't happen, but just in case)
@@ -534,12 +543,13 @@ const handleWebhook = async (req, res) => {
 
                     if (!existingUser) {
                         // Create the user account with temporary password
-                        const tempPassword = Math.random().toString(36).slice(-8) + 'Temp1!';
+                        tempPassword = Math.random().toString(36).slice(-8) + 'Temp1!';
+                        const hashedPassword = await hashPassword(tempPassword);
 
                         const newUser = new User({
                             name: subscription.guestName,
                             email: subscription.guestEmail,
-                            password: tempPassword,
+                            password: hashedPassword,
                             phone: subscription.guestPhone,
                             role: 'patient',
                             status: 'active'
@@ -563,6 +573,12 @@ const handleWebhook = async (req, res) => {
 
                 // Activate the subscription with calculated end date
                 await activateSubscription(subscription._id);
+
+                // If this was a guest subscription and we created a new user, send login credentials
+                if (subscription.guestEmail && tempPassword) {
+                    // Send welcome email with login credentials to the user
+                    await sendWelcomeEmailWithCredentials(subscription.guestEmail, subscription.guestName, subscription.guestEmail, tempPassword);
+                }
             }
         } else if (event === 'payment.failed') {
             // Payment failed
@@ -661,8 +677,8 @@ const createGuestSubscriptionOrder = async (req, res, next) => {
         const existingUser = await User.findOne({ email: clientEmail });
 
         if (existingUser) {
-        // If user exists, allow them to proceed with guest subscription
-        // This addresses the issue where paid users couldn't subscribe again
+            // If user exists, allow them to proceed with guest subscription
+            // This addresses the issue where paid users couldn't subscribe again
         }
 
         // Use the actual plan price instead of the provided amount
@@ -816,6 +832,8 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
         if (expectedSignature === signature) {
             // Payment verified successfully
 
+            let tempPassword = null; // Initialize to track if we created a new user with temp password
+
             // If this is a guest subscription, create the user account first
             if (subscription.guestName && subscription.guestEmail && subscription.guestPhone) {
                 // Check if user already exists (shouldn't happen, but just in case)
@@ -823,7 +841,8 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
 
                 if (!existingUser) {
                     // Create the user account with temporary password
-                    const tempPassword = Math.random().toString(36).slice(-8) + 'Temp1!';
+                    tempPassword = Math.random().toString(36).slice(-8) + 'Temp1!';
+                    const hashedPassword = await hashPassword(tempPassword);
 
                     const newUser = new User({
                         name: subscription.guestName,
@@ -853,14 +872,11 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
             // Activate the subscription with calculated end date
             const updatedSubscription = await activateSubscription(subscription._id);
 
-            // Get user details to potentially send credentials (if this is for a guest who needs them)
-            const user = await User.findById(updatedSubscription.userId);
-
-            // If this was related to a guest account creation scenario, send login credentials
+            // If this was a guest subscription and we created a new user, send login credentials
             // This would typically be for cases where account was created during subscription purchase
-            if (user) {
+            if (subscription.guestEmail && tempPassword) {
                 // Send welcome email with login credentials to the user
-                await sendWelcomeEmailWithCredentials(user.email, user.name, user.email, user.password);
+                await sendWelcomeEmailWithCredentials(subscription.guestEmail, subscription.guestName, subscription.guestEmail, tempPassword);
             }
 
             res.status(200).json(

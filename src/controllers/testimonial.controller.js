@@ -1,4 +1,5 @@
 const Testimonial = require('../models/Testimonial.model');
+const User = require('../models/User.model');
 
 // Get all testimonials with filtering and search
 exports.getAllTestimonials = async (req, res) => {
@@ -9,11 +10,18 @@ exports.getAllTestimonials = async (req, res) => {
 
         // Apply search filter
         if (search) {
+            // For search functionality with user data, we'll need to first find matching users
+            const matchingUsers = await User.find({
+                $or: [
+                    { name: { $regex: search, $options: 'i' } },
+                    { email: { $regex: search, $options: 'i' } }
+                ]
+            });
+
             filter.$or = [
-                { clientName: { $regex: search, $options: 'i' } },
-                { serviceUsed: { $regex: search, $options: 'i' } },
                 { content: { $regex: search, $options: 'i' } },
-                { problem: { $regex: search, $options: 'i' } }
+                { problem: { $regex: search, $options: 'i' } },
+                { userId: { $in: matchingUsers.map(user => user._id) } }
             ];
         }
 
@@ -22,7 +30,9 @@ exports.getAllTestimonials = async (req, res) => {
             filter.status = status;
         }
 
-        const testimonials = await Testimonial.find(filter).sort({ createdAt: -1 });
+        const testimonials = await Testimonial.find(filter)
+            .populate('userId', 'name email profilePicture')
+            .sort({ createdAt: -1 });
 
         res.json({
             success: true,
@@ -41,6 +51,7 @@ exports.getAllTestimonials = async (req, res) => {
 exports.getPublicTestimonials = async (req, res) => {
     try {
         const testimonials = await Testimonial.find({ status: 'approved' })
+            .populate('userId', 'name email profilePicture')
             .sort({ featured: -1, createdAt: -1 }); // Featured testimonials first
 
         res.json({
@@ -62,7 +73,9 @@ exports.getFeaturedTestimonials = async (req, res) => {
         const testimonials = await Testimonial.find({
             status: 'approved',
             featured: true
-        }).sort({ createdAt: -1 });
+        })
+            .populate('userId', 'name email profilePicture')
+            .sort({ createdAt: -1 });
 
         res.json({
             success: true,
@@ -81,7 +94,8 @@ exports.getFeaturedTestimonials = async (req, res) => {
 exports.getTestimonialById = async (req, res) => {
     try {
         const { id } = req.params;
-        const testimonial = await Testimonial.findById(id);
+        const testimonial = await Testimonial.findById(id)
+            .populate('userId', 'name email profilePicture');
 
         if (!testimonial) {
             return res.status(404).json({
@@ -114,6 +128,11 @@ exports.createTestimonial = async (req, res) => {
             featured: req.user?.role === 'admin' ? req.body.featured : false
         };
 
+        // If authenticated user is creating testimonial, use their userId
+        if (req.user && !testimonialData.userId) {
+            testimonialData.userId = req.user._id;
+        }
+
         const testimonial = new Testimonial(testimonialData);
         await testimonial.save();
 
@@ -139,7 +158,8 @@ exports.updateTestimonial = async (req, res) => {
             id,
             req.body,
             { new: true, runValidators: true }
-        );
+        )
+            .populate('userId', 'name email profilePicture');
 
         if (!testimonial) {
             return res.status(404).json({
@@ -180,7 +200,8 @@ exports.updateTestimonialStatus = async (req, res) => {
             id,
             { status },
             { new: true, runValidators: true }
-        );
+        )
+            .populate('userId', 'name email profilePicture');
 
         if (!testimonial) {
             return res.status(404).json({
@@ -208,7 +229,8 @@ exports.toggleFeaturedStatus = async (req, res) => {
     try {
         const { id } = req.params;
 
-        const testimonial = await Testimonial.findById(id);
+        const testimonial = await Testimonial.findById(id)
+            .populate('userId', 'name email profilePicture');
 
         if (!testimonial) {
             return res.status(404).json({
@@ -246,7 +268,8 @@ exports.toggleFeaturedStatus = async (req, res) => {
 exports.deleteTestimonial = async (req, res) => {
     try {
         const { id } = req.params;
-        const testimonial = await Testimonial.findByIdAndDelete(id);
+        const testimonial = await Testimonial.findByIdAndDelete(id)
+            .populate('userId', 'name email profilePicture');
 
         if (!testimonial) {
             return res.status(404).json({

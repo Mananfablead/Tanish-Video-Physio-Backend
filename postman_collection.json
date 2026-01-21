@@ -939,7 +939,7 @@
       "name": "Sessions",
       "item": [
         {
-          "name": "Get All Sessions",
+          "name": "Get All Sessions (User)",
           "request": {
             "method": "GET",
             "header": [
@@ -958,7 +958,7 @@
           "response": []
         },
         {
-          "name": "Get Upcoming Sessions",
+          "name": "Get Upcoming Sessions (User)",
           "request": {
             "method": "GET",
             "header": [
@@ -977,7 +977,45 @@
           "response": []
         },
         {
-          "name": "Get Session By ID",
+          "name": "Get All Sessions (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/sessions/all",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "sessions", "all"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Upcoming Sessions (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/sessions/all/upcoming",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "sessions", "all", "upcoming"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Session By ID (User)",
           "request": {
             "method": "GET",
             "header": [
@@ -1002,7 +1040,32 @@
           "response": []
         },
         {
-          "name": "Create Session",
+          "name": "Get Session By ID (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/sessions/admin/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "sessions", "admin", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "session_id_here"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Session (User)",
           "description": "Creates a new session. The therapistId parameter is no longer required and will be automatically assigned from the associated booking.",
           "request": {
             "method": "POST",
@@ -1031,7 +1094,36 @@
           "response": []
         },
         {
-          "name": "Update Session",
+          "name": "Create Session (Admin)",
+          "description": "Creates a new session for any user. Requires userId, therapistId, and either bookingId or subscriptionId.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookingId\": \"booking_id_here\",\n  \"userId\": \"user_id_here\",\n  \"therapistId\": \"therapist_id_here\",\n  \"date\": \"2024-03-25\",\n  \"time\": \"10:00\",\n  \"type\": \"1-on-1\",\n  \"status\": \"scheduled\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/sessions/admin",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "sessions", "admin"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Session (User)",
           "request": {
             "method": "PUT",
             "header": [
@@ -1065,7 +1157,41 @@
           "response": []
         },
         {
-          "name": "Delete Session",
+          "name": "Update Session (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"completed\",\n  \"notes\": \"Session completed successfully\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/sessions/admin/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "sessions", "admin", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "session_id_here"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Session (User)",
           "request": {
             "method": "DELETE",
             "header": [
@@ -1090,7 +1216,32 @@
           "response": []
         },
         {
-          "name": "Reschedule Session",
+          "name": "Delete Session (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/sessions/admin/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "sessions", "admin", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "session_id_here"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reschedule Session (User)",
           "request": {
             "method": "PUT",
             "header": [
@@ -1113,6 +1264,40 @@
               "raw": "{{baseUrl}}/api/sessions/:id/reschedule",
               "host": ["{{baseUrl}}"],
               "path": ["api", "sessions", ":id", "reschedule"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "session_id_here"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reschedule Session (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"2024-03-26\",\n  \"time\": \"14:00\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/sessions/admin/:id/reschedule",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "sessions", "admin", ":id", "reschedule"],
               "variable": [
                 {
                   "key": "id",

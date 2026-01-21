@@ -264,9 +264,11 @@ const updateGuestBookingStatus = async (req, res, next) => {
 
             res.status(200).json(ApiResponse.success({ booking: updatedBooking }, `Booking status updated to ${status} successfully`));
         } else {
-            // If it's a guest booking, we need to check if the booking contains the client's email information
-            // For guest bookings, we might have stored the client's email in the booking record itself
-            if (booking.clientEmail === clientEmail || booking.clientName) {
+            // For guest bookings, we need to verify the booking is associated with the provided email
+            // We can check if the booking was created for a user with this email
+            const bookingUser = await User.findById(booking.userId);
+
+            if (bookingUser && bookingUser.email === clientEmail) {
                 // Update the booking status for guest bookings
                 // Only allow certain status changes for guest bookings
                 if (['cancelled'].includes(status)) {

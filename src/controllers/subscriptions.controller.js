@@ -18,7 +18,7 @@ const getSubscriptionPlans = async (req, res, next) => {
 // Create a new subscription plan (admin only)
 const createSubscriptionPlan = async (req, res, next) => {
     try {
-        const { planId, name, price, description, features, duration } = req.body;
+        const { planId, name, price, description, features, duration, sessions } = req.body;
 
         // Check if plan already exists
         const existingPlan = await SubscriptionPlan.findOne({ planId });
@@ -32,7 +32,8 @@ const createSubscriptionPlan = async (req, res, next) => {
             price,
             description,
             features,
-            duration
+            duration,
+            sessions
         });
 
         await plan.save();
@@ -72,11 +73,11 @@ const getSubscriptionPlan = async (req, res, next) => {
 // Update a subscription plan (admin only)
 const updateSubscriptionPlan = async (req, res, next) => {
     try {
-        const { name, price, description, features, duration, status, sortOrder } = req.body;
+        const { name, price, description, features, duration, sessions, status, sortOrder } = req.body;
 
         const plan = await SubscriptionPlan.findByIdAndUpdate(
             req.params.id,
-            { name, price, description, features, duration, status, sortOrder },
+            { name, price, description, features, duration, sessions, status, sortOrder },
             { new: true, runValidators: true }
         );
 
@@ -108,11 +109,75 @@ const deleteSubscriptionPlan = async (req, res, next) => {
 // Get subscriptions for authenticated user
 const getUserSubscriptions = async (req, res, next) => {
     try {
+        // Get user's subscriptions
         const subscriptions = await Subscription.find({ userId: req.user.userId })
             .populate('planId')
             .sort({ createdAt: -1 });
 
-        res.status(200).json(ApiResponse.success({ subscriptions }, 'User subscriptions retrieved successfully'));
+        // For each subscription, we can enrich it with session data
+        // Let's calculate session usage for each subscription
+        const enrichedSubscriptions = await Promise.all(subscriptions.map(async (subscription) => {
+            // Convert to plain object to modify
+            const subscriptionObj = subscription.toObject();
+
+            // Get the plan details to determine if it has session limits
+            const plan = await SubscriptionPlan.findById(subscription.planId);
+
+            if (plan && plan.sessions > 0) {
+                // Count sessions for this user related to this subscription
+                // Since we don't have direct mapping between sessions and subscriptions,
+                // we'll count sessions based on bookings made during the subscription period
+                const bookingModel = require('../models/Booking.model');
+                const sessionModel = require('../models/Session.model');
+
+                // Find bookings made during the subscription period
+                let bookingCount = 0;
+                let completedSessionCount = 0;
+
+                if (subscription.startDate) {
+                    const endDate = subscription.endDate || new Date(); // Use current date if no end date
+
+                    // Count bookings created during subscription period
+                    bookingCount = await bookingModel.countDocuments({
+                        userId: req.user.userId,
+                        createdAt: {
+                            $gte: subscription.startDate,
+                            $lte: endDate
+                        }
+                    });
+
+                    // Count completed sessions during subscription period
+                    completedSessionCount = await sessionModel.countDocuments({
+                        userId: req.user.userId,
+                        createdAt: {
+                            $gte: subscription.startDate,
+                            $lte: endDate
+                        },
+                        status: 'completed'
+                    });
+                }
+
+                // Add session information to the subscription object
+                subscriptionObj.sessionInfo = {
+                    totalAllowed: plan.sessions,
+                    sessionsUsed: completedSessionCount, // Using completed sessions as the measure
+                    sessionsRemaining: Math.max(0, plan.sessions - completedSessionCount),
+                    bookingsMade: bookingCount
+                };
+            } else {
+                // Unlimited sessions
+                subscriptionObj.sessionInfo = {
+                    totalAllowed: 'unlimited',
+                    sessionsUsed: 0, // Would need to count actual sessions separately
+                    sessionsRemaining: 'unlimited',
+                    bookingsMade: 0
+                };
+            }
+
+            return subscriptionObj;
+        }));
+
+        res.status(200).json(ApiResponse.success({ subscriptions: enrichedSubscriptions }, 'User subscriptions retrieved successfully'));
     } catch (error) {
         next(error);
     }
@@ -126,7 +191,67 @@ const getAllSubscriptions = async (req, res, next) => {
             .populate('planId')
             .sort({ createdAt: -1 });
 
-        res.status(200).json(ApiResponse.success({ subscriptions }, 'All subscriptions retrieved successfully'));
+        // Enrich each subscription with session information
+        const enrichedSubscriptions = await Promise.all(subscriptions.map(async (subscription) => {
+            // Convert to plain object to modify
+            const subscriptionObj = subscription.toObject();
+
+            // Get the plan details to determine if it has session limits
+            const plan = await SubscriptionPlan.findById(subscription.planId);
+
+            if (plan && plan.sessions > 0) {
+                // Count sessions for this user related to this subscription
+                const bookingModel = require('../models/Booking.model');
+                const sessionModel = require('../models/Session.model');
+
+                // Find bookings made during the subscription period
+                let bookingCount = 0;
+                let completedSessionCount = 0;
+
+                if (subscription.userId && subscription.startDate) {
+                    const endDate = subscription.endDate || new Date(); // Use current date if no end date
+
+                    // Count bookings created during subscription period
+                    bookingCount = await bookingModel.countDocuments({
+                        userId: subscription.userId,
+                        createdAt: {
+                            $gte: subscription.startDate,
+                            $lte: endDate
+                        }
+                    });
+
+                    // Count completed sessions during subscription period
+                    completedSessionCount = await sessionModel.countDocuments({
+                        userId: subscription.userId,
+                        createdAt: {
+                            $gte: subscription.startDate,
+                            $lte: endDate
+                        },
+                        status: 'completed'
+                    });
+                }
+
+                // Add session information to the subscription object
+                subscriptionObj.sessionInfo = {
+                    totalAllowed: plan.sessions,
+                    sessionsUsed: completedSessionCount,
+                    sessionsRemaining: Math.max(0, plan.sessions - completedSessionCount),
+                    bookingsMade: bookingCount
+                };
+            } else {
+                // Unlimited sessions
+                subscriptionObj.sessionInfo = {
+                    totalAllowed: 'unlimited',
+                    sessionsUsed: 0,
+                    sessionsRemaining: 'unlimited',
+                    bookingsMade: 0
+                };
+            }
+
+            return subscriptionObj;
+        }));
+
+        res.status(200).json(ApiResponse.success({ subscriptions: enrichedSubscriptions }, 'All subscriptions retrieved successfully'));
     } catch (error) {
         next(error);
     }
