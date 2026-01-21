@@ -16,6 +16,7 @@ const chatRoutes = require('./chat.routes');
 const questionnaireRoutes = require('./questionnaires.routes');
 const cmsRoutes = require('./cms.routes');
 const testimonialRoutes = require('./testimonial.routes');
+const groupSessionRoutes = require('./groupSession.route');
 
 // Mount route modules
 router.use('/auth', authRoutes);
@@ -32,5 +33,6 @@ router.use('/chat', chatRoutes);
 router.use('/questionnaires', questionnaireRoutes);
 router.use('/cms', cmsRoutes);
 router.use('/testimonials', testimonialRoutes);
+router.use('/group-sessions', groupSessionRoutes);
 
 module.exports = router;

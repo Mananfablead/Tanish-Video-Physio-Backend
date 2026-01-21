@@ -1,51 +1,138 @@
 const Session = require('../models/Session.model');
 const User = require('../models/User.model');
+const GroupSession = require('../models/GroupSession.model');
+const CallLog = require('../models/CallLog.model');
 const logger = require('../utils/logger');
 
 // Function to setup video call socket handlers
 const setupVideoCallHandlers = (io, socket) => {
-    // Join a video call room
-    socket.on('join-video-call', async (data) => {
+    // Join a video call room (both 1-on-1 and group)
+    socket.on('join-room', async (data) => {
         try {
-            const { sessionId } = data;
+            const { sessionId, groupSessionId } = data;
             const userId = socket.user.userId;
             
-            // Verify session exists and user has access
-            const session = await Session.findById(sessionId)
-                .populate('userId')
-                .populate('therapistId');
-                
-            if (!session) {
-                socket.emit('error', { message: 'Session not found' });
-                return;
-            }
+            let roomType, roomInfo;
 
-            // Check if user has permission to join the call
-            const isUser = session.userId && session.userId._id.toString() === userId;
-            const isTherapist = session.therapistId && session.therapistId._id.toString() === userId;
-            
-            if (!isUser && !isTherapist) {
-                socket.emit('error', { message: 'Unauthorized to join this session' });
+            // Determine if it's a 1-on-1 or group session
+            if (sessionId) {
+                // 1-on-1 session
+                roomType = 'session';
+
+                // Verify session exists and user has access
+                const session = await Session.findById(sessionId)
+                    .populate('userId')
+                    .populate('therapistId');
+
+                if (!session) {
+                    socket.emit('error', { message: 'Session not found' });
+                    return;
+                }
+
+                // Check if user has permission to join the call
+                const isUser = session.userId && session.userId._id.toString() === userId;
+                const isTherapist = session.therapistId && session.therapistId._id.toString() === userId;
+
+                if (!isUser && !isTherapist) {
+                    socket.emit('error', { message: 'Unauthorized to join this session' });
+                    return;
+                }
+
+                roomInfo = session;
+
+                // Check if call has started within the valid time frame
+                const now = new Date();
+                const sessionTime = new Date(session.date + 'T' + session.time);
+
+                // Allow joining 15 minutes before and 15 minutes after session start time
+                if (now < new Date(sessionTime.getTime() - 15 * 60000) || now > new Date(sessionTime.getTime() + 15 * 60000)) {
+                    socket.emit('error', { message: 'Session is not active at this time' });
+                    return;
+                }
+            } else if (groupSessionId) {
+                // Group session
+                roomType = 'group';
+
+                // Verify group session exists and user has access
+                const groupSession = await GroupSession.findById(groupSessionId)
+                    .populate('therapistId')
+                    .populate('participants.userId');
+
+                if (!groupSession) {
+                    socket.emit('error', { message: 'Group session not found' });
+                    return;
+                }
+
+                // Check if user has permission to join the group call
+                const isTherapist = groupSession.therapistId._id.toString() === userId;
+                const isParticipant = groupSession.participants.some(
+                    p => p.userId._id.toString() === userId && p.status === 'accepted'
+                );
+
+                if (!isTherapist && !isParticipant) {
+                    socket.emit('error', { message: 'Unauthorized to join this group session' });
+                    return;
+                }
+
+                // Check if max participants reached
+                const activeParticipants = Array.from(io.sockets.adapter.rooms.get(groupSessionId) || []).length;
+                if (activeParticipants >= groupSession.maxParticipants && !isTherapist) {
+                    socket.emit('error', { message: 'Maximum participants reached for this group session' });
+                    return;
+                }
+
+                roomInfo = groupSession;
+            } else {
+                socket.emit('error', { message: 'Either sessionId or groupSessionId is required' });
                 return;
             }
 
             // Add user to the video call room
-            socket.join(sessionId);
-            logger.info(`User ${userId} joined video call room ${sessionId}`);
+            const roomId = sessionId || groupSessionId;
+            socket.join(roomId);
+            logger.info(`User ${userId} joined ${roomType} room ${roomId}`);
 
             // Notify others in the room
-            socket.to(sessionId).emit('participant-joined', {
+            socket.to(roomId).emit('participant-joined', {
                 userId: userId,
-                sessionId: sessionId,
-                isTherapist: isTherapist,
-                isUser: isUser
+                roomId: roomId,
+                roomType: roomType,
+                isTherapist: isTherapist || (roomInfo.therapistId && roomInfo.therapistId._id.toString() === userId),
+                isUser: isUser || isParticipant
             });
+
+            // Update call log if call is active - execute as promise to avoid blocking
+            (async () => {
+                try {
+                    const activeCallLog = await CallLog.findOne({
+                        [roomType === 'group' ? 'groupSessionId' : 'sessionId']: roomId,
+                        status: 'active'
+                    }).sort({ callStartedAt: -1 });
+
+                    if (activeCallLog) {
+                        const existingParticipant = activeCallLog.participants.find(
+                            p => p.userId.toString() === userId
+                        );
+
+                        if (!existingParticipant) {
+                            activeCallLog.participants.push({
+                                userId: userId,
+                                joinedAt: new Date()
+                            });
+                            await activeCallLog.save();
+                        }
+                    }
+                } catch (error) {
+                    logger.error('Error updating call log on join:', error);
+                }
+            })();
 
             // Emit success event
             socket.emit('joined-call', {
                 success: true,
-                sessionId: sessionId,
-                message: 'Successfully joined video call'
+                roomId: roomId,
+                roomType: roomType,
+                message: `Successfully joined ${roomType} video call`
             });
         } catch (error) {
             logger.error('Error joining video call:', error);
@@ -54,18 +141,44 @@ const setupVideoCallHandlers = (io, socket) => {
     });
 
     // Leave a video call room
-    socket.on('leave-video-call', (data) => {
+    socket.on('leave-room', async (data) => {
         try {
-            const { sessionId } = data;
+            const { roomId, roomType } = data;
             const userId = socket.user.userId;
             
-            socket.leave(sessionId);
-            logger.info(`User ${userId} left video call room ${sessionId}`);
+            socket.leave(roomId);
+            logger.info(`User ${userId} left ${roomType} room ${roomId}`);
 
-            socket.to(sessionId).emit('participant-left', {
+            socket.to(roomId).emit('participant-left', {
                 userId: userId,
-                sessionId: sessionId
+                roomId: roomId,
+                roomType: roomType
             });
+
+            // Update call log if call is active - execute as promise to avoid blocking
+            (async () => {
+                try {
+                    const activeCallLog = await CallLog.findOne({
+                        [roomType === 'group' ? 'groupSessionId' : 'sessionId']: roomId,
+                        status: 'active'
+                    }).sort({ callStartedAt: -1 });
+
+                    if (activeCallLog) {
+                        const participantIndex = activeCallLog.participants.findIndex(
+                            p => p.userId.toString() === userId
+                        );
+
+                        if (participantIndex !== -1) {
+                            activeCallLog.participants[participantIndex].leftAt = new Date();
+                            activeCallLog.participants[participantIndex].duration =
+                                (new Date() - activeCallLog.participants[participantIndex].joinedAt) / 1000;
+                            await activeCallLog.save();
+                        }
+                    }
+                } catch (error) {
+                    logger.error('Error updating call log on leave:', error);
+                }
+            })();
 
             socket.emit('left-call', {
                 success: true,
@@ -77,13 +190,102 @@ const setupVideoCallHandlers = (io, socket) => {
         }
     });
 
+    // Start a call
+    socket.on('call-start', async (data) => {
+        try {
+            const { roomId, roomType } = data;
+            const userId = socket.user.userId;
+
+            // Only therapist can start the call
+            if (roomType === 'session') {
+                const session = await Session.findById(roomId);
+                if (session && session.therapistId.toString() !== userId) {
+                    socket.emit('error', { message: 'Only therapist can start the call' });
+                    return;
+                }
+            } else if (roomType === 'group') {
+                const groupSession = await GroupSession.findById(roomId);
+                if (groupSession && groupSession.therapistId.toString() !== userId) {
+                    socket.emit('error', { message: 'Only therapist can start the call' });
+                    return;
+                }
+            }
+
+            // Create call log entry
+            const callLog = new CallLog({
+                [roomType === 'group' ? 'groupSessionId' : 'sessionId']: roomId,
+                type: roomType === 'group' ? 'group' : 'one-on-one',
+                callStartedAt: new Date(),
+                status: 'active',
+                participants: []
+            });
+
+            // Add participants to call log
+            const room = io.sockets.adapter.rooms.get(roomId);
+            if (room) {
+                for (const participantId of room) {
+                    const participantSocket = io.sockets.sockets.get(participantId);
+                    if (participantSocket && participantSocket.user) {
+                        callLog.participants.push({
+                            userId: participantSocket.user.userId,
+                            joinedAt: new Date()
+                        });
+                    }
+                }
+            }
+
+            await callLog.save();
+
+            io.to(roomId).emit('call-started', {
+                roomId: roomId,
+                startedBy: userId,
+                callLogId: callLog._id
+            });
+        } catch (error) {
+            logger.error('Error starting call:', error);
+            socket.emit('error', { message: 'Failed to start call' });
+        }
+    });
+
+    // Accept a call
+    socket.on('call-accept', (data) => {
+        try {
+            const { roomId, roomType } = data;
+            const userId = socket.user.userId;
+
+            socket.to(roomId).emit('call-accepted', {
+                acceptedBy: userId,
+                roomId: roomId
+            });
+        } catch (error) {
+            logger.error('Error accepting call:', error);
+            socket.emit('error', { message: 'Failed to accept call' });
+        }
+    });
+
+    // Reject a call
+    socket.on('call-reject', (data) => {
+        try {
+            const { roomId, roomType } = data;
+            const userId = socket.user.userId;
+
+            socket.to(roomId).emit('call-rejected', {
+                rejectedBy: userId,
+                roomId: roomId
+            });
+        } catch (error) {
+            logger.error('Error rejecting call:', error);
+            socket.emit('error', { message: 'Failed to reject call' });
+        }
+    });
+
     // Handle WebRTC signaling - offer
     socket.on('offer', (data) => {
         try {
-            const { sessionId, offer, senderId } = data;
+            const { roomId, offer, senderId } = data;
             
             // Broadcast offer to other participants in the room
-            socket.to(sessionId).emit('offer', {
+            socket.to(roomId).emit('offer', {
                 offer,
                 senderId
             });
@@ -96,7 +298,7 @@ const setupVideoCallHandlers = (io, socket) => {
     // Handle WebRTC signaling - answer
     socket.on('answer', (data) => {
         try {
-            const { sessionId, answer, senderId, targetId } = data;
+            const { roomId, answer, senderId, targetId } = data;
             
             // Send answer to the specific target participant
             socket.to(targetId).emit('answer', {
@@ -112,7 +314,7 @@ const setupVideoCallHandlers = (io, socket) => {
     // Handle ICE candidates
     socket.on('ice-candidate', (data) => {
         try {
-            const { sessionId, candidate, senderId, targetId } = data;
+            const { roomId, candidate, senderId, targetId } = data;
             
             // Forward ICE candidate to target participant
             if (targetId) {
@@ -122,7 +324,7 @@ const setupVideoCallHandlers = (io, socket) => {
                 });
             } else {
                 // Broadcast to all other participants in the room
-                socket.to(sessionId).emit('ice-candidate', {
+                socket.to(roomId).emit('ice-candidate', {
                     candidate,
                     senderId
                 });
@@ -136,10 +338,10 @@ const setupVideoCallHandlers = (io, socket) => {
     // Handle mute/unmute events
     socket.on('audio-toggle', (data) => {
         try {
-            const { sessionId, muted } = data;
+            const { roomId, muted } = data;
             const userId = socket.user.userId;
             
-            socket.to(sessionId).emit('audio-toggle', {
+            socket.to(roomId).emit('audio-toggle', {
                 userId,
                 muted
             });
@@ -150,10 +352,10 @@ const setupVideoCallHandlers = (io, socket) => {
 
     socket.on('video-toggle', (data) => {
         try {
-            const { sessionId, videoEnabled } = data;
+            const { roomId, videoEnabled } = data;
             const userId = socket.user.userId;
             
-            socket.to(sessionId).emit('video-toggle', {
+            socket.to(roomId).emit('video-toggle', {
                 userId,
                 videoEnabled
             });
@@ -165,10 +367,10 @@ const setupVideoCallHandlers = (io, socket) => {
     // Handle screen sharing toggle
     socket.on('screen-share-toggle', (data) => {
         try {
-            const { sessionId, sharing } = data;
+            const { roomId, sharing } = data;
             const userId = socket.user.userId;
             
-            socket.to(sessionId).emit('screen-share-toggle', {
+            socket.to(roomId).emit('screen-share-toggle', {
                 userId,
                 sharing
             });
@@ -177,11 +379,175 @@ const setupVideoCallHandlers = (io, socket) => {
         }
     });
 
+    // Handle mute participant (therapist only)
+    socket.on('mute-user', async (data) => {
+        try {
+            const { roomId, userIdToMute, roomType } = data;
+            const userId = socket.user.userId;
+
+            // Only therapist can mute users
+            if (roomType === 'session') {
+                const session = await Session.findById(roomId);
+                if (session && session.therapistId.toString() !== userId) {
+                    socket.emit('error', { message: 'Only therapist can mute participants' });
+                    return;
+                }
+            } else if (roomType === 'group') {
+                const groupSession = await GroupSession.findById(roomId);
+                if (groupSession && groupSession.therapistId.toString() !== userId) {
+                    socket.emit('error', { message: 'Only therapist can mute participants' });
+                    return;
+                }
+            }
+
+            socket.to(userIdToMute).emit('mute-request', {
+                muted: true
+            });
+
+            socket.to(roomId).emit('user-muted', {
+                userId: userIdToMute,
+                mutedBy: userId
+            });
+        } catch (error) {
+            logger.error('Error muting user:', error);
+            socket.emit('error', { message: 'Failed to mute user' });
+        }
+    });
+
+    // Handle end call (therapist only)
+    socket.on('end-call', async (data) => {
+        try {
+            const { roomId, roomType } = data;
+            const userId = socket.user.userId;
+
+            // Only therapist can end the call
+            if (roomType === 'session') {
+                const session = await Session.findById(roomId);
+                if (session && session.therapistId.toString() !== userId) {
+                    socket.emit('error', { message: 'Only therapist can end the call' });
+                    return;
+                }
+            } else if (roomType === 'group') {
+                const groupSession = await GroupSession.findById(roomId);
+                if (groupSession && groupSession.therapistId.toString() !== userId) {
+                    socket.emit('error', { message: 'Only therapist can end the call' });
+                    return;
+                }
+            }
+
+            // Update call log
+            const callLog = await CallLog.findOne({
+                [roomType === 'group' ? 'groupSessionId' : 'sessionId']: roomId,
+                status: 'active'
+            }).sort({ callStartedAt: -1 });
+
+            if (callLog) {
+                callLog.callEndedAt = new Date();
+                callLog.duration = (new Date() - callLog.callStartedAt) / 1000; // Duration in seconds
+                callLog.status = 'completed';
+
+                // Update participant durations
+                const room = io.sockets.adapter.rooms.get(roomId);
+                if (room) {
+                    for (const participantId of room) {
+                        const participantSocket = io.sockets.sockets.get(participantId);
+                        if (participantSocket && participantSocket.user) {
+                            const participantIndex = callLog.participants.findIndex(
+                                p => p.userId.toString() === participantSocket.user.userId.toString()
+                            );
+                            if (participantIndex !== -1) {
+                                callLog.participants[participantIndex].leftAt = new Date();
+                                callLog.participants[participantIndex].duration =
+                                    (callLog.callEndedAt - callLog.participants[participantIndex].joinedAt) / 1000;
+                            } else {
+                                // Add participant who joined after call started
+                                callLog.participants.push({
+                                    userId: participantSocket.user.userId,
+                                    joinedAt: callLog.callStartedAt, // Assume they joined when call started
+                                    leftAt: new Date(),
+                                    duration: (new Date() - callLog.callStartedAt) / 1000
+                                });
+                            }
+                        }
+                    }
+                }
+
+                await callLog.save();
+            }
+
+            io.to(roomId).emit('call-ended', {
+                endedBy: userId,
+                message: 'Call ended by therapist'
+            });
+        } catch (error) {
+            logger.error('Error ending call:', error);
+            socket.emit('error', { message: 'Failed to end call' });
+        }
+    });
+
     // Handle disconnect
     socket.on('disconnect', () => {
         logger.info(`Socket ${socket.id} disconnected from video call`);
         
-        // Notify rooms that user has disconnected
+        // Update call log if call is active - execute as promise to avoid blocking
+        (async () => {
+            try {
+                // Find all rooms the user was in
+                for (const [roomId, room] of io.sockets.adapter.rooms) {
+                    if (room.has(socket.id)) {
+                        const userId = socket.user?.userId;
+                        if (userId) {
+                            // Determine if it's a session or group room by checking room type
+                            // For simplicity, we'll check both possibilities
+                            let roomType = null;
+
+                            // Check if this room corresponds to a session
+                            const session = await Session.findById(roomId);
+                            if (session) {
+                                roomType = 'session';
+                            } else {
+                                // Check if this room corresponds to a group session
+                                const groupSession = await GroupSession.findById(roomId);
+                                if (groupSession) {
+                                    roomType = 'group';
+                                }
+                            }
+
+                            if (roomType) {
+                                // Update call log if call is active
+                                const activeCallLog = await CallLog.findOne({
+                                    [roomType === 'group' ? 'groupSessionId' : 'sessionId']: roomId,
+                                    status: 'active'
+                                }).sort({ callStartedAt: -1 });
+
+                                if (activeCallLog) {
+                                    const participantIndex = activeCallLog.participants.findIndex(
+                                        p => p.userId.toString() === userId
+                                    );
+
+                                    if (participantIndex !== -1) {
+                                        activeCallLog.participants[participantIndex].leftAt = new Date();
+                                        activeCallLog.participants[participantIndex].duration =
+                                            (new Date() - activeCallLog.participants[participantIndex].joinedAt) / 1000;
+                                        await activeCallLog.save();
+                                    }
+                                }
+
+                                // Notify others in the room
+                                socket.to(roomId).emit('participant-left', {
+                                    userId: userId,
+                                    roomId: roomId,
+                                    roomType: roomType
+                                });
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                logger.error('Error handling disconnect:', error);
+            }
+        })();
+
         // Note: Socket.io automatically removes user from rooms on disconnect
     });
 };

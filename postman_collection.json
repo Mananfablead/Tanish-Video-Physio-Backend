@@ -3591,6 +3591,163 @@
       ]
     },
     {
+      "name": "Video Calls",
+      "item": [
+        {
+          "name": "Generate Video Call Join Link",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sessionId\": \"session_id_here\",\n  \"userId\": \"user_id_here\",\n  \"role\": \"patient\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/video-call/generate-join-link",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "video-call", "generate-join-link"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Verify Video Call Join Link",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"jwt_token_here\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/video-call/verify-join-link",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "video-call", "verify-join-link"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Video Call Info",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/video-call/info/:sessionId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "video-call", "info", ":sessionId"],
+              "variable": [
+                {
+                  "key": "sessionId",
+                  "value": "session_id_here"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Join Video Call (WebSocket)",
+          "description": "This endpoint is handled through WebSocket connection. Client should connect to ws://localhost:5000 and authenticate with JWT token, then emit 'join-video-call' event with sessionId.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "ws://localhost:5000",
+              "protocol": "ws",
+              "host": ["localhost"],
+              "port": "5000"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Leave Video Call (WebSocket)",
+          "description": "Client should emit 'leave-video-call' event with sessionId through WebSocket connection.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "ws://localhost:5000",
+              "protocol": "ws",
+              "host": ["localhost"],
+              "port": "5000"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Send Video Call Offer (WebSocket)",
+          "description": "Client should emit 'offer' event with WebRTC offer data through WebSocket connection.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "ws://localhost:5000",
+              "protocol": "ws",
+              "host": ["localhost"],
+              "port": "5000"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Send Video Call Answer (WebSocket)",
+          "description": "Client should emit 'answer' event with WebRTC answer data through WebSocket connection.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "ws://localhost:5000",
+              "protocol": "ws",
+              "host": ["localhost"],
+              "port": "5000"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Send ICE Candidate (WebSocket)",
+          "description": "Client should emit 'ice-candidate' event with ICE candidate data through WebSocket connection.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "ws://localhost:5000",
+              "protocol": "ws",
+              "host": ["localhost"],
+              "port": "5000"
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+
+    {
       "name": "Password Reset",
       "item": [
         {
@@ -3669,6 +3826,402 @@
               "raw": "{{baseUrl}}/api/auth/update-password",
               "host": ["{{baseUrl}}"],
               "path": ["api", "auth", "update-password"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Testimonials",
+      "item": [
+        {
+          "name": "Get All Testimonials (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/testimonials",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "testimonials"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Testimonial Stats (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/testimonials/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "testimonials", "stats"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Testimonial By ID (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/testimonials/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "testimonials", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "testimonial_id_here"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Testimonial (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientName\": \"John Doe\",\n  \"clientEmail\": \"john@example.com\",\n  \"rating\": 5,\n  \"content\": \"Excellent service! Highly recommend.\",\n  \"serviceUsed\": \"Physical Therapy\",\n  \"problem\": \"Back pain\",\n  \"status\": \"pending\",\n  \"featured\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/testimonials",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "testimonials"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Testimonial (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientName\": \"John Doe Updated\",\n  \"rating\": 4,\n  \"content\": \"Great service!\",\n  \"status\": \"approved\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/testimonials/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "testimonials", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "testimonial_id_here"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Testimonial Status (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"approved\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/testimonials/:id/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "testimonials", ":id", "status"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "testimonial_id_here"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Toggle Featured Status (Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/testimonials/:id/featured",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "testimonials", ":id", "featured"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "testimonial_id_here"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Testimonial (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/testimonials/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "testimonials", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "testimonial_id_here"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Public Testimonials",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/testimonials/public",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "testimonials", "public"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Featured Testimonials",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/testimonials/public/featured",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "testimonials", "public", "featured"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Video Calls",
+      "item": [
+        {
+          "name": "Generate Video Call Join Link",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sessionId\": \"session_id_here\",\n  \"userId\": \"user_id_here\",\n  \"role\": \"patient\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/video-call/generate-join-link",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "video-call", "generate-join-link"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Verify Video Call Join Link",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"jwt_token_here\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/video-call/verify-join-link",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "video-call", "verify-join-link"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Video Call Info",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/video-call/info/:sessionId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "video-call", "info", ":sessionId"],
+              "variable": [
+                {
+                  "key": "sessionId",
+                  "value": "session_id_here"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Join Video Call (WebSocket)",
+          "description": "This endpoint is handled through WebSocket connection. Client should connect to ws://localhost:5000 and authenticate with JWT token, then emit 'join-video-call' event with sessionId.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "ws://localhost:5000",
+              "protocol": "ws",
+              "host": ["localhost"],
+              "port": "5000"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Leave Video Call (WebSocket)",
+          "description": "Client should emit 'leave-video-call' event with sessionId through WebSocket connection.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "ws://localhost:5000",
+              "protocol": "ws",
+              "host": ["localhost"],
+              "port": "5000"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Send Video Call Offer (WebSocket)",
+          "description": "Client should emit 'offer' event with WebRTC offer data through WebSocket connection.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "ws://localhost:5000",
+              "protocol": "ws",
+              "host": ["localhost"],
+              "port": "5000"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Send Video Call Answer (WebSocket)",
+          "description": "Client should emit 'answer' event with WebRTC answer data through WebSocket connection.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "ws://localhost:5000",
+              "protocol": "ws",
+              "host": ["localhost"],
+              "port": "5000"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Send ICE Candidate (WebSocket)",
+          "description": "Client should emit 'ice-candidate' event with ICE candidate data through WebSocket connection.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "ws://localhost:5000",
+              "protocol": "ws",
+              "host": ["localhost"],
+              "port": "5000"
             }
           },
           "response": []

@@ -79,6 +79,7 @@ const validateUpdateProfile = [
 ];
 
 module.exports = {
+    validate,
     validateRegister,
     validateLogin,
     validateBooking,
