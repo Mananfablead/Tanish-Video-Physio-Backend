@@ -7,6 +7,7 @@ const CmsTerms = require('../models/CmsTerms.model');
 const CmsFeaturedTherapist = require('../models/CmsFeaturedTherapist.model');
 const CmsContact = require('../models/CmsContact.model');
 const CmsAbout = require('../models/CmsAbout.model');
+const config = require('../config/env');
 
 // Hero Section
 exports.getHeroPublic = async (req, res) => {
@@ -54,9 +55,9 @@ exports.updateHero = async (req, res) => {
         delete heroData._id;
         delete heroData.id;
         
-        // If there's an uploaded file, update the image field with the file path
+        // If there's an uploaded file, update the image field with the full URL
         if (req.file) {
-            heroData.image = `/uploads/cms-images/${req.file.filename}`;
+            heroData.image = `${config.BASE_URL}/uploads/cms-images/${req.file.filename}`;
         }
         
         // Check if hero exists
@@ -149,9 +150,9 @@ exports.createStep = async (req, res) => {
             delete stepData._id;
             delete stepData.id;
             
-            // If there's an uploaded file, update the image field with the file path
+            // If there's an uploaded file, update the image field with the full URL
             if (req.file) {
-                stepData.image = `/uploads/cms-images/${req.file.filename}`;
+                stepData.image = `${config.BASE_URL}/uploads/cms-images/${req.file.filename}`;
             }
             
             const step = new CmsStep(stepData);
@@ -179,9 +180,9 @@ exports.updateStep = async (req, res) => {
         delete stepData._id;
         delete stepData.id;
         
-        // If there's an uploaded file, update the image field with the file path
+        // If there's an uploaded file, update the image field with the full URL
         if (req.file) {
-            stepData.image = `/uploads/cms-images/${req.file.filename}`;
+            stepData.image = `${config.BASE_URL}/uploads/cms-images/${req.file.filename}`;
         }
         
         const step = await CmsStep.findByIdAndUpdate(id, stepData, { new: true });
@@ -267,6 +268,18 @@ exports.getConditionsAdmin = async (req, res) => {
 
 exports.updateConditions = async (req, res) => {
     try {
+        // DEBUG: Log incoming data
+        console.log('=== CONDITIONS UPDATE DEBUG ===');
+        console.log('Body keys:', Object.keys(req.body));
+        console.log('Files keys:', req.files ? Object.keys(req.files) : 'No files');
+        console.log('Conditions data from body:', req.body.conditions);
+        
+        if (req.files) {
+            Object.keys(req.files).forEach(key => {
+                console.log(`File ${key}:`, req.files[key][0]?.filename);
+            });
+        }
+        
         // Clean up the request body to remove any problematic id fields
         const conditionsData = { ...req.body };
         delete conditionsData._id;
@@ -276,28 +289,48 @@ exports.updateConditions = async (req, res) => {
         if (req.files) {
             // Process main image
             if (req.files['image'] && req.files['image'].length > 0) {
-                conditionsData.image = `/uploads/cms-images/${req.files['image'][0].filename}`;
+                conditionsData.image = `${config.BASE_URL}/uploads/cms-condition-images/${req.files['image'][0].filename}`;
             }
             
             // Process condition images if any
-            if (req.files['conditions']) {
-                // This assumes the conditions images are sent separately
-                // If conditions array is being updated, we need to handle it differently
-                const conditionImages = req.files['conditions'];
+            // Handle files sent - multer.any() changes field names to numeric indices
+            if (req.files) {
+                console.log('Processing uploaded files...');
                 
-                // If conditions data contains an array, we need to map images to the conditions
-                if (conditionsData.conditions) {
-                    const conditionsArray = JSON.parse(conditionsData.conditions);
-                    
-                    // Update conditions with images if files are available
-                    for (let i = 0; i < conditionsArray.length && i < conditionImages.length; i++) {
-                        if (conditionImages[i]) {
-                            conditionsArray[i].image = `/uploads/cms-condition-images/${conditionImages[i].filename}`;
-                        }
-                    }
-                    
-                    conditionsData.conditions = conditionsArray;
+                // Parse the conditions from the body
+                let conditionsArray;
+                if (typeof conditionsData.conditions === 'string') {
+                    conditionsArray = JSON.parse(conditionsData.conditions);
+                } else {
+                    conditionsArray = conditionsData.conditions || [];
                 }
+                
+                console.log(`Found ${conditionsArray.length} conditions`);
+                console.log('Received files:', Object.keys(req.files));
+                
+                // Process each uploaded file using numeric indices (0, 1, 2, etc.)
+                Object.keys(req.files).forEach(fieldIndex => {
+                    const index = parseInt(fieldIndex);
+                    // Check if it's an array (multer behavior) or direct file object
+                    const uploadedFile = Array.isArray(req.files[fieldIndex]) ? req.files[fieldIndex][0] : req.files[fieldIndex];
+                    
+                    if (uploadedFile && uploadedFile.filename) {
+                        console.log(`Found file for condition ${index}: ${uploadedFile.filename}`);
+                        
+                        // Update the condition at this index
+                        if (conditionsArray[index]) {
+                            // Use relative path that will be served by the static middleware
+                            conditionsArray[index].image = `${config.BASE_URL}/uploads/cms-condition-images/${uploadedFile.filename}`;
+                            console.log(`Set image URL for condition ${index}: ${conditionsArray[index].image}`);
+                        }
+                    } else {
+                        console.log(`No valid file found for index ${index}`);
+                        console.log('File data:', req.files[fieldIndex]);
+                    }
+                });
+                
+                // Update the conditions data
+                conditionsData.conditions = conditionsArray;
             }
         }
         
@@ -308,6 +341,16 @@ exports.updateConditions = async (req, res) => {
             } catch (e) {
                 // If it's not JSON, leave it as is
             }
+        }
+        
+        // Clean up any existing problematic image data in conditions
+        // (Only clean up if no image URL was set from uploaded files)
+        if (conditionsData.conditions && Array.isArray(conditionsData.conditions)) {
+            conditionsData.conditions = conditionsData.conditions.map(condition => ({
+                ...condition,
+                // Only convert to null if it's an object and not a valid URL string
+                image: (condition.image && typeof condition.image === 'object') ? null : condition.image
+            }));
         }
         
         let conditions = await CmsConditionsSection.findOne().sort({ createdAt: -1 });
@@ -614,9 +657,9 @@ exports.updateFeaturedTherapist = async (req, res) => {
         delete therapistData._id;
         delete therapistData.id;
         
-        // If there's an uploaded file, update the image field with the file path
+        // If there's an uploaded file, update the image field with the full URL
         if (req.file) {
-            therapistData.image = `/uploads/cms-images/${req.file.filename}`;
+            therapistData.image = `${config.BASE_URL}/uploads/cms-images/${req.file.filename}`;
         }
         
         let therapist = await CmsFeaturedTherapist.findOne().sort({ createdAt: -1 });
@@ -747,9 +790,25 @@ exports.updateAbout = async (req, res) => {
         delete aboutData._id;
         delete aboutData.id;
         
-        // If there's an uploaded file, update the image field with the file path
-        if (req.file) {
-            aboutData.image = `/uploads/cms-images/${req.file.filename}`;
+        // Handle multiple image uploads
+        if (req.files && req.files.length > 0) {
+            // Get the current about section to preserve existing images
+            const currentAbout = await CmsAbout.findOne().sort({ createdAt: -1 });
+            
+            // Initialize images array with existing images
+            const images = [...(currentAbout?.images || [])];
+            
+            // Add new uploaded images
+            req.files.forEach(file => {
+                images.push(`${config.BASE_URL}/uploads/cms-images/${file.filename}`);
+            });
+            
+            aboutData.images = images;
+            
+            // Also update the legacy single image field for backward compatibility
+            if (images.length > 0) {
+                aboutData.image = images[0];
+            }
         }
         
         let about = await CmsAbout.findOne().sort({ createdAt: -1 });

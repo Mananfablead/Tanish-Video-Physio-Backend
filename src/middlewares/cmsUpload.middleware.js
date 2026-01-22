@@ -24,17 +24,30 @@ const storage = multer.diskStorage({
     filename: function (req, file, cb) {
         // Create a unique filename using timestamp and original name
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, 'cms-' + uniqueSuffix + path.extname(file.originalname));
+        const ext = path.extname(file.originalname).toLowerCase();
+        // Ensure we have a proper extension, fallback to .jpg if unknown
+        const finalExt = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.avif'].includes(ext) ? ext : '.jpg';
+        cb(null, 'cms-' + uniqueSuffix + finalExt);
     }
 });
 
-// File filter to allow only images
+// File filter to allow only images including AVIF
 const fileFilter = (req, file, cb) => {
-    // Allow only image files
-    if (file.mimetype.startsWith('image/')) {
+    // Allow common image file types including AVIF
+    const allowedTypes = [
+        'image/jpeg',
+        'image/jpg',
+        'image/png',
+        'image/gif',
+        'image/webp',
+        'image/svg+xml',
+        'image/avif'
+    ];
+    
+    if (allowedTypes.includes(file.mimetype)) {
         cb(null, true);
     } else {
-        cb(new Error('Only image files are allowed!'), false);
+        cb(new Error(`Invalid file type: ${file.mimetype}. Only image files are allowed!`), false);
     }
 };
 

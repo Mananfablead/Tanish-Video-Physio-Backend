@@ -28,6 +28,13 @@ app.use(
           "http://localhost:5000", // backend
           "http://localhost:8081", // frontend
         ],
+        mediaSrc: [
+          "'self'",
+          "data:",
+          "blob:",
+          "http://localhost:5000",
+          "http://localhost:8081",
+        ],
       },
     },
   })

@@ -30,6 +30,10 @@ const cmsAboutSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    images: [{
+        type: String,
+        default: ''
+    }],
     image: {
         type: String,
         default: ''

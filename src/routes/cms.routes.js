@@ -57,7 +57,7 @@ router.put('/admin/contact', cmsController.updateContact);
 
 // About Section
 router.get('/admin/about', cmsController.getAboutAdmin);
-router.put('/admin/about', cmsUpload.single('image'), cmsController.updateAbout);
+router.put('/admin/about', cmsUpload.array('images', 10), cmsController.updateAbout);
 
 // Get all CMS data
 router.get('/admin/all', cmsController.getAllCmsData);
