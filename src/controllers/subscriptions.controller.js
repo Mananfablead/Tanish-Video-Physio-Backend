@@ -120,8 +120,9 @@ const getUserSubscriptions = async (req, res, next) => {
             // Convert to plain object to modify
             const subscriptionObj = subscription.toObject();
 
-            // Get the plan details to determine if it has session limits
-            const plan = await SubscriptionPlan.findById(subscription.planId);
+            // Validate that planId is a valid ObjectId before querying
+            const isValidObjectId = require('mongoose').Types.ObjectId.isValid(subscription.planId);
+            const plan = isValidObjectId ? await SubscriptionPlan.findById(subscription.planId) : null;
 
             if (plan && plan.sessions > 0) {
                 // Count sessions for this user related to this subscription
@@ -196,8 +197,9 @@ const getAllSubscriptions = async (req, res, next) => {
             // Convert to plain object to modify
             const subscriptionObj = subscription.toObject();
 
-            // Get the plan details to determine if it has session limits
-            const plan = await SubscriptionPlan.findById(subscription.planId);
+            // Validate that planId is a valid ObjectId before querying
+            const isValidObjectId = require('mongoose').Types.ObjectId.isValid(subscription.planId);
+            const plan = isValidObjectId ? await SubscriptionPlan.findById(subscription.planId) : null;
 
             if (plan && plan.sessions > 0) {
                 // Count sessions for this user related to this subscription
