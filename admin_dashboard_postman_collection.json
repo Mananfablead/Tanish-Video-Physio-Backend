@@ -1,0 +1,101 @@
+{
+  "info": {
+    "name": "Admin Dashboard API Collection",
+    "description": "Collection for testing the admin dashboard API endpoint with exact response structure",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Admin Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"your_admin_password\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Login as admin to get authentication token for dashboard access"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "item": [
+        {
+          "name": "Get Admin Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/reports/admin/dashboard",
+              "host": ["{{base_url}}"],
+              "path": ["reports", "admin", "dashboard"]
+            },
+            "description": "Get comprehensive admin dashboard data with stats, charts, and recent activity"
+          },
+          "response": [
+            {
+              "name": "Successful Dashboard Response",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/reports/admin/dashboard"
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"stats\": {\n      \"totalUsers\": 6850,\n      \"activeSubscriptions\": 4230,\n      \"totalRevenue\": 45800,\n      \"upcomingSessions\": 156,\n      \"completedToday\": 48,\n      \"avgRating\": 4.8,\n      \"conversionRate\": 68,\n      \"totalServices\": 250\n    },\n    \"revenueChart\": [\n      { \"month\": \"Jan\", \"revenue\": 12400 },\n      { \"month\": \"Feb\", \"revenue\": 15800 },\n      { \"month\": \"Mar\", \"revenue\": 18200 },\n      { \"month\": \"Apr\", \"revenue\": 14500 },\n      { \"month\": \"May\", \"revenue\": 16700 },\n      { \"month\": \"Jun\", \"revenue\": 19300 }\n    ],\n    \"sessionsChart\": [\n      { \"day\": \"Sun\", \"completed\": 32, \"cancelled\": 2, \"noShow\": 1 },\n      { \"day\": \"Mon\", \"completed\": 45, \"cancelled\": 3, \"noShow\": 2 },\n      { \"day\": \"Tue\", \"completed\": 38, \"cancelled\": 1, \"noShow\": 1 },\n      { \"day\": \"Wed\", \"completed\": 41, \"cancelled\": 2, \"noShow\": 2 },\n      { \"day\": \"Thu\", \"completed\": 39, \"cancelled\": 1, \"noShow\": 1 },\n      { \"day\": \"Fri\", \"completed\": 35, \"cancelled\": 3, \"noShow\": 2 },\n      { \"day\": \"Sat\", \"completed\": 28, \"cancelled\": 2, \"noShow\": 1 }\n    ],\n    \"userGrowthChart\": [\n      { \"month\": \"Jan\", \"users\": 1200, \"therapists\": 45 },\n      { \"month\": \"Feb\", \"users\": 1350, \"therapists\": 48 },\n      { \"month\": \"Mar\", \"users\": 1180, \"therapists\": 42 },\n      { \"month\": \"Apr\", \"users\": 1420, \"therapists\": 51 },\n      { \"month\": \"May\", \"users\": 1280, \"therapists\": 47 },\n      { \"month\": \"Jun\", \"users\": 1390, \"therapists\": 49 }\n    ],\n    \"recentActivity\": [\n      {\n        \"type\": \"session_complete\",\n        \"title\": \"Session completed\",\n        \"description\": \"Admin completed session with Rohit\",\n        \"time\": \"2 min ago\"\n      },\n      {\n        \"type\": \"new_booking\",\n        \"title\": \"New booking\",\n        \"description\": \"Priya Sharma booked Back Pain Therapy\",\n        \"time\": \"15 min ago\"\n      },\n      {\n        \"type\": \"payment_received\",\n        \"title\": \"Payment received\",\n        \"description\": \"₹2500 received for Knee Rehabilitation\",\n        \"time\": \"1 hour ago\"\n      },\n      {\n        \"type\": \"new_user\",\n        \"title\": \"New user registered\",\n        \"description\": \"Amit Patel joined the platform\",\n        \"time\": \"2 hours ago\"\n      }\n    ],\n    \"upcomingSessions\": [\n      {\n        \"_id\": \"69707303dc9e1df5e808c567\",\n        \"user\": \"Rohit Kumar\",\n        \"therapist\": \"Admin\",\n        \"time\": \"11:00 AM\",\n        \"type\": \"1-on-1\",\n        \"status\": \"live\"\n      },\n      {\n        \"_id\": \"69707303dc9e1df5e808c568\",\n        \"user\": \"Priya Sharma\",\n        \"therapist\": \"Dr. Johnson\",\n        \"time\": \"2:30 PM\",\n        \"type\": \"1-on-1\",\n        \"status\": \"upcoming\"\n      },\n      {\n        \"_id\": \"69707303dc9e1df5e808c569\",\n        \"user\": \"Amit Patel\",\n        \"therapist\": \"Dr. Smith\",\n        \"time\": \"4:00 PM\",\n        \"type\": \"1-on-1\",\n        \"status\": \"upcoming\"\n      }\n    ]\n  }\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000/api",
+      "type": "string",
+      "description": "Base API URL"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string",
+      "description": "JWT authentication token (obtained from login)"
+    }
+  ]
+}
