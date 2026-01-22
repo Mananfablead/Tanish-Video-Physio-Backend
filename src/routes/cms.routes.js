@@ -9,7 +9,7 @@ router.get('/public/hero', cmsController.getHeroPublic);
 router.get('/public/steps', cmsController.getStepsPublic);
 router.get('/public/conditions', cmsController.getConditionsPublic);
 router.get('/public/whyUs', cmsController.getWhyUsPublic);
-router.get('/public/faq', cmsController.getFaqsPublic);
+router.get('/public/faqs', cmsController.getFaqsPublic);
 router.get('/public/terms', cmsController.getTermsPublic);
 router.get('/public/featuredTherapist', cmsController.getFeaturedTherapistPublic);
 router.get('/public/contact', cmsController.getContactPublic);

@@ -16,6 +16,9 @@ const storage = multer.diskStorage({
         } else if (fieldname === 'conditions.image') {
             // For condition images in some formats
             cb(null, 'public/uploads/cms-condition-images/');
+        } else if (fieldname.includes('condition') && fieldname.includes('.image')) {
+            // For various condition image field formats
+            cb(null, 'public/uploads/cms-condition-images/');
         } else {
             // Default for other image fields
             cb(null, 'public/uploads/cms-images/');

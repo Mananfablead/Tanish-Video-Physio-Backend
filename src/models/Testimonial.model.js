@@ -25,6 +25,12 @@ const testimonialSchema = new mongoose.Schema({
         trim: true,
         maxlength: [200, 'Problem description cannot exceed 200 characters']
     },
+    serviceUsed: {
+        type: String,
+        required: [true, 'Service used is required'],
+        trim: true,
+        maxlength: [100, 'Service used description cannot exceed 100 characters']
+    },
     status: {
         type: String,
         enum: ['pending', 'approved', 'rejected'],

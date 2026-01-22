@@ -308,24 +308,35 @@ exports.updateConditions = async (req, res) => {
                 console.log(`Found ${conditionsArray.length} conditions`);
                 console.log('Received files:', Object.keys(req.files));
                 
-                // Process each uploaded file using numeric indices (0, 1, 2, etc.)
-                Object.keys(req.files).forEach(fieldIndex => {
-                    const index = parseInt(fieldIndex);
+                // Process each uploaded file - handle both numeric indices and named fields
+                Object.keys(req.files).forEach(fieldKey => {
                     // Check if it's an array (multer behavior) or direct file object
-                    const uploadedFile = Array.isArray(req.files[fieldIndex]) ? req.files[fieldIndex][0] : req.files[fieldIndex];
+                    const uploadedFile = Array.isArray(req.files[fieldKey]) ? req.files[fieldKey][0] : req.files[fieldKey];
                     
                     if (uploadedFile && uploadedFile.filename) {
-                        console.log(`Found file for condition ${index}: ${uploadedFile.filename}`);
+                        let conditionIndex = null;
                         
-                        // Update the condition at this index
-                        if (conditionsArray[index]) {
-                            // Use relative path that will be served by the static middleware
-                            conditionsArray[index].image = `${config.BASE_URL}/uploads/cms-condition-images/${uploadedFile.filename}`;
-                            console.log(`Set image URL for condition ${index}: ${conditionsArray[index].image}`);
+                        // Try to extract index from field name like 'conditions[0].image'
+                        const match = fieldKey.match(/conditions\\[(\\d+)\\]\\.image/);
+                        if (match) {
+                            conditionIndex = parseInt(match[1]);
+                        } else {
+                            // Fall back to numeric index if fieldKey is a number
+                            conditionIndex = parseInt(fieldKey);
+                        }
+                        
+                        if (!isNaN(conditionIndex) && conditionsArray[conditionIndex]) {
+                            console.log(`Found file for condition ${conditionIndex}: ${uploadedFile.filename}`);
+                            
+                            // Update the condition at this index
+                            conditionsArray[conditionIndex].image = `${config.BASE_URL}/uploads/cms-condition-images/${uploadedFile.filename}`;
+                            console.log(`Set image URL for condition ${conditionIndex}: ${conditionsArray[conditionIndex].image}`);
+                        } else {
+                            console.log(`Could not map file ${fieldKey} to a condition index`);
                         }
                     } else {
-                        console.log(`No valid file found for index ${index}`);
-                        console.log('File data:', req.files[fieldIndex]);
+                        console.log(`No valid file found for field ${fieldKey}`);
+                        console.log('File data:', req.files[fieldKey]);
                     }
                 });
                 
@@ -343,14 +354,38 @@ exports.updateConditions = async (req, res) => {
             }
         }
         
-        // Clean up any existing problematic image data in conditions
-        // (Only clean up if no image URL was set from uploaded files)
+        // First, get the existing conditions from database to preserve existing image URLs
+        const existingConditionsDoc = await CmsConditionsSection.findOne().sort({ createdAt: -1 });
+        const existingConditions = existingConditionsDoc?.conditions || [];
+        
+        // Process conditions array to properly handle image updates
         if (conditionsData.conditions && Array.isArray(conditionsData.conditions)) {
-            conditionsData.conditions = conditionsData.conditions.map(condition => ({
-                ...condition,
-                // Only convert to null if it's an object and not a valid URL string
-                image: (condition.image && typeof condition.image === 'object') ? null : condition.image
-            }));
+            conditionsData.conditions = conditionsData.conditions.map((condition, index) => {
+                // If there was a file uploaded for this specific condition index, use the new image
+                const hasNewImage = req.files && (
+                    req.files[`conditions[${index}].image`] || 
+                    req.files[index.toString()] // fallback for numeric indices
+                );
+                
+                if (hasNewImage) {
+                    // A new image was uploaded for this condition, keep the new URL
+                    return condition;
+                } else {
+                    // No new image uploaded for this condition, preserve existing image URL from database
+                    if (existingConditions[index] && existingConditions[index].image && typeof existingConditions[index].image === 'string') {
+                        return {
+                            ...condition,
+                            image: existingConditions[index].image
+                        };
+                    } else {
+                        // Handle cleanup for problematic data in the new condition
+                        return {
+                            ...condition,
+                            image: (condition.image && typeof condition.image === 'object') ? null : condition.image
+                        };
+                    }
+                }
+            });
         }
         
         let conditions = await CmsConditionsSection.findOne().sort({ createdAt: -1 });
