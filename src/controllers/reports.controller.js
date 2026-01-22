@@ -200,9 +200,210 @@ const getTherapistReport = async (req, res, next) => {
     }
 };
 
+// Get admin dashboard data
+const getAdminDashboard = async (req, res, next) => {
+    try {
+        // Get today's date for daily stats
+        const today = new Date();
+        const todayStart = new Date(today.setHours(0, 0, 0, 0));
+        const todayEnd = new Date(today.setHours(23, 59, 59, 999));
+
+        // Get user statistics
+        const totalUsers = await User.countDocuments({ role: 'patient' });
+        
+        // Get subscription statistics
+        const Subscription = require('../models/Subscription.model');
+        const activeSubscriptions = await Subscription.countDocuments({ status: 'active' });
+
+        // Get revenue statistics
+        const payments = await Payment.find({ status: 'paid' });
+        const totalRevenue = payments.reduce((sum, payment) => sum + payment.amount, 0);
+
+        // Get upcoming sessions
+        const upcomingSessions = await Session.countDocuments({ 
+            status: { $in: ['scheduled', 'pending'] },
+            startTime: { $gte: new Date() }
+        });
+
+        // Get completed sessions today
+        const completedToday = await Session.countDocuments({ 
+            status: 'completed',
+            updatedAt: { $gte: todayStart, $lte: todayEnd }
+        });
+
+        // Get service statistics
+        const Service = require('../models/Service.model');
+        const totalServices = await Service.countDocuments({ status: 'active' });
+
+        // Generate chart data (last 6 months)
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const currentMonth = new Date().getMonth();
+        
+        // Revenue chart data
+        const revenueChart = [];
+        for (let i = 5; i >= 0; i--) {
+            const monthIndex = (currentMonth - i + 12) % 12;
+            const year = new Date().getFullYear() - (currentMonth - i < 0 ? 1 : 0);
+            
+            const startDate = new Date(year, monthIndex, 1);
+            const endDate = new Date(year, monthIndex + 1, 0);
+            
+            const monthPayments = await Payment.find({
+                status: 'paid',
+                createdAt: { $gte: startDate, $lte: endDate }
+            });
+            
+            const revenue = monthPayments.reduce((sum, payment) => sum + payment.amount, 0);
+            
+            revenueChart.push({
+                month: months[monthIndex],
+                revenue
+            });
+        }
+
+        // Sessions chart data (last 7 days)
+        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const sessionsChart = [];
+        
+        for (let i = 6; i >= 0; i--) {
+            const date = new Date();
+            date.setDate(date.getDate() - i);
+            const dayStart = new Date(date.setHours(0, 0, 0, 0));
+            const dayEnd = new Date(date.setHours(23, 59, 59, 999));
+            
+            const completed = await Session.countDocuments({
+                status: 'completed',
+                updatedAt: { $gte: dayStart, $lte: dayEnd }
+            });
+            
+            const cancelled = await Session.countDocuments({
+                status: 'cancelled',
+                updatedAt: { $gte: dayStart, $lte: dayEnd }
+            });
+            
+            // For demo purposes, assuming some no-shows
+            const noShow = Math.floor(completed * 0.05);
+            
+            sessionsChart.push({
+                day: days[date.getDay()],
+                completed,
+                cancelled,
+                noShow
+            });
+        }
+
+        // User growth chart (last 6 months)
+        const userGrowthChart = [];
+        for (let i = 5; i >= 0; i--) {
+            const monthIndex = (currentMonth - i + 12) % 12;
+            const year = new Date().getFullYear() - (currentMonth - i < 0 ? 1 : 0);
+            
+            const startDate = new Date(year, monthIndex, 1);
+            const endDate = new Date(year, monthIndex + 1, 0);
+            
+            const users = await User.countDocuments({
+                role: 'patient',
+                createdAt: { $gte: startDate, $lte: endDate }
+            });
+            
+            // Get therapists created in this period (for comparison)
+            const therapists = await User.countDocuments({
+                role: 'admin',
+                createdAt: { $gte: startDate, $lte: endDate }
+            });
+            
+            userGrowthChart.push({
+                month: months[monthIndex],
+                users,
+                therapists
+            });
+        }
+
+        // Recent activity (mock data for demo)
+        const recentActivity = [
+            {
+                type: 'session_complete',
+                title: 'Session completed',
+                description: 'Admin completed session with Rohit',
+                time: '2 min ago'
+            },
+            {
+                type: 'new_booking',
+                title: 'New booking',
+                description: 'Priya Sharma booked Back Pain Therapy',
+                time: '15 min ago'
+            },
+            {
+                type: 'payment_received',
+                title: 'Payment received',
+                description: '₹2500 received for Knee Rehabilitation',
+                time: '1 hour ago'
+            },
+            {
+                type: 'new_user',
+                title: 'New user registered',
+                description: 'Amit Patel joined the platform',
+                time: '2 hours ago'
+            }
+        ];
+
+        // Upcoming sessions (sample data)
+        const upcomingSessionsData = [
+            {
+                _id: '69707303dc9e1df5e808c567',
+                user: 'Rohit Kumar',
+                therapist: 'Admin',
+                time: '11:00 AM',
+                type: '1-on-1',
+                status: 'live'
+            },
+            {
+                _id: '69707303dc9e1df5e808c568',
+                user: 'Priya Sharma',
+                therapist: 'Dr. Johnson',
+                time: '2:30 PM',
+                type: '1-on-1',
+                status: 'upcoming'
+            },
+            {
+                _id: '69707303dc9e1df5e808c569',
+                user: 'Amit Patel',
+                therapist: 'Dr. Smith',
+                time: '4:00 PM',
+                type: '1-on-1',
+                status: 'upcoming'
+            }
+        ];
+
+        res.status(200).json({
+            success: true,
+            data: {
+                stats: {
+                    totalUsers,
+                    activeSubscriptions,
+                    totalRevenue,
+                    upcomingSessions,
+                    completedToday,
+                    avgRating: 4.8,
+                    conversionRate: 68,
+                    totalServices
+                },
+                revenueChart,
+                sessionsChart,
+                userGrowthChart,
+                recentActivity,
+                upcomingSessions: upcomingSessionsData
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
 module.exports = {
     getUserReport,
     getSessionReport,
     getRevenueReport,
-    getTherapistReport
+    getTherapistReport,
+    getAdminDashboard
 };

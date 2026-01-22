@@ -14,7 +14,7 @@ const sessionSchema = new mongoose.Schema({
     therapistId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
-        required: [true, 'Therapist ID is required']
+        // required: [true, 'Therapist ID is required']
     },
     userId: {
         type: mongoose.Schema.Types.ObjectId,

@@ -135,172 +135,92 @@ const createSession = async (req, res, next) => {
     const { bookingId, subscriptionId, date, time, type, status, duration } =
       req.body;
 
-    // Validate that either bookingId or subscriptionId is provided
+    // Either bookingId or subscriptionId required
     if (!bookingId && !subscriptionId) {
       return res
         .status(400)
-        .json(
-          ApiResponse.error(
-            "Either bookingId or subscriptionId must be provided"
-          )
-        );
+        .json(ApiResponse.error("Either bookingId or subscriptionId must be provided"));
     }
 
-    let therapistId, userId;
+    let therapistId = null;
+    const userId = req.user.userId;
 
-    // Handle booking-based session
+    /** ---------------- BOOKING BASED SESSION ---------------- */
     if (bookingId) {
       const booking = await Booking.findOne({
         _id: bookingId,
-        userId: req.user.userId,
+        userId,
       });
+
       if (!booking) {
         return res.status(404).json(ApiResponse.error("Booking not found"));
       }
 
-      // Check if the booking has been paid
       if (booking.paymentStatus !== "paid") {
         return res
           .status(400)
-          .json(
-            ApiResponse.error(
-              "Cannot create session: Booking payment status is not paid"
-            )
-          );
+          .json(ApiResponse.error("Booking payment not completed"));
       }
 
-      therapistId = booking.therapistId;
-      userId = req.user.userId;
+      therapistId = booking.therapistId; // auto from booking
     }
 
-    // Handle subscription-based session
-    else if (subscriptionId) {
+    /** ---------------- SUBSCRIPTION BASED SESSION ---------------- */
+    if (subscriptionId) {
       const Subscription = require("../models/Subscription.model");
       const SubscriptionPlan = require("../models/SubscriptionPlan.model");
-      const sessionModel = require("../models/Session.model");
 
       const subscription = await Subscription.findOne({
         _id: subscriptionId,
-        userId: req.user.userId,
+        userId,
       });
+
       if (!subscription) {
-        return res
-          .status(404)
-          .json(ApiResponse.error("Subscription not found"));
+        return res.status(404).json(ApiResponse.error("Subscription not found"));
       }
 
-      // Check if subscription is active
       if (subscription.status !== "active") {
         return res
           .status(400)
-          .json(
-            ApiResponse.error(
-              "Cannot create session: Subscription is not active"
-            )
-          );
+          .json(ApiResponse.error("Subscription is not active"));
       }
 
-      // Check subscription validity dates
       const now = new Date();
       if (subscription.endDate && subscription.endDate < now) {
         return res
           .status(400)
-          .json(
-            ApiResponse.error("Cannot create session: Subscription has expired")
-          );
+          .json(ApiResponse.error("Subscription has expired"));
       }
 
-      // Check session limits if the subscription plan has a limit
-      const plan = await SubscriptionPlan.findById(subscription.planId);
-      if (plan && plan.sessions > 0) {
-        // 0 means unlimited sessions
-        // Count completed sessions for this subscription
-        const completedSessionsCount = await sessionModel.countDocuments({
-          subscriptionId: subscription._id,
-          status: "completed",
-        });
-
-        if (completedSessionsCount >= plan.sessions) {
-          return res
-            .status(400)
-            .json(
-              ApiResponse.error(
-                `Cannot create session: Maximum session limit of ${plan.sessions} reached for this subscription`
-              )
-            );
-        }
-      }
-
-      // Get therapist from request body for subscription-based session
-      therapistId = req.body.therapistId;
-      if (!therapistId) {
-        return res
-          .status(400)
-          .json(
-            ApiResponse.error(
-              "Therapist ID is required for subscription-based session"
-            )
-          );
-      }
-
-      userId = req.user.userId;
+      // therapistId intentionally NULL (admin later assign karega)
+      therapistId = null;
     }
 
-    // Auto-generate startTime from date and time
+    /** ---------------- TIME SETUP ---------------- */
     const startTime = new Date(`${date}T${time}:00`);
 
-    // Calculate endTime based on duration if provided
     let endTime = null;
-    if (duration && typeof duration === "number" && duration > 0) {
-      endTime = new Date(startTime.getTime() + duration * 60000); // duration in minutes converted to milliseconds
+    if (duration && duration > 0) {
+      endTime = new Date(startTime.getTime() + duration * 60000);
     }
 
-    // Generate a unique sessionId
-    const sessionId = `session_${Date.now()}_${Math.random()
-      .toString(36)
-      .substr(2, 9)}`;
-
-    const sessionData = {
-      therapistId,
+    /** ---------------- SESSION CREATE ---------------- */
+    const session = await Session.create({
+      bookingId: bookingId || undefined,
+      subscriptionId: subscriptionId || undefined,
+      therapistId, // can be null
       userId,
-      sessionId, // Add the unique sessionId
       date,
       time,
-      startTime, // Add the required startTime field
-      endTime, // Add the calculated endTime based on duration
-      type,
-      status,
-      duration, // Add the duration field
-    };
+      startTime,
+      endTime,
+      type: type || "1-on-1",
+      status: status || "scheduled",
+      duration: duration || 0,
+    });
 
-    // Add bookingId or subscriptionId depending on the session type
-    if (bookingId) {
-      sessionData.bookingId = bookingId;
-    }
-
-    if (subscriptionId) {
-      sessionData.subscriptionId = subscriptionId;
-    }
-
-    const session = new Session(sessionData);
-
-    await session.save();
-
-    // Populate the response based on session type
-    if (bookingId) {
-      await session.populate(
-        "bookingId",
-        "serviceName therapistName date time"
-      );
-    }
-
-    if (subscriptionId) {
-      await session.populate(
-        "subscriptionId",
-        "planId planName startDate endDate status"
-      );
-    }
-
+    await session.populate("bookingId", "serviceName therapistName date time");
+    await session.populate("subscriptionId", "planId planName startDate endDate status");
     await session.populate("therapistId", "name email role");
 
     res
@@ -310,6 +230,8 @@ const createSession = async (req, res, next) => {
     next(error);
   }
 };
+
+
 
 // Update session by ID
 const updateSession = async (req, res, next) => {
