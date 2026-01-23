@@ -19,9 +19,9 @@ const getAvailabilityByTherapist = async (req, res, next) => {
     try {
         const { therapistId } = req.params;
 
-        // Validate therapist (admin user) exists
+        // Validate therapist exists
         const therapist = await User.findById(therapistId);
-        if (!therapist || therapist.role !== 'admin') {
+        if (!therapist || (therapist.role !== 'admin' && therapist.role !== 'therapist')) {
             return res.status(404).json(ApiResponse.error('Therapist not found'));
         }
 
@@ -37,11 +37,11 @@ const getAvailabilityByTherapist = async (req, res, next) => {
 // Create availability
 const createAvailability = async (req, res, next) => {
     try {
-        const { therapistId, date, availableTimes, status } = req.body;
+        const { therapistId, date, timeSlots } = req.body;
 
-        // Validate therapist (admin user) exists
+        // Validate therapist exists
         const therapist = await User.findById(therapistId);
-        if (!therapist || therapist.role !== 'admin') {
+        if (!therapist || (therapist.role !== 'admin' && therapist.role !== 'therapist')) {
             return res.status(404).json(ApiResponse.error('Therapist not found'));
         }
 
@@ -54,8 +54,7 @@ const createAvailability = async (req, res, next) => {
         const availability = new Availability({
             therapistId,
             date,
-            availableTimes,
-            status
+            timeSlots
         });
 
         await availability.save();
@@ -71,11 +70,11 @@ const createAvailability = async (req, res, next) => {
 // Update availability
 const updateAvailability = async (req, res, next) => {
     try {
-        const { availableTimes, status } = req.body;
+        const { timeSlots } = req.body;
 
         const availability = await Availability.findByIdAndUpdate(
             req.params.id,
-            { availableTimes, status },
+            { timeSlots },
             { new: true, runValidators: true }
         )
             .populate('therapistId', 'name email role')
@@ -109,7 +108,7 @@ const deleteAvailability = async (req, res, next) => {
 // Bulk update availability for a month
 const bulkUpdateAvailability = async (req, res, next) => {
     try {
-        const { therapistId, month, year, availableTimes, status } = req.body;
+        const { therapistId, month, year, timeSlots } = req.body;
 
         // Validate required fields
         if (!therapistId || month === undefined || year === undefined) {
@@ -140,26 +139,6 @@ const bulkUpdateAvailability = async (req, res, next) => {
             return res.status(400).json(ApiResponse.error('Invalid month or year'));
         }
 
-        // Ensure availableTimes is an array if provided
-        let validatedAvailableTimes = [];
-        if (availableTimes !== undefined) {
-            if (Array.isArray(availableTimes)) {
-                validatedAvailableTimes = availableTimes;
-            } else {
-                // If it's not an array, try to convert to array or set as empty array
-                validatedAvailableTimes = [];
-            }
-        }
-
-        // Ensure status is valid if provided
-        let validatedStatus = status;
-        if (status !== undefined) {
-            const validStatuses = ['available', 'unavailable', 'booked'];
-            if (!validStatuses.includes(status)) {
-                validatedStatus = 'available'; // default to available
-            }
-        }
-
         // Calculate the number of days in the specified month
         const daysInMonth = new Date(yearNum, monthNum, 0).getDate();
 
@@ -177,16 +156,14 @@ const bulkUpdateAvailability = async (req, res, next) => {
 
             if (availability) {
                 // Update existing availability
-                availability.availableTimes = availableTimes !== undefined ? validatedAvailableTimes : availability.availableTimes;
-                availability.status = validatedStatus !== undefined ? validatedStatus : availability.status;
+                availability.timeSlots = timeSlots !== undefined ? timeSlots : availability.timeSlots;
                 await availability.save();
             } else {
                 // Create new availability
                 availability = new Availability({
                     therapistId,
                     date,
-                    availableTimes: validatedAvailableTimes,
-                    status: validatedStatus || 'available'
+                    timeSlots: timeSlots || []
                 });
                 await availability.save();
             }

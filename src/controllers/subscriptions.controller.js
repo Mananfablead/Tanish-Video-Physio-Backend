@@ -165,6 +165,14 @@ const getUserSubscriptions = async (req, res, next) => {
                     sessionsRemaining: Math.max(0, plan.sessions - completedSessionCount),
                     bookingsMade: bookingCount
                 };
+                
+                // Add "kitna bacha hai" information
+                subscriptionObj.availableSessions = {
+                    total: plan.sessions,
+                    used: completedSessionCount,
+                    remaining: Math.max(0, plan.sessions - completedSessionCount),
+                    percentageUsed: Math.round((completedSessionCount / plan.sessions) * 100)
+                };
             } else {
                 // Unlimited sessions
                 subscriptionObj.sessionInfo = {
@@ -172,6 +180,14 @@ const getUserSubscriptions = async (req, res, next) => {
                     sessionsUsed: 0, // Would need to count actual sessions separately
                     sessionsRemaining: 'unlimited',
                     bookingsMade: 0
+                };
+                
+                // Add "kitna bacha hai" information for unlimited plans
+                subscriptionObj.availableSessions = {
+                    total: 'unlimited',
+                    used: 0,
+                    remaining: 'unlimited',
+                    percentageUsed: 0
                 };
             }
 
@@ -240,6 +256,14 @@ const getAllSubscriptions = async (req, res, next) => {
                     sessionsRemaining: Math.max(0, plan.sessions - completedSessionCount),
                     bookingsMade: bookingCount
                 };
+                
+                // Add "kitna bacha hai" (how many left) information
+                subscriptionObj.availableSessions = {
+                    total: plan.sessions === 0 ? 'unlimited' : plan.sessions,
+                    used: completedSessionCount,
+                    remaining: plan.sessions === 0 ? 'unlimited' : Math.max(0, plan.sessions - completedSessionCount),
+                    percentageUsed: plan.sessions === 0 ? 0 : Math.round((completedSessionCount / plan.sessions) * 100)
+                };
             } else {
                 // Unlimited sessions
                 subscriptionObj.sessionInfo = {
@@ -247,6 +271,14 @@ const getAllSubscriptions = async (req, res, next) => {
                     sessionsUsed: 0,
                     sessionsRemaining: 'unlimited',
                     bookingsMade: 0
+                };
+                
+                // Add "kitna bacha hai" information for unlimited plans
+                subscriptionObj.availableSessions = {
+                    total: 'unlimited',
+                    used: 0,
+                    remaining: 'unlimited',
+                    percentageUsed: 0
                 };
             }
 

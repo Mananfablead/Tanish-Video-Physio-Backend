@@ -1066,7 +1066,7 @@
         },
         {
           "name": "Create Session (User)",
-          "description": "Creates a new session. The therapistId parameter is no longer required and will be automatically assigned from the associated booking.",
+          "description": "Creates a new session. The therapistId parameter is no longer required and will be automatically assigned from the associated booking. Automatically updates availability status from 'available' to 'booked' for the specified time slot.",
           "request": {
             "method": "POST",
             "header": [
@@ -1095,7 +1095,7 @@
         },
         {
           "name": "Create Session (Admin)",
-          "description": "Creates a new session for any user. Requires userId, therapistId, and either bookingId or subscriptionId.",
+          "description": "Creates a new session for any user. Requires userId, therapistId, and either bookingId or subscriptionId. Automatically updates availability status from 'available' to 'booked' for the specified time slot.",
           "request": {
             "method": "POST",
             "header": [
@@ -1124,6 +1124,7 @@
         },
         {
           "name": "Update Session (User)",
+          "description": "Update session details. If time is changed, automatically updates availability status: marks old time slot as 'available' and new time slot as 'booked'.",
           "request": {
             "method": "PUT",
             "header": [
@@ -1158,6 +1159,7 @@
         },
         {
           "name": "Update Session (Admin)",
+          "description": "Update session details. If date/time is changed, automatically updates availability status: marks old time slot as 'available' and new time slot as 'booked'.",
           "request": {
             "method": "PUT",
             "header": [
@@ -1192,6 +1194,7 @@
         },
         {
           "name": "Delete Session (User)",
+          "description": "Delete a session. Automatically updates availability status: marks the time slot as 'available'.",
           "request": {
             "method": "DELETE",
             "header": [
@@ -1217,6 +1220,7 @@
         },
         {
           "name": "Delete Session (Admin)",
+          "description": "Delete a session. Automatically updates availability status: marks the time slot as 'available'.",
           "request": {
             "method": "DELETE",
             "header": [
@@ -1242,6 +1246,7 @@
         },
         {
           "name": "Reschedule Session (User)",
+          "description": "Reschedule an existing session to a new date/time. Automatically updates availability status: marks old time slot as 'available' and new time slot as 'booked'.",
           "request": {
             "method": "PUT",
             "header": [
@@ -1276,6 +1281,7 @@
         },
         {
           "name": "Reschedule Session (Admin)",
+          "description": "Reschedule an existing session to a new date/time. Automatically updates availability status: marks old time slot as 'available' and new time slot as 'booked'.",
           "request": {
             "method": "PUT",
             "header": [
@@ -1926,9 +1932,11 @@
     },
     {
       "name": "Availability",
+      "description": "Manage therapist availability with time slots. Each availability entry contains time slots with start/end times and status (available/unavailable/booked). When sessions are created/rescheduled, availability status is automatically updated.",
       "item": [
         {
           "name": "Get All Availability",
+          "description": "Retrieve all availability entries with time slots. Each entry contains date and array of time slots with start/end times and current status (available/booked/unavailable).",
           "request": {
             "method": "GET",
             "header": [],
@@ -1942,6 +1950,7 @@
         },
         {
           "name": "Get Availability By Therapist",
+          "description": "Retrieve availability entries for a specific therapist. Returns all dates with their respective time slots showing start/end times and current booking status.",
           "request": {
             "method": "GET",
             "header": [],
@@ -1961,6 +1970,7 @@
         },
         {
           "name": "Create Availability (Admin)",
+          "description": "Create therapist availability for a specific date with time slots. Each time slot includes start time, end time, and status. Time slots automatically update to 'booked' when sessions are created.",
           "request": {
             "method": "POST",
             "header": [
@@ -1977,7 +1987,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"therapistId\": \"therapist_id_here\",\n  \"date\": \"2024-03-26\",\n  \"availableTimes\": [\"09:00\", \"10:00\", \"11:00\", \"14:00\", \"15:00\"]\n}"
+              "raw": "{\n  \"therapistId\": \"therapist_id_here\",\n  \"date\": \"2024-03-26\",\n  \"timeSlots\": [\n    {\n      \"start\": \"09:00\",\n      \"end\": \"09:30\",\n      \"status\": \"available\"\n    },\n    {\n      \"start\": \"10:00\",\n      \"end\": \"10:30\",\n      \"status\": \"available\"\n    },\n    {\n      \"start\": \"11:00\",\n      \"end\": \"11:30\",\n      \"status\": \"unavailable\"\n    },\n    {\n      \"start\": \"14:00\",\n      \"end\": \"14:30\",\n      \"status\": \"available\"\n    },\n    {\n      \"start\": \"15:00\",\n      \"end\": \"15:30\",\n      \"status\": \"available\"\n    }\n  ]\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/availability",
@@ -1989,6 +1999,7 @@
         },
         {
           "name": "Update Availability (Admin)",
+          "description": "Update existing availability time slots. Modify start/end times and status for specific time slots. Note that 'booked' slots cannot be modified directly - they must be unbooked through session management.",
           "request": {
             "method": "PUT",
             "header": [
@@ -2005,7 +2016,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"availableTimes\": [\"10:00\", \"11:00\", \"14:00\", \"15:00\", \"16:00\"],\n  \"status\": \"available\"\n}"
+              "raw": "{\n  \"timeSlots\": [\n    {\n      \"start\": \"10:00\",\n      \"end\": \"10:30\",\n      \"status\": \"available\"\n    },\n    {\n      \"start\": \"11:00\",\n      \"end\": \"11:30\",\n      \"status\": \"available\"\n    },\n    {\n      \"start\": \"14:00\",\n      \"end\": \"14:30\",\n      \"status\": \"available\"\n    },\n    {\n      \"start\": \"15:00\",\n      \"end\": \"15:30\",\n      \"status\": \"available\"\n    },\n    {\n      \"start\": \"16:00\",\n      \"end\": \"16:30\",\n      \"status\": \"available\"\n    }\n  ]\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/availability/:id",
@@ -2023,6 +2034,7 @@
         },
         {
           "name": "Delete Availability (Admin)",
+          "description": "Delete an availability entry for a specific date. Note: Cannot delete availability entries that have booked time slots. Cancel sessions first to free up booked slots.",
           "request": {
             "method": "DELETE",
             "header": [
@@ -2048,6 +2060,7 @@
         },
         {
           "name": "Bulk Update Availability (Admin)",
+          "description": "Bulk update therapist availability for an entire month. Creates or updates availability entries for all days in the specified month with the provided time slots template.",
           "request": {
             "method": "POST",
             "header": [
@@ -2064,7 +2077,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"therapistId\": \"therapist_id_here\",\n  \"month\": 3,\n  \"year\": 2024,\n  \"availableTimes\": [\"09:00\", \"10:00\", \"11:00\", \"14:00\", \"15:00\"],\n  \"status\": \"available\"\n}"
+              "raw": "{\n  \"therapistId\": \"therapist_id_here\",\n  \"month\": 3,\n  \"year\": 2024,\n  \"timeSlots\": [\n    {\n      \"start\": \"09:00\",\n      \"end\": \"09:30\",\n      \"status\": \"available\"\n    },\n    {\n      \"start\": \"10:00\",\n      \"end\": \"10:30\",\n      \"status\": \"available\"\n    },\n    {\n      \"start\": \"11:00\",\n      \"end\": \"11:30\",\n      \"status\": \"unavailable\"\n    },\n    {\n      \"start\": \"14:00\",\n      \"end\": \"14:30\",\n      \"status\": \"available\"\n    },\n    {\n      \"start\": \"15:00\",\n      \"end\": \"15:30\",\n      \"status\": \"available\"\n    }\n  ]\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/availability/bulk-update",
