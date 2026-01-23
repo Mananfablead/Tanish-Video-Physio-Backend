@@ -185,6 +185,109 @@ const getProfile = async (req, res, next) => {
     }
 };
 
+// Get all admin profiles (fully public endpoint)
+const getAllAdminProfiles = async (req, res, next) => {
+    try {
+        // Get all admin users
+        const admins = await User.find({ role: 'admin' }).select('-password -resetPasswordToken -resetPasswordExpires');
+        
+        if (!admins || admins.length === 0) {
+            return res.status(404).json(ApiResponse.error('No admin users found'));
+        }
+
+        // Process each admin's data for public consumption
+        const publicAdminData = admins.map(admin => {
+            // Convert profile picture to full URL if it exists
+            let profilePictureUrl = admin.profilePicture;
+            if (admin.profilePicture && admin.profilePicture.startsWith('/uploads/')) {
+                const baseUrl = `${req.protocol}://${req.get('host')}`;
+                profilePictureUrl = `${baseUrl}${admin.profilePicture}`;
+            }
+
+            // Convert certification URLs to full URLs if they exist
+            let certificationsUrls = admin.doctorProfile?.certifications || [];
+            if (certificationsUrls.length > 0) {
+                const baseUrl = `${req.protocol}://${req.get('host')}`;
+                certificationsUrls = certificationsUrls.map(cert => {
+                    if (cert && cert.startsWith('/uploads/')) {
+                        return `${baseUrl}${cert}`;
+                    }
+                    return cert;
+                });
+            }
+
+            return {
+                id: admin._id,
+                name: admin.name,
+                email: admin.email,
+                role: admin.role,
+                profilePicture: profilePictureUrl,
+                doctorProfile: admin.doctorProfile ? {
+                    name: admin.doctorProfile.name,
+                    experience: admin.doctorProfile.experience,
+                    specialization: admin.doctorProfile.specialization,
+                    bio: admin.doctorProfile.bio,
+                    education: admin.doctorProfile.education,
+                    languages: admin.doctorProfile.languages,
+                    certifications: certificationsUrls
+                } : null,
+                joinDate: admin.joinDate
+            };
+        });
+
+        res.status(200).json(ApiResponse.success(publicAdminData, 'All admin profiles retrieved successfully'));
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Get public admin profile (publicly accessible but only for admin users)
+const getPublicProfile = async (req, res, next) => {
+    try {
+        const { userId } = req.params;
+        
+        // Only allow access to admin user profiles
+        const user = await User.findById(userId).select('-password -resetPasswordToken -resetPasswordExpires');
+        if (!user) {
+            return res.status(404).json(ApiResponse.error('User not found'));
+        }
+
+        // Check if user is admin
+        if (user.role !== 'admin') {
+            return res.status(403).json(ApiResponse.error('Access denied. Only admin profiles are publicly accessible.'));
+        }
+
+        // If user has a profile picture, convert to full URL
+        if (user.profilePicture && user.profilePicture.startsWith('/uploads/')) {
+            const baseUrl = `${req.protocol}://${req.get('host')}`;
+            user.profilePicture = `${baseUrl}${user.profilePicture}`;
+        }
+
+        // Prepare admin-specific public data
+        const publicAdminData = {
+            id: user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            profilePicture: user.profilePicture,
+            doctorProfile: user.doctorProfile ? {
+                name: user.doctorProfile.name,
+                experience: user.doctorProfile.experience,
+                specialization: user.doctorProfile.specialization,
+                bio: user.doctorProfile.bio,
+                education: user.doctorProfile.education,
+                languages: user.doctorProfile.languages,
+                certifications: user.doctorProfile.certifications
+            } : null,
+            joinDate: user.joinDate
+        };
+
+        res.status(200).json(ApiResponse.success(publicAdminData, 'Admin profile retrieved successfully'));
+    } catch (error) {
+        next(error);
+    }
+};
+
 // Update user profile
 const updateProfile = async (req, res, next) => {
     try {
@@ -214,17 +317,60 @@ const updateProfile = async (req, res, next) => {
             }
         }
 
+        // Handle doctorProfile - it may come as a JSON string when using form data
+        let doctorProfile = req.body.doctorProfile;
+        if (typeof doctorProfile === 'string') {
+            try {
+                doctorProfile = JSON.parse(doctorProfile);
+            } catch (e) {
+                // If it's not JSON, create an object from individual fields
+                doctorProfile = {};
+                Object.keys(req.body).forEach(key => {
+                    if (key.startsWith('doctorProfile[')) {
+                        const field = key.match(/doctorProfile\[(.*?)\]/)[1];
+                        if (!doctorProfile[field]) {
+                            doctorProfile[field] = req.body[key];
+                        }
+                    }
+                });
+            }
+        }
+
         // Handle profile picture if uploaded
         let profilePicture = null;
-        if (req.file) {
+        if (req.files && req.files['profilePicture'] && req.files['profilePicture'].length > 0) {
             // Create full URL for the image
             const baseUrl = `${req.protocol}://${req.get('host')}`;
-            profilePicture = `${baseUrl}/uploads/profile-pictures/${req.file.filename}`;
+            profilePicture = `${baseUrl}/uploads/profile-pictures/${req.files['profilePicture'][0].filename}`;
+        }
+
+        // Handle certification files if uploaded
+        let certifications = [];
+        if (req.files && req.files['certifications']) {
+            const baseUrl = `${req.protocol}://${req.get('host')}`;
+            certifications = req.files['certifications'].map(file => 
+                `${baseUrl}/uploads/certifications/${file.filename}`
+            );
         }
 
         const updateData = { name, phone };
         if (healthProfile && Object.keys(healthProfile).length > 0) {
             updateData.healthProfile = healthProfile;
+        }
+        if (doctorProfile && Object.keys(doctorProfile).length > 0) {
+            // Merge existing certifications with new ones if they exist
+            if (certifications.length > 0) {
+                doctorProfile.certifications = [
+                    ...(doctorProfile.certifications || []),
+                    ...certifications
+                ];
+            }
+            updateData.doctorProfile = doctorProfile;
+        } else if (certifications.length > 0) {
+            // If no doctorProfile exists but we have certifications, create one
+            updateData.doctorProfile = {
+                certifications: certifications
+            };
         }
         if (profilePicture) {
             updateData.profilePicture = profilePicture;
@@ -244,6 +390,17 @@ const updateProfile = async (req, res, next) => {
         if (user.profilePicture && user.profilePicture.startsWith('/uploads/')) {
             const baseUrl = `${req.protocol}://${req.get('host')}`;
             user.profilePicture = `${baseUrl}${user.profilePicture}`;
+        }
+
+        // If user has certifications, convert to full URLs
+        if (user.doctorProfile && user.doctorProfile.certifications) {
+            user.doctorProfile.certifications = user.doctorProfile.certifications.map(cert => {
+                if (cert && cert.startsWith('/uploads/')) {
+                    const baseUrl = `${req.protocol}://${req.get('host')}`;
+                    return `${baseUrl}${cert}`;
+                }
+                return cert;
+            });
         }
 
         res.status(200).json(ApiResponse.success(user, 'Profile updated successfully'));
@@ -544,6 +701,8 @@ module.exports = {
     login,
     logout,
     getProfile,
+    getPublicProfile,
+    getAllAdminProfiles,
     updateProfile,
     createAdminUser,
     forgotPassword,

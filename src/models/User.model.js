@@ -52,6 +52,7 @@ const userSchema = new mongoose.Schema({
         default: null
     },
     joinDate: {
+        
         type: Date,
         default: Date.now
     },
@@ -62,6 +63,17 @@ const userSchema = new mongoose.Schema({
     resetPasswordExpires: {
         type: Date,
         default: null
+    },
+    doctorProfile: {
+        name: String,
+        experience: String,
+        specialization: String,
+        certifications: [{ type: String }],
+        bio: String,
+        education: String,
+        languages: [{ type: String, default: ['Hindi', 'English', 'Gujarati'] }],
+        fee: String,
+        availability: String
     }
 }, {
     timestamps: true
