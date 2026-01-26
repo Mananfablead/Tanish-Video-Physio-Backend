@@ -1030,7 +1030,7 @@ const rescheduleAdminSession = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
-};
+}; 
 // Admin function to accept session
 const acceptSession = async (req, res, next) => {
   try {
@@ -1056,6 +1056,31 @@ const acceptSession = async (req, res, next) => {
       .populate("subscriptionId", "planId planName startDate endDate status")
       .populate("therapistId", "name email role")
       .populate("userId", "name email");
+
+    // Update availability status to 'booked' if therapistId exists
+    if (updatedSession.therapistId) {
+      try {
+        await Availability.updateOne(
+          { therapistId: updatedSession.therapistId, date: updatedSession.date },
+          { 
+            $set: { 
+              "timeSlots.$[elem].status": "booked" 
+            } 
+          },
+          { 
+            arrayFilters: [
+              { 
+                "elem.start": updatedSession.time, 
+                "elem.status": "available" 
+              }
+            ]
+          }
+        );
+      } catch (availabilityError) {
+        console.error('Error updating availability status during session accept:', availabilityError);
+        // Continue with response even if availability update fails
+      }
+    }
 
     res
       .status(200)
@@ -1090,6 +1115,31 @@ const rejectSession = async (req, res, next) => {
       .populate("subscriptionId", "planId planName startDate endDate status")
       .populate("therapistId", "name email role")
       .populate("userId", "name email");
+
+    // Update availability status back to 'available' if therapistId exists
+    if (updatedSession.therapistId) {
+      try {
+        await Availability.updateOne(
+          { therapistId: updatedSession.therapistId, date: updatedSession.date },
+          { 
+            $set: { 
+              "timeSlots.$[elem].status": "available" 
+            } 
+          },
+          { 
+            arrayFilters: [
+              { 
+                "elem.start": updatedSession.time, 
+                "elem.status": "booked" 
+              }
+            ]
+          }
+        );
+      } catch (availabilityError) {
+        console.error('Error updating availability status during session reject:', availabilityError);
+        // Continue with response even if availability update fails
+      }
+    }
 
     res
       .status(200)
