@@ -4,6 +4,32 @@ const Booking = require('../models/Booking.model');
 const Payment = require('../models/Payment.model');
 const ApiResponse = require('../utils/apiResponse');
 
+// Helper function to format time
+const formatTime = (date) => {
+    if (!date) return '';
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const formattedHours = hours % 12 || 12;
+    const formattedMinutes = minutes.toString().padStart(2, '0');
+    return `${formattedHours}:${formattedMinutes} ${ampm}`;
+};
+
+// Helper function to get time ago
+const getTimeAgo = (date) => {
+    if (!date) return '';
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMinutes = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMinutes / 60);
+    const diffDays = Math.floor(diffHours / 24);
+    
+    if (diffMinutes < 1) return 'Just now';
+    if (diffMinutes < 60) return `${diffMinutes} min ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+};
+
 // Get user reports
 const getUserReport = async (req, res, next) => {
     try {
@@ -320,60 +346,119 @@ const getAdminDashboard = async (req, res, next) => {
         }
 
         // Recent activity (mock data for demo)
-        const recentActivity = [
-            {
-                type: 'session_complete',
-                title: 'Session completed',
-                description: 'Admin completed session with Rohit',
-                time: '2 min ago'
-            },
-            {
-                type: 'new_booking',
-                title: 'New booking',
-                description: 'Priya Sharma booked Back Pain Therapy',
-                time: '15 min ago'
-            },
-            {
-                type: 'payment_received',
-                title: 'Payment received',
-                description: '₹2500 received for Knee Rehabilitation',
-                time: '1 hour ago'
-            },
-            {
-                type: 'new_user',
-                title: 'New user registered',
-                description: 'Amit Patel joined the platform',
-                time: '2 hours ago'
-            }
-        ];
+        // Fetch recent activity from database
+    const recentActivity = [];
+    
+    // Get recently completed sessions (last 24 hours)
+    const recentCompletedSessions = await Session.find({
+        status: 'completed',
+        updatedAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+    })
+    .populate('userId', 'name')
+    .populate('therapistId', 'name')
+    .populate('bookingId', 'serviceName')
+    .sort({ updatedAt: -1 })
+    .limit(5);
+    
+    recentCompletedSessions.forEach(session => {
+        recentActivity.push({
+            type: 'session_complete',
+            title: 'Session completed',
+            description: `${session.therapistId?.name || 'Therapist'} completed session with ${session.userId?.name || 'User'}`,
+            time: getTimeAgo(session.updatedAt)
+        });
+    });
+    
+    // Get recent bookings (last 24 hours)
+    const recentBookings = await Booking.find({
+        createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+    })
+    .populate('userId', 'name')
+    .populate('serviceId', 'name')
+    .sort({ createdAt: -1 })
+    .limit(5);
+    
+    recentBookings.forEach(booking => {
+        recentActivity.push({
+            type: 'new_booking',
+            title: 'New booking',
+            description: `${booking.userId?.name || 'User'} booked ${booking.serviceId?.name || booking.serviceName || 'Service'}`,
+            time: getTimeAgo(booking.createdAt)
+        });
+    });
+    
+    // Get recent payments (last 24 hours)
+    const recentPayments = await Payment.find({
+        status: 'completed',
+        createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+    })
+    .populate('userId', 'name')
+    .populate('bookingId')
+    .sort({ createdAt: -1 })
+    .limit(5);
+    
+    recentPayments.forEach(payment => {
+        recentActivity.push({
+            type: 'payment_received',
+            title: 'Payment received',
+            description: `₹${payment.amount} received from ${payment.userId?.name || 'User'}`,
+            time: getTimeAgo(payment.createdAt)
+        });
+    });
+    
+    // Get recent user registrations (last 24 hours)
+    const recentUsers = await User.find({
+        role: 'user',
+        createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+    })
+    .sort({ createdAt: -1 })
+    .limit(5);
+    
+    recentUsers.forEach(user => {
+        recentActivity.push({
+            type: 'new_user',
+            title: 'New user registered',
+            description: `${user.name} joined the platform`,
+            time: getTimeAgo(user.createdAt)
+        });
+    });
+    
+    // Sort all activities by time (most recent first)
+    recentActivity.sort((a, b) => {
+        // Convert time strings back to dates for sorting
+        const timeA = new Date(a.time);
+        const timeB = new Date(b.time);
+        return timeB - timeA;
+    });
+    
+    // Limit to last 10 activities
+    const recentActivityData = recentActivity.slice(0, 10);
 
-        // Upcoming sessions (sample data)
-        const upcomingSessionsData = [
-            {
-                _id: '69707303dc9e1df5e808c567',
-                user: 'Rohit Kumar',
-                therapist: 'Admin',
-                time: '11:00 AM',
-                type: '1-on-1',
-                status: 'live'
-            },
-            {
-                _id: '69707303dc9e1df5e808c568',
-                user: 'Priya Sharma',
-                therapist: 'Dr. Johnson',
-                time: '2:30 PM',
-                type: '1-on-1',
-                status: 'upcoming'
-            },
-            {
-                _id: '69707303dc9e1df5e808c569',
-                user: 'Amit Patel',
-                therapist: 'Dr. Smith',
-                time: '4:00 PM',
-                type: '1-on-1',
-                status: 'upcoming'
-            }
-        ];
+    // Fetch upcoming sessions dynamically
+    const upcomingSessionsData = [];
+    
+    // Get upcoming and live sessions
+    const dashboardUpcomingSessions = await Session.find({
+        $or: [
+            { status: 'scheduled', startTime: { $gte: new Date() } },
+            { status: 'live' }
+        ]
+    })
+    .populate('userId', 'name')
+    .populate('therapistId', 'name')
+    .sort({ startTime: 1 })
+    .limit(10);
+    
+    dashboardUpcomingSessions.forEach(session => {
+        upcomingSessionsData.push({
+            _id: session._id,
+            user: session.userId?.name || 'Unknown User',
+            therapist: session.therapistId?.name || 'Unknown Therapist',
+            time: formatTime(session.startTime),
+            type: session.type || '1-on-1',
+            status: session.status
+        });
+    });
 
         res.status(200).json({
             success: true,
