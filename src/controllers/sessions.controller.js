@@ -257,8 +257,6 @@ const createSession = async (req, res, next) => {
   }
 };
 
-
-
 // Update session by ID
 const updateSession = async (req, res, next) => {
   try {
@@ -1033,6 +1031,73 @@ const rescheduleAdminSession = async (req, res, next) => {
     next(error);
   }
 };
+// Admin function to accept session
+const acceptSession = async (req, res, next) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== "admin" && req.user.role !== "therapist") {
+      return res
+        .status(403)
+        .json(ApiResponse.error("Insufficient permissions"));
+    }
+
+    const session = await Session.findById(req.params.id);
+    if (!session) {
+      return res.status(404).json(ApiResponse.error("Session not found"));
+    }
+
+    // Update session status to scheduled
+    const updatedSession = await Session.findByIdAndUpdate(
+      req.params.id,
+      { status: "scheduled" },
+      { new: true, runValidators: true }
+    )
+      .populate("bookingId", "serviceName therapistName date time")
+      .populate("subscriptionId", "planId planName startDate endDate status")
+      .populate("therapistId", "name email role")
+      .populate("userId", "name email");
+
+    res
+      .status(200)
+      .json(ApiResponse.success({ session: updatedSession }, "Session accepted successfully"));
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Admin function to reject session
+const rejectSession = async (req, res, next) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== "admin" && req.user.role !== "therapist") {
+      return res
+        .status(403)
+        .json(ApiResponse.error("Insufficient permissions"));
+    }
+
+    const session = await Session.findById(req.params.id);
+    if (!session) {
+      return res.status(404).json(ApiResponse.error("Session not found"));
+    }
+
+    // Update session status to cancelled
+    const updatedSession = await Session.findByIdAndUpdate(
+      req.params.id,
+      { status: "cancelled" },
+      { new: true, runValidators: true }
+    )
+      .populate("bookingId", "serviceName therapistName date time")
+      .populate("subscriptionId", "planId planName startDate endDate status")
+      .populate("therapistId", "name email role")
+      .populate("userId", "name email");
+
+    res
+      .status(200)
+      .json(ApiResponse.success({ session: updatedSession }, "Session rejected successfully"));
+  } catch (error) {
+    next(error);
+  }
+};
 
 module.exports = {
   // User functions
@@ -1052,4 +1117,8 @@ module.exports = {
   updateAdminSession,
   deleteAdminSession,
   rescheduleAdminSession,
+  
+  // Session approval functions
+  acceptSession,
+  rejectSession,
 };

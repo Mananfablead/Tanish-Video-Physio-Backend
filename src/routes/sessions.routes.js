@@ -15,7 +15,10 @@ const {
     createAdminSession,
     updateAdminSession,
     deleteAdminSession,
-    rescheduleAdminSession
+    rescheduleAdminSession,
+    // Session approval functions
+    acceptSession,
+    rejectSession
 } = require('../controllers/sessions.controller');
 const { authenticateToken, authorizeRoles } = require('../middlewares/auth.middleware');
 
@@ -56,5 +59,9 @@ router.delete('/:id', authenticateToken, deleteSession);
 
 // Admin can delete any session
 router.delete('/admin/:id', authenticateToken, authorizeRoles('admin', 'therapist'), deleteAdminSession);
+
+// Admin session approval routes
+router.put('/accept/:id', authenticateToken, authorizeRoles('admin', 'therapist'), acceptSession);
+router.put('/reject/:id', authenticateToken, authorizeRoles('admin', 'therapist'), rejectSession);
 
 module.exports = router;
