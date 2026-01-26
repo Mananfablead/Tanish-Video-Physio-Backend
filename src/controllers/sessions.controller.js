@@ -131,30 +131,39 @@ const getSessionById = async (req, res, next) => {
 };
 
 // Create a new session
+// Create a new session
 const createSession = async (req, res, next) => {
   try {
-    const { bookingId, subscriptionId, date, time, type, status, duration } =
-      req.body;
+    const {
+      bookingId,
+      subscriptionId,
+      therapistId: bodyTherapistId,
+      date,
+      time,
+      type,
+      status,
+      duration,
+    } = req.body;
 
-    // Either bookingId or subscriptionId required
     if (!bookingId && !subscriptionId) {
-      return res
-        .status(400)
-        .json(ApiResponse.error("Either bookingId or subscriptionId must be provided"));
+      return res.status(400).json(
+        ApiResponse.error(
+          "Either bookingId or subscriptionId must be provided"
+        )
+      );
     }
 
-    let therapistId = null;
     const userId = req.user.userId;
+    let therapistId = null;
 
-    /** ---------------- BOOKING BASED SESSION ---------------- */
+    /* ================= BOOKING FLOW ================= */
     if (bookingId) {
-      const booking = await Booking.findOne({
-        _id: bookingId,
-        userId,
-      });
+      const booking = await Booking.findOne({ _id: bookingId, userId });
 
       if (!booking) {
-        return res.status(404).json(ApiResponse.error("Booking not found"));
+        return res
+          .status(404)
+          .json(ApiResponse.error("Booking not found"));
       }
 
       if (booking.paymentStatus !== "paid") {
@@ -163,13 +172,12 @@ const createSession = async (req, res, next) => {
           .json(ApiResponse.error("Booking payment not completed"));
       }
 
-      therapistId = booking.therapistId; // auto from booking
+      therapistId = booking.therapistId;
     }
 
-    /** ---------------- SUBSCRIPTION BASED SESSION ---------------- */
+    /* ================= SUBSCRIPTION FLOW ================= */
     if (subscriptionId) {
       const Subscription = require("../models/Subscription.model");
-      const SubscriptionPlan = require("../models/SubscriptionPlan.model");
 
       const subscription = await Subscription.findOne({
         _id: subscriptionId,
@@ -177,7 +185,9 @@ const createSession = async (req, res, next) => {
       });
 
       if (!subscription) {
-        return res.status(404).json(ApiResponse.error("Subscription not found"));
+        return res
+          .status(404)
+          .json(ApiResponse.error("Subscription not found"));
       }
 
       if (subscription.status !== "active") {
@@ -186,30 +196,36 @@ const createSession = async (req, res, next) => {
           .json(ApiResponse.error("Subscription is not active"));
       }
 
-      const now = new Date();
-      if (subscription.endDate && subscription.endDate < now) {
+      if (subscription.endDate && subscription.endDate < new Date()) {
         return res
           .status(400)
-          .json(ApiResponse.error("Subscription has expired"));
+          .json(ApiResponse.error("Subscription expired"));
       }
 
-      // therapistId intentionally NULL (admin later assign karega)
-      therapistId = null;
+      // 🔥 IMPORTANT FIX
+      therapistId = bodyTherapistId || null;
+
+      if (!therapistId) {
+        return res.status(400).json(
+          ApiResponse.error(
+            "therapistId is required for subscription session booking"
+          )
+        );
+      }
     }
 
-    /** ---------------- TIME SETUP ---------------- */
+    /* ================= TIME ================= */
     const startTime = new Date(`${date}T${time}:00`);
+    const endTime =
+      duration && duration > 0
+        ? new Date(startTime.getTime() + duration * 60000)
+        : null;
 
-    let endTime = null;
-    if (duration && duration > 0) {
-      endTime = new Date(startTime.getTime() + duration * 60000);
-    }
-
-    /** ---------------- SESSION CREATE ---------------- */
+    /* ================= CREATE SESSION ================= */
     const session = await Session.create({
       bookingId: bookingId || undefined,
       subscriptionId: subscriptionId || undefined,
-      therapistId, // can be null
+      therapistId,
       userId,
       date,
       time,
@@ -220,42 +236,44 @@ const createSession = async (req, res, next) => {
       duration: duration || 0,
     });
 
-    // Update availability status to 'booked' if therapistId exists
-    if (therapistId) {
-      try {
-        await Availability.updateOne(
-          { therapistId, date },
-          { 
-            $set: { 
-              "timeSlots.$[elem].status": "booked" 
-            } 
+    /* ================= AVAILABILITY UPDATE ================= */
+    await Availability.updateOne(
+      { therapistId, date },
+      {
+        $set: {
+          "timeSlots.$[slot].status": "booked",
+        },
+      },
+      {
+        arrayFilters: [
+          {
+            "slot.start": time,
+            "slot.status": "available",
           },
-          { 
-            arrayFilters: [
-              { 
-                "elem.start": time, 
-                "elem.status": "available" 
-              }
-            ]
-          }
-        );
-      } catch (availabilityError) {
-        console.error('Error updating availability status:', availabilityError);
-        // Continue with response even if availability update fails
+        ],
       }
-    }
+    );
 
+    /* ================= POPULATE ================= */
     await session.populate("bookingId", "serviceName therapistName date time");
-    await session.populate("subscriptionId", "planId planName startDate endDate status");
+    await session.populate(
+      "subscriptionId",
+      "planId planName startDate endDate status"
+    );
     await session.populate("therapistId", "name email role");
 
-    res
-      .status(201)
-      .json(ApiResponse.success({ session }, "Session created successfully"));
+    return res.status(201).json(
+      ApiResponse.success(
+        { session },
+        "Session created successfully"
+      )
+    );
   } catch (error) {
     next(error);
   }
 };
+
+
 
 // Update session by ID
 const updateSession = async (req, res, next) => {
