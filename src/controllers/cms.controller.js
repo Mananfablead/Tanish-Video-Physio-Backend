@@ -239,7 +239,7 @@ exports.getConditionsPublic = async (req, res) => {
         const conditions = await CmsConditionsSection.findOne({ isPublic: true }).sort({ createdAt: -1 });
         res.json({
             success: true,
-            data: conditions || {}
+            data: conditions || { conditions: [] }
         });
     } catch (error) {
         res.status(500).json({
@@ -255,7 +255,7 @@ exports.getConditionsAdmin = async (req, res) => {
         const conditions = await CmsConditionsSection.findOne().sort({ createdAt: -1 });
         res.json({
             success: true,
-            data: conditions || {}
+            data: conditions || { conditions: [] }
         });
     } catch (error) {
         res.status(500).json({
@@ -270,9 +270,11 @@ exports.updateConditions = async (req, res) => {
     try {
         // DEBUG: Log incoming data
         console.log('=== CONDITIONS UPDATE DEBUG ===');
+        console.log('Raw body:', req.body);
         console.log('Body keys:', Object.keys(req.body));
         console.log('Files keys:', req.files ? Object.keys(req.files) : 'No files');
         console.log('Conditions data from body:', req.body.conditions);
+        console.log('Conditions type:', typeof req.body.conditions);
         
         if (req.files) {
             Object.keys(req.files).forEach(key => {
@@ -285,73 +287,111 @@ exports.updateConditions = async (req, res) => {
         delete conditionsData._id;
         delete conditionsData.id;
         
-        // Handle file uploads
+        // Handle conditions data - works with indexed fields, JSON string, or array
+        let conditionsArray = [];
+
+        // Check if we have indexed condition fields
+        const conditionFields = {};
+        Object.keys(req.body).forEach(key => {
+            const match = key.match(/^conditions\[(\d+)\]\.(title|content|image)$/);
+            if (match) {
+                const index = parseInt(match[1]);
+                const field = match[2];
+                if (!conditionFields[index]) {
+                    conditionFields[index] = {};
+                }
+                conditionFields[index][field] = req.body[key];
+            }
+        });
+
+        // Convert indexed fields to array
+        if (Object.keys(conditionFields).length > 0) {
+            // Sort by index and convert to array
+            conditionsArray = Object.keys(conditionFields)
+                .sort((a, b) => parseInt(a) - parseInt(b))
+                .map(index => conditionFields[index]);
+            console.log('Built conditions from indexed fields:', conditionsArray);
+        } else if (req.body.conditions) {
+            // Handle JSON string or array
+            if (typeof req.body.conditions === 'string') {
+                try {
+                    conditionsArray = JSON.parse(req.body.conditions);
+                } catch (e) {
+                    console.log('Failed to parse conditions JSON string:', e.message);
+                }
+            } else if (Array.isArray(req.body.conditions)) {
+                conditionsArray = req.body.conditions;
+            }
+        }
+
+        console.log('Final conditions array:', conditionsArray);
+
+        // Update conditions data with processed array
+        conditionsData.conditions = conditionsArray;
+
+        // Handle file uploads for images
         if (req.files) {
             // Process main image
             if (req.files['image'] && req.files['image'].length > 0) {
                 conditionsData.image = `${config.BASE_URL}/uploads/cms-condition-images/${req.files['image'][0].filename}`;
             }
             
-            // Process condition images if any
-            // Handle files sent - multer.any() changes field names to numeric indices
-            if (req.files) {
-                console.log('Processing uploaded files...');
-                
-                // Parse the conditions from the body
-                let conditionsArray;
-                if (typeof conditionsData.conditions === 'string') {
-                    conditionsArray = JSON.parse(conditionsData.conditions);
-                } else {
-                    conditionsArray = conditionsData.conditions || [];
-                }
-                
-                console.log(`Found ${conditionsArray.length} conditions`);
-                console.log('Received files:', Object.keys(req.files));
-                
-                // Process each uploaded file - handle both numeric indices and named fields
+            // Process condition images - enhanced debugging
+            console.log('=== FILE UPLOAD DEBUG ===');
+            console.log('All received files:', req.files);
+            console.log('File field names:', Object.keys(req.files));
+
+            if (conditionsArray.length > 0) {
                 Object.keys(req.files).forEach(fieldKey => {
-                    // Check if it's an array (multer behavior) or direct file object
+                    console.log(`Processing file field: ${fieldKey}`);
                     const uploadedFile = Array.isArray(req.files[fieldKey]) ? req.files[fieldKey][0] : req.files[fieldKey];
                     
                     if (uploadedFile && uploadedFile.filename) {
+                        console.log(`File details:`, {
+                            field: fieldKey,
+                            filename: uploadedFile.filename,
+                            mimetype: uploadedFile.mimetype,
+                            size: uploadedFile.size
+                        });
+
                         let conditionIndex = null;
                         
-                        // Try to extract index from field name like 'conditions[0].image'
-                        const match = fieldKey.match(/conditions\\[(\\d+)\\]\\.image/);
-                        if (match) {
-                            conditionIndex = parseInt(match[1]);
-                        } else {
-                            // Fall back to numeric index if fieldKey is a number
-                            conditionIndex = parseInt(fieldKey);
+                        // Enhanced pattern matching for condition images
+                        // Try multiple patterns to catch different field name formats
+                        const patterns = [
+                            /^conditions\[(\d+)\]\.image$/,  // conditions[0].image
+                            /^conditions\.(\d+)\.image$/,    // conditions.0.image  
+                            /^(\d+)$/,                       // Just the index number
+                            /^conditions\[(\d+)\]$/          // conditions[0] (if image is separate)
+                        ];
+
+                        for (const pattern of patterns) {
+                            const match = fieldKey.match(pattern);
+                            if (match) {
+                                conditionIndex = parseInt(match[1] || match[0]);
+                                console.log(`Matched pattern ${pattern} with index: ${conditionIndex}`);
+                                break;
+                            }
                         }
                         
-                        if (!isNaN(conditionIndex) && conditionsArray[conditionIndex]) {
-                            console.log(`Found file for condition ${conditionIndex}: ${uploadedFile.filename}`);
+                        if (conditionIndex !== null && conditionIndex < conditionsArray.length) {
+                            const imageUrl = `${config.BASE_URL}/uploads/cms-condition-images/${uploadedFile.filename}`;
+                            console.log(`Setting image for condition ${conditionIndex}: ${imageUrl}`);
+                            conditionsArray[conditionIndex].image = imageUrl;
                             
-                            // Update the condition at this index
-                            conditionsArray[conditionIndex].image = `${config.BASE_URL}/uploads/cms-condition-images/${uploadedFile.filename}`;
-                            console.log(`Set image URL for condition ${conditionIndex}: ${conditionsArray[conditionIndex].image}`);
+                            // Also update the conditionsData to ensure it's preserved
+                            if (conditionsData.conditions && conditionsData.conditions[conditionIndex]) {
+                                conditionsData.conditions[conditionIndex].image = imageUrl;
+                            }
                         } else {
-                            console.log(`Could not map file ${fieldKey} to a condition index`);
+                            console.log(`Could not match field ${fieldKey} to condition index. Array length: ${conditionsArray.length}`);
                         }
                     } else {
                         console.log(`No valid file found for field ${fieldKey}`);
-                        console.log('File data:', req.files[fieldKey]);
                     }
                 });
-                
-                // Update the conditions data
-                conditionsData.conditions = conditionsArray;
             }
-        }
-        
-        // If conditions data is a string (from form data), parse it
-        if (typeof conditionsData.conditions === 'string') {
-            try {
-                conditionsData.conditions = JSON.parse(conditionsData.conditions);
-            } catch (e) {
-                // If it's not JSON, leave it as is
-            }
+            console.log('=== END FILE UPLOAD DEBUG ===');
         }
         
         // First, get the existing conditions from database to preserve existing image URLs
@@ -359,19 +399,17 @@ exports.updateConditions = async (req, res) => {
         const existingConditions = existingConditionsDoc?.conditions || [];
         
         // Process conditions array to properly handle image updates
-        if (conditionsData.conditions && Array.isArray(conditionsData.conditions)) {
-            conditionsData.conditions = conditionsData.conditions.map((condition, index) => {
-                // If there was a file uploaded for this specific condition index, use the new image
-                const hasNewImage = req.files && (
-                    req.files[`conditions[${index}].image`] || 
-                    req.files[index.toString()] // fallback for numeric indices
-                );
+        if (conditionsArray && Array.isArray(conditionsArray)) {
+            // Create a copy of conditionsArray with image URLs preserved
+            const processedConditions = conditionsArray.map((condition, index) => {
+                // Check if this condition already has an image URL from file upload
+                const hasUploadedImage = condition.image && condition.image.startsWith('http');
                 
-                if (hasNewImage) {
-                    // A new image was uploaded for this condition, keep the new URL
+                if (hasUploadedImage) {
+                // Keep the uploaded image URL
                     return condition;
                 } else {
-                    // No new image uploaded for this condition, preserve existing image URL from database
+                    // No new image uploaded, preserve existing image URL from database
                     if (existingConditions[index] && existingConditions[index].image && typeof existingConditions[index].image === 'string') {
                         return {
                             ...condition,
@@ -386,16 +424,22 @@ exports.updateConditions = async (req, res) => {
                     }
                 }
             });
+
+            conditionsData.conditions = processedConditions;
         }
         
         let conditions = await CmsConditionsSection.findOne().sort({ createdAt: -1 });
 
         if (conditions) {
+            console.log('Updating existing conditions with data:', conditionsData);
             Object.assign(conditions, conditionsData);
             await conditions.save();
+            console.log('Saved conditions:', conditions.conditions);
         } else {
+            console.log('Creating new conditions with data:', conditionsData);
             conditions = new CmsConditionsSection(conditionsData);
             await conditions.save();
+            console.log('Created conditions:', conditions.conditions);
         }
 
         res.json({

@@ -4425,6 +4425,38 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "CMS Admin",
+      "item": [
+        {
+          "name": "Update Conditions",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Terms and Conditions\",\n  \"description\": \"These terms and conditions govern your use of our physiotherapy services...\",\n  \"conditions\": [\n    {\n      \"title\": \"Service Agreement\",\n      \"content\": \"By using our services, you agree to the terms outlined...\"\n    },\n    {\n      \"title\": \"Service Agreement\",\n      \"content\": \"By using our services, you agree to the terms outlined...\"\n    }\n  ],\n  \"isPublic\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/cms/admin/conditions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cms", "admin", "conditions"]
+            }
+          },
+          "response": []
+        }
+      ]
     }
   ],
   "variable": [

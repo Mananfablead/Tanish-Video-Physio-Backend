@@ -89,32 +89,40 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // // Serve static files
-// app.use(
-//   "/uploads",
-//   express.static(path.join(__dirname, "..", "public", "uploads"), {
-//     setHeaders: (res) => {
-//       res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
-//     },
-//   })
-// );
+// Serve static files from public/uploads directory
+const PUBLIC_UPLOADS_DIR = path.join(__dirname, '..', 'public', 'uploads');
 
-
-const UPLOADS_DIR = path.resolve('/home/u378554361/uploads');
-
-if (!fs.existsSync(UPLOADS_DIR)) {
-    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+if (!fs.existsSync(PUBLIC_UPLOADS_DIR)) {
+    fs.mkdirSync(PUBLIC_UPLOADS_DIR, { recursive: true });
 }
 
 app.use(
     '/uploads',
-    express.static(UPLOADS_DIR, {
-    setHeaders: (res) => {
+    express.static(PUBLIC_UPLOADS_DIR, {
+        setHeaders: (res) => {
             res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-    },
-  })
+        },
+    })
 );
 
-console.log('📂 Serving uploads from:', UPLOADS_DIR);
+console.log('📂 Serving uploads from:', PUBLIC_UPLOADS_DIR);
+
+// const UPLOADS_DIR = path.resolve('/home/u378554361/uploads');
+
+// if (!fs.existsSync(UPLOADS_DIR)) {
+//     fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+// }
+
+// app.use(
+//     '/uploads',
+//     express.static(UPLOADS_DIR, {
+//     setHeaders: (res) => {
+//             res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+//     },
+//   })
+// );
+
+// console.log('📂 Serving uploads from:', UPLOADS_DIR);
 
 
 // Routes

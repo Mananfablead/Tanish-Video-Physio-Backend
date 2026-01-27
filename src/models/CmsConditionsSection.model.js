@@ -1,7 +1,12 @@
 const mongoose = require('mongoose');
 
 const cmsConditionSchema = new mongoose.Schema({
-    name: {
+    title: {
+        type: String,
+        required: true,
+        trim: true
+    },
+    content: {
         type: String,
         required: true,
         trim: true
@@ -24,10 +29,6 @@ const cmsConditionsSectionSchema = new mongoose.Schema({
         trim: true
     },
     conditions: [cmsConditionSchema],
-    image: {
-        type: String,
-        default: ''
-    },
     isPublic: {
         type: Boolean,
         default: true
