@@ -99,16 +99,12 @@ app.use(express.urlencoded({ extended: true }));
 // );
 
 
-// 🔥 uploads folder OUTSIDE public_html
-const UPLOADS_DIR = path.resolve(process.cwd(), '../uploads');
+const UPLOADS_DIR = path.resolve('/home/u378554361/uploads');
 
-// Ensure uploads directory exists
 if (!fs.existsSync(UPLOADS_DIR)) {
     fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-    console.log('📁 uploads folder created:', UPLOADS_DIR);
 }
 
-// Serve uploads statically
 app.use(
     '/uploads',
     express.static(UPLOADS_DIR, {
