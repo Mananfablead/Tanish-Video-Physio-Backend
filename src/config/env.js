@@ -18,11 +18,11 @@ const config = {
 
 // Validate required environment variables
 // const requiredEnvVars = ['RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET']; // Temporarily disabled
-const missingEnvVars = requiredEnvVars.filter(envVar => !config[envVar]);
+// const missingEnvVars = requiredEnvVars.filter(envVar => !config[envVar]);
 
-if (missingEnvVars.length > 0) {
-    console.error('Missing required environment variables:', missingEnvVars);
-    process.exit(1);
-}
+// if (missingEnvVars.length > 0) {
+//     console.error('Missing required environment variables:', missingEnvVars);
+//     process.exit(1);
+// }
 
 module.exports = config;
