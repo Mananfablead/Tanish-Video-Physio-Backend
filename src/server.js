@@ -10,6 +10,7 @@ const connectDB = require('./config/db');
 const config = require('./config/env');
 const routes = require('./routes');
 const errorHandler = require('./middlewares/error.middleware');
+const fs = require('fs');
 
 const app = express();
 // Security middleware
@@ -87,15 +88,37 @@ if (config.NODE_ENV === 'development') {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve static files
+// // Serve static files
+// app.use(
+//   "/uploads",
+//   express.static(path.join(__dirname, "..", "public", "uploads"), {
+//     setHeaders: (res) => {
+//       res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+//     },
+//   })
+// );
+
+
+// 🔥 uploads folder OUTSIDE public_html
+const UPLOADS_DIR = path.resolve(process.cwd(), '../uploads');
+
+// Ensure uploads directory exists
+if (!fs.existsSync(UPLOADS_DIR)) {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+    console.log('📁 uploads folder created:', UPLOADS_DIR);
+}
+
+// Serve uploads statically
 app.use(
-  "/uploads",
-  express.static(path.join(__dirname, "..", "public", "uploads"), {
+    '/uploads',
+    express.static(UPLOADS_DIR, {
     setHeaders: (res) => {
-      res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+            res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     },
   })
 );
+
+console.log('📂 Serving uploads from:', UPLOADS_DIR);
 
 
 // Routes
