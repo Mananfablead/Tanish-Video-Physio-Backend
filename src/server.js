@@ -11,6 +11,8 @@ const config = require('./config/env');
 const routes = require('./routes');
 const errorHandler = require('./middlewares/error.middleware');
 const fs = require('fs');
+const path = require('path');
+const initUploadDirectories = require('./utils/initUploadDirs');
 
 const app = express();
 // Security middleware
@@ -88,22 +90,11 @@ if (config.NODE_ENV === 'development') {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// // Serve static files
-// app.use(
-//   "/uploads",
-//   express.static(path.join(__dirname, "..", "public", "uploads"), {
-//     setHeaders: (res) => {
-//       res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
-//     },
-//   })
-// );
+// Initialize upload directories
+initUploadDirectories();
 
-
-const UPLOADS_DIR = path.resolve('/home/u378554361/uploads');
-
-if (!fs.existsSync(UPLOADS_DIR)) {
-    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-}
+// Serve static files from the correct upload directory
+const UPLOADS_DIR = path.join(__dirname, '..', 'public', 'uploads');
 
 app.use(
     '/uploads',
@@ -114,7 +105,7 @@ app.use(
   })
 );
 
-console.log('📂 Serving uploads from:', UPLOADS_DIR);
+console.log('📂 Serving uploads from:', path.resolve(UPLOADS_DIR));
 
 
 // Routes

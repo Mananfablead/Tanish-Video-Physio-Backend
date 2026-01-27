@@ -1,28 +1,41 @@
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
+
+// Create directory if it doesn't exist
+function createDirIfNotExists(dir) {
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+    }
+}
 
 // Set up storage for CMS images
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         // Store in different directories based on the field name
         const fieldname = file.fieldname;
+        let dest;
         
         if (fieldname === 'image') {
             // For general image fields like hero, about, etc.
-            cb(null, 'public/uploads/cms-images/');
+            dest = 'public/uploads/cms-images/';
         } else if (fieldname.includes('conditions[') && fieldname.includes('].image')) {
             // For condition images
-            cb(null, 'public/uploads/cms-condition-images/');
+            dest = 'public/uploads/cms-condition-images/';
         } else if (fieldname === 'conditions.image') {
             // For condition images in some formats
-            cb(null, 'public/uploads/cms-condition-images/');
+            dest = 'public/uploads/cms-condition-images/';
         } else if (fieldname.includes('condition') && fieldname.includes('.image')) {
             // For various condition image field formats
-            cb(null, 'public/uploads/cms-condition-images/');
+            dest = 'public/uploads/cms-condition-images/';
         } else {
             // Default for other image fields
-            cb(null, 'public/uploads/cms-images/');
+            dest = 'public/uploads/cms-images/';
         }
+
+        // Create directory if it doesn't exist
+        createDirIfNotExists(dest);
+        cb(null, dest);
     },
     filename: function (req, file, cb) {
         // Create a unique filename using timestamp and original name

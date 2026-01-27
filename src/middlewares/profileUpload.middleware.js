@@ -1,16 +1,30 @@
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
+const { dirname } = require('path');
+
+// Create directory if it doesn't exist
+function createDirIfNotExists(dir) {
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+    }
+}
 
 // Set up storage for profile pictures and certifications
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
+        let dest;
         if (file.fieldname === 'profilePicture') {
-            cb(null, 'public/uploads/profile-pictures/');
+            dest = 'public/uploads/profile-pictures/';
         } else if (file.fieldname === 'certifications') {
-            cb(null, 'public/uploads/certifications/');
+            dest = 'public/uploads/certifications/';
         } else {
-            cb(null, 'public/uploads/temp/');
+            dest = 'public/uploads/temp/';
         }
+
+        // Create directory if it doesn't exist
+        createDirIfNotExists(dest);
+        cb(null, dest);
     },
     filename: function (req, file, cb) {
         // Create a unique filename using timestamp and original name

@@ -1,17 +1,31 @@
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
+
+// Create directory if it doesn't exist
+function createDirIfNotExists(dir) {
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+    }
+}
 
 // Set up storage for service images and videos
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         // Store in different directories based on file type
+        let dest;
         if (file.mimetype.startsWith('image/')) {
-            cb(null, 'public/uploads/service-images/');
+            dest = 'public/uploads/service-images/';
         } else if (file.mimetype.startsWith('video/')) {
-            cb(null, 'public/uploads/service-videos/');
+            dest = 'public/uploads/service-videos/';
         } else {
             cb(new Error('Unsupported file type'), false);
+            return;
         }
+
+        // Create directory if it doesn't exist
+        createDirIfNotExists(dest);
+        cb(null, dest);
     },
     filename: function (req, file, cb) {
         // Create a unique filename using timestamp and original name
