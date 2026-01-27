@@ -13,13 +13,16 @@ function createDirIfNotExists(dir) {
 // Set up storage for profile pictures and certifications
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
+        let dir;
         if (file.fieldname === 'profilePicture') {
-            cb(null, 'public/uploads/profile-pictures/');
+            dir = 'public/uploads/profile-pictures/';
         } else if (file.fieldname === 'certifications') {
-            cb(null, 'public/uploads/certifications/');
+            dir = 'public/uploads/certifications/';
         } else {
-            cb(null, 'public/uploads/temp/');
+            dir = 'public/uploads/temp/';
         }
+        createDirIfNotExists(dir);
+        cb(null, dir);
     },
     filename: function (req, file, cb) {
         // Create a unique filename using timestamp and original name
