@@ -11,8 +11,6 @@ const config = require('./config/env');
 const routes = require('./routes');
 const errorHandler = require('./middlewares/error.middleware');
 const fs = require('fs');
-const path = require('path');
-const initUploadDirectories = require('./utils/initUploadDirs');
 
 const app = express();
 // Security middleware
