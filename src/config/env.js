@@ -1,4 +1,10 @@
+// Load environment variables
 require('dotenv').config();
+
+// Log environment variables for debugging (remove sensitive data)
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('RAZORPAY_KEY_ID exists:', !!process.env.RAZORPAY_KEY_ID);
+console.log('RAZORPAY_KEY_SECRET exists:', !!process.env.RAZORPAY_KEY_SECRET);
 
 const config = {
     NODE_ENV: process.env.NODE_ENV || 'development',
@@ -17,12 +23,12 @@ const config = {
 };
 
 // Validate required environment variables
-// const requiredEnvVars = ['RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET']; // Temporarily disabled
-// const missingEnvVars = requiredEnvVars.filter(envVar => !config[envVar]);
+const requiredEnvVars = ['RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET'];
+const missingEnvVars = requiredEnvVars.filter(envVar => !config[envVar]);
 
-// if (missingEnvVars.length > 0) {
-//     console.error('Missing required environment variables:', missingEnvVars);
-//     process.exit(1);
-// }
+if (missingEnvVars.length > 0) {
+    console.warn('Warning: Missing required environment variables:', missingEnvVars);
+    console.warn('Payment functionality will be disabled until these are set.');
+}
 
 module.exports = config;
