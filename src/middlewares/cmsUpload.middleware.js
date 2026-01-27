@@ -14,28 +14,23 @@ const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         // Store in different directories based on the field name
         const fieldname = file.fieldname;
-        let dest;
         
         if (fieldname === 'image') {
             // For general image fields like hero, about, etc.
-            dest = 'public/uploads/cms-images/';
+            cb(null, 'public/uploads/cms-images/');
         } else if (fieldname.includes('conditions[') && fieldname.includes('].image')) {
             // For condition images
-            dest = 'public/uploads/cms-condition-images/';
+            cb(null, 'public/uploads/cms-condition-images/');
         } else if (fieldname === 'conditions.image') {
             // For condition images in some formats
-            dest = 'public/uploads/cms-condition-images/';
+            cb(null, 'public/uploads/cms-condition-images/');
         } else if (fieldname.includes('condition') && fieldname.includes('.image')) {
             // For various condition image field formats
-            dest = 'public/uploads/cms-condition-images/';
+            cb(null, 'public/uploads/cms-condition-images/');
         } else {
             // Default for other image fields
-            dest = 'public/uploads/cms-images/';
+            cb(null, 'public/uploads/cms-images/');
         }
-
-        // Create directory if it doesn't exist
-        createDirIfNotExists(dest);
-        cb(null, dest);
     },
     filename: function (req, file, cb) {
         // Create a unique filename using timestamp and original name

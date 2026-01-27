@@ -13,19 +13,13 @@ function createDirIfNotExists(dir) {
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         // Store in different directories based on file type
-        let dest;
         if (file.mimetype.startsWith('image/')) {
-            dest = 'public/uploads/service-images/';
+            cb(null, 'public/uploads/service-images/');
         } else if (file.mimetype.startsWith('video/')) {
-            dest = 'public/uploads/service-videos/';
+            cb(null, 'public/uploads/service-videos/');
         } else {
             cb(new Error('Unsupported file type'), false);
-            return;
         }
-
-        // Create directory if it doesn't exist
-        createDirIfNotExists(dest);
-        cb(null, dest);
     },
     filename: function (req, file, cb) {
         // Create a unique filename using timestamp and original name
