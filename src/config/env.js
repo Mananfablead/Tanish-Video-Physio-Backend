@@ -17,7 +17,7 @@ const config = {
 };
 
 // Validate required environment variables
-const requiredEnvVars = ['RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET'];
+const requiredEnvVars = []; // Making Razorpay keys optional for now
 const missingEnvVars = requiredEnvVars.filter(envVar => !config[envVar]);
 
 if (missingEnvVars.length > 0) {
