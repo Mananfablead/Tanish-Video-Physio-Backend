@@ -52,7 +52,21 @@ const authorizeRoles = (...roles) => {
     };
 };
 
+// Middleware to authorize admin only
+const authorizeAdmin = (req, res, next) => {
+    if (!req.user) {
+        return res.status(401).json(ApiResponse.error('Authentication required'));
+    }
+
+    if (req.user.role !== 'admin') {
+        return res.status(403).json(ApiResponse.error('Admin access required'));
+    }
+
+    next();
+};
+
 module.exports = {
     authenticateToken,
-    authorizeRoles
+    authorizeRoles,
+    authorizeAdmin
 };
