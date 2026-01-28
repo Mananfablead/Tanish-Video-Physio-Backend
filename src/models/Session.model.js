@@ -24,16 +24,12 @@ const sessionSchema = new mongoose.Schema({
     sessionId: {
         type: String,
         unique: true,
-        required: [true, 'Session ID is required']
+        required: [true, 'Session ID is required'],
+        default: function () {
+            return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        }
     },
-    // sessionId: {
-    //     type: String,
-    //     unique: true,
-    //     required: [true, 'Session ID is required'],
-    //     default: function () {
-    //         return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    //     }
-    // },
+
     date: {
         type: String, // Format: YYYY-MM-DD
         required: [true, 'Date is required'],
