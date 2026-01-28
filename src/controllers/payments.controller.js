@@ -311,7 +311,7 @@ const verifyGuestPayment = async (req, res, next) => {
                 { orderId },
                 {
                     paymentId,
-                    status: 'verified',
+                    status: 'paid',
                     verifiedAt: new Date()
                 }
             );
