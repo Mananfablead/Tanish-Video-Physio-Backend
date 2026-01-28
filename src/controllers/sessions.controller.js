@@ -51,10 +51,12 @@ const getAllSessions = async (req, res, next) => {
 const getUserUpcomingSessions = async (req, res, next) => {
   try {
     const now = new Date();
+    // Show sessions that start within 30 minutes from now
+    const thirtyMinutesFromNow = new Date(now.getTime() + 30 * 60000);
 
     const sessions = await Session.find({
       userId: req.user.userId,
-      startTime: { $gte: now },
+      startTime: { $gte: now, $lte: thirtyMinutesFromNow },
       status: { $in: ["scheduled", "live"] },
     })
       .populate("bookingId", "serviceName therapistName date time")
@@ -84,9 +86,11 @@ const getAllUpcomingSessions = async (req, res, next) => {
     }
 
     const now = new Date();
+    // Show sessions that start within 30 minutes from now
+    const thirtyMinutesFromNow = new Date(now.getTime() + 30 * 60000);
 
     const sessions = await Session.find({
-      startTime: { $gte: now },
+      startTime: { $gte: now, $lte: thirtyMinutesFromNow },
       status: { $in: ["scheduled", "live"] },
     })
       .populate("bookingId", "serviceName therapistName date time")
