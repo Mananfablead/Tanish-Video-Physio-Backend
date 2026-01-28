@@ -4423,6 +4423,200 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "Get User Call History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/video-call/history?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "video-call", "history"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Report Call Issue",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sessionId\": \"session_id_here\",\n  \"issue\": \"audio_quality\",\n  \"description\": \"Poor audio quality during call\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/video-call/report-issue",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "video-call", "report-issue"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Call Logs (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/video-call/logs?dateRange=2024-01-01,2024-12-31&therapistId=therapist_id&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "video-call", "logs"],
+              "query": [
+                {
+                  "key": "dateRange",
+                  "value": "2024-01-01,2024-12-31"
+                },
+                {
+                  "key": "therapistId",
+                  "value": "therapist_id"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Call Quality Metrics (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/video-call/logs/:sessionId/metrics",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "video-call", "logs", ":sessionId", "metrics"],
+              "variable": [
+                {
+                  "key": "sessionId",
+                  "value": "session_id_here"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Active Calls (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/video-call/active",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "video-call", "active"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Force End Call (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sessionId\": \"session_id_here\",\n  \"reason\": \"Emergency termination\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/video-call/force-end",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "video-call", "force-end"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Mute Participant (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sessionId\": \"session_id_here\",\n  \"userId\": \"user_id_here\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/video-call/mute-participant",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "video-call", "mute-participant"]
+            }
+          },
+          "response": []
         }
       ]
     },
