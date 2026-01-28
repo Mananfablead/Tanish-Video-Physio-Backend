@@ -1,5 +1,6 @@
 const User = require('../models/User.model');
 const Subscription = require('../models/Subscription.model');
+const Booking = require('../models/Booking.model');
 const { generateToken } = require('../config/jwt');
 const { hashPassword, comparePassword } = require('../utils/auth.utils');
 const ApiResponse = require('../utils/apiResponse');
@@ -163,7 +164,37 @@ const getProfile = async (req, res, next) => {
             activeSubscription = subscriptions[0];
         }
 
-        // Add subscription data to the response
+        // Get user's bookings with service information
+        const userBookings = await Booking.find({
+            userId: req.user.userId
+        })
+            .populate('serviceId')
+            .sort({ createdAt: -1 });
+
+        // Get active services from bookings (only services user has purchased)
+        const purchasedServices = userBookings
+            .filter(booking =>
+                booking.serviceId &&
+                booking.serviceId.status === 'active' &&
+                booking.status === 'confirmed' &&
+                booking.paymentStatus === 'paid'
+            )
+            .map(booking => ({
+                id: booking.serviceId._id,
+                name: booking.serviceId.name,
+                description: booking.serviceId.description,
+                category: booking.serviceId.category,
+                price: booking.serviceId.price,
+                duration: booking.serviceId.duration,
+                bookingId: booking._id,
+                bookingDate: booking.date,
+                bookingTime: booking.time,
+                bookingStatus: booking.status,
+                paymentStatus: booking.paymentStatus,
+                amountPaid: booking.amount
+            }));
+
+        // Add subscription data and purchased services to the response
         const responseData = {
             ...user.toObject(),
             subscriptionData: activeSubscription ? {
@@ -177,6 +208,7 @@ const getProfile = async (req, res, next) => {
                 endDate: activeSubscription.endDate,
                 createdAt: activeSubscription.createdAt
             } : null,
+            purchasedServices: purchasedServices
         };
 
         res.status(200).json(ApiResponse.success(responseData, 'Profile retrieved successfully'));

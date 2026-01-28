@@ -55,6 +55,9 @@ const paymentSchema = new mongoose.Schema({
     paymentDate: {
         type: Date
     },
+    verifiedAt: {
+        type: Date
+    },
     notes: {
         type: String,
         maxlength: [500, 'Notes cannot exceed 500 characters']

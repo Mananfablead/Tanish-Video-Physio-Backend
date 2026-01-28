@@ -107,7 +107,7 @@ app.use(
 
 console.log('📂 Serving uploads from:', PUBLIC_UPLOADS_DIR);
 
-// const UPLOADS_DIR = path.resolve('/home/u378554361/uploads');
+// const UPLOADS_DIR = path.resolve('/home/u378554361/domains/apitanishvideo.fableadtech.in/uploads');
 
 // if (!fs.existsSync(UPLOADS_DIR)) {
 //     fs.mkdirSync(UPLOADS_DIR, { recursive: true });
@@ -116,6 +116,7 @@ console.log('📂 Serving uploads from:', PUBLIC_UPLOADS_DIR);
 // app.use(
 //     '/uploads',
 //     express.static(UPLOADS_DIR, {
+//     express.static(UPLOADS_DIR, {
 //         setHeaders: (res) => {
 //             res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
 //         },
@@ -123,7 +124,6 @@ console.log('📂 Serving uploads from:', PUBLIC_UPLOADS_DIR);
 // );
 
 // console.log('📂 Serving uploads from:', UPLOADS_DIR);
-
 
 // Routes
 app.use('/api', routes);
