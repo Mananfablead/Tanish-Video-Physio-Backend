@@ -116,6 +116,7 @@ console.log('📂 Serving uploads from:', PUBLIC_UPLOADS_DIR);
 // app.use(
 //     '/uploads',
 //     express.static(UPLOADS_DIR, {
+//     express.static(UPLOADS_DIR, {
 //         setHeaders: (res) => {
 //             res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
 //         },
