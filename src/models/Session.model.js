@@ -73,6 +73,9 @@ const sessionSchema = new mongoose.Schema({
     },
     joinLink: {
         type: String
+    },
+    therapistJoinLink: {
+        type: String
     }
 }, {
     timestamps: true,

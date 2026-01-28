@@ -16,7 +16,7 @@ const generateJoinLink = (sessionId, userId, role) => {
             sessionId,
             userId,
             role,
-            exp: Math.floor(Date.now() / 1000) + (60 * 60) // Token expires in 1 hour
+            exp: Math.floor(Date.now() / 1000) + (48 * 60 * 60) // Token expires in 48 hours
         },
         config.JWT_SECRET
     );

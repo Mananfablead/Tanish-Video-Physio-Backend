@@ -2,6 +2,7 @@ const Session = require("../models/Session.model");
 const Booking = require("../models/Booking.model");
 const Availability = require("../models/Availability.model");
 const ApiResponse = require("../utils/apiResponse");
+const { generateJoinLink } = require("../utils/videoCall.utils");
 
 // Get all sessions for authenticated user
 const getUserSessions = async (req, res, next) => {
@@ -1064,10 +1065,18 @@ const acceptSession = async (req, res, next) => {
       return res.status(404).json(ApiResponse.error("Session not found"));
     }
 
-    // Update session status to scheduled
+    // Generate video call join links for both user and therapist
+    const userJoinLink = generateJoinLink(session.sessionId, session.userId.toString(), 'user');
+    const therapistJoinLink = generateJoinLink(session.sessionId, session.therapistId.toString(), 'therapist');
+    
+    // Update session with join links and status
     const updatedSession = await Session.findByIdAndUpdate(
       req.params.id,
-      { status: "scheduled" },
+      { 
+        status: "scheduled",
+        joinLink: userJoinLink, // Store user join link in the main field
+        therapistJoinLink: therapistJoinLink // Store therapist link separately
+      },
       { new: true, runValidators: true }
     )
       .populate("bookingId", "serviceName therapistName date time")
@@ -1102,7 +1111,13 @@ const acceptSession = async (req, res, next) => {
 
     res
       .status(200)
-      .json(ApiResponse.success({ session: updatedSession }, "Session accepted successfully"));
+      .json(ApiResponse.success({ 
+        session: updatedSession,
+        joinLinks: {
+          user: userJoinLink,
+          therapist: therapistJoinLink
+        }
+      }, "Session accepted successfully"));
   } catch (error) {
     next(error);
   }
