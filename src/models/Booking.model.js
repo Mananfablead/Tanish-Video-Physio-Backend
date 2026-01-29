@@ -35,8 +35,8 @@ const bookingSchema = new mongoose.Schema({
     },
     time: {
         type: String, // Format: HH:MM
-        required: [true, 'Time is required'],
-        match: [/^([01]\d|2[0-3]):([0-5]\d)$/, 'Time must be in HH:MM format']
+        // required: [true, 'Time is required'],
+        // match: [/^([01]\d|2[0-3]):([0-5]\d)$/, 'Time must be in HH:MM format']
     },
     status: {
         type: String,

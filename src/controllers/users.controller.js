@@ -119,7 +119,7 @@ const getAllUsers = async (req, res, next) => {
 
         res.status(200).json(
             ApiResponse.success({
-                users,
+                users: resultUsers,
                 pagination: {
                     page,
                     limit,
