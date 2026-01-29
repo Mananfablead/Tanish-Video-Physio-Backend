@@ -96,7 +96,7 @@ const getServiceByIdAdmin = async (req, res, next) => {
 // Create a new service (admin only)
 const createService = async (req, res, next) => {
     try {
-        const { name, description, about, price, duration, category, status, features, prerequisites, benefits, contraindications } = req.body;
+        const { name, description, about, price, duration, category, status, features, prerequisites, benefits, contraindications, sessions, validity } = req.body;
 
         // Prepare service object
         const serviceData = {
@@ -110,7 +110,9 @@ const createService = async (req, res, next) => {
             features: safeJsonParse(features, []),
             prerequisites: safeJsonParse(prerequisites, []),
             benefits: safeJsonParse(benefits, []),
-            contraindications: safeJsonParse(contraindications, [])
+            contraindications: safeJsonParse(contraindications, []),
+            sessions,
+            validity
         };
 
         // Process uploaded files if they exist
@@ -150,7 +152,7 @@ const createService = async (req, res, next) => {
 // Update service by ID (admin only)
 const updateService = async (req, res, next) => {
     try {
-        const { name, description, about, price, duration, category, status, features, prerequisites, benefits, contraindications } = req.body;
+        const { name, description, about, price, duration, category, status, features, prerequisites, benefits, contraindications, sessions, validity } = req.body;
 
         // Prepare update object
         const updateData = {};
@@ -166,6 +168,8 @@ const updateService = async (req, res, next) => {
         if (prerequisites) updateData.prerequisites = safeJsonParse(prerequisites);
         if (benefits) updateData.benefits = safeJsonParse(benefits);
         if (contraindications) updateData.contraindications = safeJsonParse(contraindications);
+        if (sessions !== undefined) updateData.sessions = sessions;
+        if (validity !== undefined) updateData.validity = validity;
 
         // Process uploaded files if they exist
         if (req.files && Object.keys(req.files).length > 0) {

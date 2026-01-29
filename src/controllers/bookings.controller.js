@@ -108,19 +108,9 @@ const createBooking = async (req, res, next) => {
             return res.status(404).json(ApiResponse.error('No active therapists available'));
         }
 
-        // Check if booking already exists for this date/time
-        const existingBooking = await Booking.findOne({
-            therapistId: therapist._id,
-            date,
-            time,
-            status: { $ne: 'cancelled' }
-        });
+  
 
-        // if (existingBooking) {
-        //     return res.status(400).json(ApiResponse.error('Slot already booked'));
-        // }
-
-        const booking = new Booking({
+const booking = new Booking({
             serviceId,
             serviceName: service.name, // Get from service model
             therapistId: therapist._id,
@@ -128,9 +118,9 @@ const createBooking = async (req, res, next) => {
             userId: req.user.userId, // Assign current user from auth middleware
             clientName: clientName || req.user.name, // Use provided clientName or fall back to authenticated user's name
             date,
-            time,
+            createdAt: new Date(),
             notes,
-            amount: service.price // Get from service model
+            amount: service.price 
         });
 
         await booking.save();
