@@ -232,6 +232,43 @@ const createSession = async (req, res, next) => {
       }
     }
 
+    /* ================= SLOT VALIDATION ================= */
+    // Fetch the availability to get the slot information
+    const availability = await Availability.findOne({ therapistId, date });
+    if (availability) {
+      const selectedSlot = availability.timeSlots.find(slot => slot.start === time);
+      if (selectedSlot) {
+        // Calculate the slot duration in minutes
+        const [startHour, startMinute] = selectedSlot.start.split(':').map(Number);
+        const [endHour, endMinute] = selectedSlot.end.split(':').map(Number);
+        
+        const slotStartTime = new Date();
+        slotStartTime.setHours(startHour, startMinute, 0, 0);
+        
+        const slotEndTime = new Date();
+        slotEndTime.setHours(endHour, endMinute, 0, 0);
+        
+        const slotDurationMinutes = (slotEndTime - slotStartTime) / (1000 * 60);
+        
+        // Check if service duration fits in the selected slot
+        if (bookingId) {
+          const booking = await Booking.findOne({ _id: bookingId, userId }).populate('serviceId');
+          if (booking && booking.serviceId && booking.serviceId.duration) {
+            const serviceDuration = parseDurationString(booking.serviceId.duration);
+            if (serviceDuration > slotDurationMinutes) {
+              return res
+                .status(400)
+                .json(
+                  ApiResponse.error(
+                    `Selected service requires ${serviceDuration} minutes but selected slot is only ${slotDurationMinutes} minutes. Please select a larger time slot.`
+                  )
+                );
+            }
+          }
+        }
+      }
+    }
+
     /* ================= TIME ================= */
     const startTime = new Date(`${date}T${time}:00`);
     const endTime =
@@ -461,6 +498,43 @@ const rescheduleUserSession = async (req, res, next) => {
 
     // Auto-generate new startTime from date and time
     const startTime = new Date(`${date}T${time}:00`);
+
+    /* ================= RESCHEDULE SLOT VALIDATION ================= */
+    // Fetch the availability to get the slot information
+    const availability = await Availability.findOne({ therapistId: session.therapistId, date: date });
+    if (availability) {
+      const selectedSlot = availability.timeSlots.find(slot => slot.start === time);
+      if (selectedSlot) {
+        // Calculate the slot duration in minutes
+        const [startHour, startMinute] = selectedSlot.start.split(':').map(Number);
+        const [endHour, endMinute] = selectedSlot.end.split(':').map(Number);
+        
+        const slotStartTime = new Date();
+        slotStartTime.setHours(startHour, startMinute, 0, 0);
+        
+        const slotEndTime = new Date();
+        slotEndTime.setHours(endHour, endMinute, 0, 0);
+        
+        const slotDurationMinutes = (slotEndTime - slotStartTime) / (1000 * 60);
+        
+        // Check if service duration fits in the selected slot
+        if (session.bookingId) {
+          const booking = await Booking.findById(session.bookingId).populate('serviceId');
+          if (booking && booking.serviceId && booking.serviceId.duration) {
+            const serviceDuration = parseDurationString(booking.serviceId.duration);
+            if (serviceDuration > slotDurationMinutes) {
+              return res
+                .status(400)
+                .json(
+                  ApiResponse.error(
+                    `Selected service requires ${serviceDuration} minutes but selected slot is only ${slotDurationMinutes} minutes. Please select a larger time slot.`
+                  )
+                );
+            }
+          }
+        }
+      }
+    }
 
     // Calculate endTime based on duration if provided
     let endTime = null;
@@ -721,6 +795,44 @@ const createAdminSession = async (req, res, next) => {
 
     // Auto-generate startTime from date and time
     const startTime = new Date(`${date}T${time}:00`);
+
+    /* ================= ADMIN SLOT VALIDATION ================= */
+    // Fetch the availability to get the slot information
+    const availability = await Availability.findOne({ therapistId: therapistId, date: date });
+    if (availability) {
+      const selectedSlot = availability.timeSlots.find(slot => slot.start === time);
+      if (selectedSlot) {
+        // Calculate the slot duration in minutes
+        const [startHour, startMinute] = selectedSlot.start.split(':').map(Number);
+        const [endHour, endMinute] = selectedSlot.end.split(':').map(Number);
+        
+        const slotStartTime = new Date();
+        slotStartTime.setHours(startHour, startMinute, 0, 0);
+        
+        const slotEndTime = new Date();
+        slotEndTime.setHours(endHour, endMinute, 0, 0);
+        
+        const slotDurationMinutes = (slotEndTime - slotStartTime) / (1000 * 60);
+        
+        // Check if service duration fits in the selected slot
+        if (bookingId) {
+          const Booking = require("../models/Booking.model");
+          const booking = await Booking.findById(bookingId).populate('serviceId');
+          if (booking && booking.serviceId && booking.serviceId.duration) {
+            const serviceDuration = parseDurationString(booking.serviceId.duration);
+            if (serviceDuration > slotDurationMinutes) {
+              return res
+                .status(400)
+                .json(
+                  ApiResponse.error(
+                    `Selected service requires ${serviceDuration} minutes but selected slot is only ${slotDurationMinutes} minutes. Please select a larger time slot.`
+                  )
+                );
+            }
+          }
+        }
+      }
+    }
 
     // Calculate endTime based on duration if provided
     let endTime = null;
@@ -1010,8 +1122,52 @@ const rescheduleAdminSession = async (req, res, next) => {
         .json(ApiResponse.error("Cannot reschedule live or completed session"));
     }
 
+    // Ensure bookingId exists to check service duration
+    if (!session.bookingId) {
+      return res
+        .status(400)
+        .json(ApiResponse.error("Cannot reschedule subscription-based session using this endpoint"));
+    }
+
     // Auto-generate new startTime from date and time
     const startTime = new Date(`${date}T${time}:00`);
+
+    /* ================= RESCHEDULE SLOT VALIDATION ================= */
+    // Fetch the availability to get the slot information
+    const availability = await Availability.findOne({ therapistId: session.therapistId, date: date });
+    if (availability) {
+      const selectedSlot = availability.timeSlots.find(slot => slot.start === time);
+      if (selectedSlot) {
+        // Calculate the slot duration in minutes
+        const [startHour, startMinute] = selectedSlot.start.split(':').map(Number);
+        const [endHour, endMinute] = selectedSlot.end.split(':').map(Number);
+        
+        const slotStartTime = new Date();
+        slotStartTime.setHours(startHour, startMinute, 0, 0);
+        
+        const slotEndTime = new Date();
+        slotEndTime.setHours(endHour, endMinute, 0, 0);
+        
+        const slotDurationMinutes = (slotEndTime - slotStartTime) / (1000 * 60);
+        
+        // Check if service duration fits in the selected slot
+        if (session.bookingId) {
+          const booking = await Booking.findById(session.bookingId).populate('serviceId');
+          if (booking && booking.serviceId && booking.serviceId.duration) {
+            const serviceDuration = parseDurationString(booking.serviceId.duration);
+            if (serviceDuration > slotDurationMinutes) {
+              return res
+                .status(400)
+                .json(
+                  ApiResponse.error(
+                    `Selected service requires ${serviceDuration} minutes but selected slot is only ${slotDurationMinutes} minutes. Please select a larger time slot.`
+                  )
+                );
+            }
+          }
+        }
+      }
+    }
 
     // Calculate endTime based on duration if provided
     let endTime = null;
