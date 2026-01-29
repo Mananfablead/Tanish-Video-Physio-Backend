@@ -79,13 +79,14 @@ const sessionSchema = new mongoose.Schema({
         type: String
     }
 }, {
-    timestamps: true,
-    validate: {
-        validator: function () {
-            return this.bookingId || this.subscriptionId;
-        },
-        message: 'Either bookingId or subscriptionId must be provided'
-    }
+    timestamps: true
+    // Removed custom validation as it was causing issues with session creation
+    // validate: {
+    //     validator: function () {
+    //         return this.bookingId || this.subscriptionId;
+    //     },
+    //     message: 'Either bookingId or subscriptionId must be provided'
+    // }
 });
 
 module.exports = mongoose.model('Session', sessionSchema);

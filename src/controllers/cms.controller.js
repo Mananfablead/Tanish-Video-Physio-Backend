@@ -13,15 +13,9 @@ const config = require('../config/env');
 exports.getHeroPublic = async (req, res) => {
     try {
         const hero = await CmsHero.findOne({ isPublic: true }).sort({ createdAt: -1 });
-        if (!hero) {
-            return res.status(404).json({
-                success: false,
-                message: 'Hero section not found'
-            });
-        }
         res.json({
             success: true,
-            data: hero
+            data: hero || {}
         });
     } catch (error) {
         res.status(500).json({

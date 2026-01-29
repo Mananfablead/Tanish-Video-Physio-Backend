@@ -53,7 +53,17 @@ const serviceSchema = new mongoose.Schema({
     }],
     contraindications: [{
         type: String
-    }]
+    }],
+    sessions: {
+        type: Number,
+        min: 0,
+        required: [true, 'Number of sessions is required']
+    },
+    validity: {
+        type: Number,
+        min: 0,
+        required: [true, 'Validity period is required']
+    }
 }, {
     timestamps: true
 });

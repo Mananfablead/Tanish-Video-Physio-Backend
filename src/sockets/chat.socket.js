@@ -6,8 +6,16 @@ const logger = require('../utils/logger');
 // Function to setup chat socket handlers
 const setupChatHandlers = (io, socket) => {
     // Join a chat room
-    socket.on('join-room', async (sessionId) => {
+    socket.on('join-room', async (data) => {
         try {
+            // Handle both string ID and object formats
+            const sessionId = typeof data === 'string' ? data : (data.sessionId || data.groupSessionId);
+
+            if (!sessionId) {
+                socket.emit('error', { message: 'Session ID is required' });
+                return;
+            }
+
             // Verify session exists and user has access
             const session = await Session.findById(sessionId).populate('userId');
             if (!session) {
@@ -31,7 +39,15 @@ const setupChatHandlers = (io, socket) => {
     });
 
     // Leave a chat room
-    socket.on('leave-room', (sessionId) => {
+    socket.on('leave-room', (data) => {
+        // Handle both string ID and object formats
+        const sessionId = typeof data === 'string' ? data : (data.sessionId || data.groupSessionId);
+
+        if (!sessionId) {
+            socket.emit('error', { message: 'Session ID is required' });
+            return;
+        }
+
         socket.leave(sessionId);
         logger.info(`User ${socket.user.userId} left session room ${sessionId}`);
 

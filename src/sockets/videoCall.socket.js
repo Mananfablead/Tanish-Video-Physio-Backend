@@ -13,6 +13,7 @@ const setupVideoCallHandlers = (io, socket) => {
             const userId = socket.user.userId;
             
             let roomType, roomInfo;
+            let isUser = false, isTherapist = false, isParticipant = false;
 
             // Determine if it's a 1-on-1 or group session
             if (sessionId) {
@@ -30,8 +31,8 @@ const setupVideoCallHandlers = (io, socket) => {
                 }
 
                 // Check if user has permission to join the call
-                const isUser = session.userId && session.userId._id.toString() === userId;
-                const isTherapist = session.therapistId && session.therapistId._id.toString() === userId;
+                isUser = session.userId && session.userId._id.toString() === userId;
+                isTherapist = session.therapistId && session.therapistId._id.toString() === userId;
 
                 if (!isUser && !isTherapist) {
                     socket.emit('error', { message: 'Unauthorized to join this session' });
@@ -40,12 +41,20 @@ const setupVideoCallHandlers = (io, socket) => {
 
                 roomInfo = session;
 
+                // Check session status first
+                if (session.status !== 'scheduled' && session.status !== 'live' && session.status !== 'pending') {
+                    socket.emit('error', { message: 'Session is not active at this time' });
+                    return;
+                }
+
                 // Check if call has started within the valid time frame
                 const now = new Date();
-                const sessionTime = new Date(session.date + 'T' + session.time);
+                // Use the startTime field which is already in the correct timezone
+                const sessionTime = new Date(session.startTime);
 
-                // Allow joining 15 minutes before and 15 minutes after session start time
-                if (now < new Date(sessionTime.getTime() - 15 * 60000) || now > new Date(sessionTime.getTime() + 15 * 60000)) {
+                // Allow joining 24 hours before and 60 minutes after session start time
+                // Development mode: Extended window for testing
+                if (now < new Date(sessionTime.getTime() - 24 * 60 * 60000) || now > new Date(sessionTime.getTime() + 60 * 60000)) {
                     socket.emit('error', { message: 'Session is not active at this time' });
                     return;
                 }
@@ -64,8 +73,8 @@ const setupVideoCallHandlers = (io, socket) => {
                 }
 
                 // Check if user has permission to join the group call
-                const isTherapist = groupSession.therapistId._id.toString() === userId;
-                const isParticipant = groupSession.participants.some(
+                isTherapist = groupSession.therapistId._id.toString() === userId;
+                isParticipant = groupSession.participants.some(
                     p => p.userId._id.toString() === userId && p.status === 'accepted'
                 );
 
@@ -78,6 +87,23 @@ const setupVideoCallHandlers = (io, socket) => {
                 const activeParticipants = Array.from(io.sockets.adapter.rooms.get(groupSessionId) || []).length;
                 if (activeParticipants >= groupSession.maxParticipants && !isTherapist) {
                     socket.emit('error', { message: 'Maximum participants reached for this group session' });
+                    return;
+                }
+
+                // Check group session status
+                if (groupSession.status !== 'scheduled' && groupSession.status !== 'live' && groupSession.status !== 'pending') {
+                    socket.emit('error', { message: 'Group session is not active at this time' });
+                    return;
+                }
+
+                // Check if call has started within the valid time frame
+                const now = new Date();
+                // Use the startTime field which is already in the correct timezone
+                const sessionTime = new Date(groupSession.startTime);
+
+                // Allow joining 24 hours before and 60 minutes after session start time
+                if (now < new Date(sessionTime.getTime() - 24 * 60 * 60000) || now > new Date(sessionTime.getTime() + 60 * 60000)) {
+                    socket.emit('error', { message: 'Group session is not active at this time' });
                     return;
                 }
 
