@@ -43,6 +43,49 @@ const getBookingById = async (req, res, next) => {
     }
 };
 
+// Get booking details by ID for both guest and authenticated users (unified endpoint)
+const getBookingDetails = async (req, res, next) => {
+    try {
+        const { id: bookingId } = req.params;
+        
+        // For guest users, we'll accept email in the request body to verify access
+        const { clientEmail } = req.body;
+        
+        // Find the booking by ID
+        const booking = await Booking.findById(bookingId)
+            .populate('serviceId', 'name price duration description')
+            .populate('therapistId', 'name email role profilePicture');
+            
+        if (!booking) {
+            return res.status(404).json(ApiResponse.error('Booking not found'));
+        }
+        
+        // Check access permissions
+        let hasAccess = false;
+        
+        if (req.user) {
+            // Authenticated user - check if booking belongs to them or they're admin
+            if (req.user.role === 'admin' || booking.userId.equals(req.user.userId)) {
+                hasAccess = true;
+            }
+        } else if (clientEmail) {
+            // Guest user - verify by email
+            const user = await User.findOne({ email: clientEmail });
+            if (user && booking.userId.equals(user._id)) {
+                hasAccess = true;
+            }
+        }
+        
+        if (!hasAccess) {
+            return res.status(403).json(ApiResponse.error('Unauthorized to access this booking'));
+        }
+        
+        res.status(200).json(ApiResponse.success({ booking }, 'Booking details retrieved successfully'));
+    } catch (error) {
+        next(error);
+    }
+};
+
 // Create a new booking
 const createBooking = async (req, res, next) => {
     try {
@@ -565,4 +608,5 @@ module.exports = {
     deleteBooking,
     getBookingsByStatus,
     getAllBookingsForAdmin,
+    getBookingDetails // Single unified function
 };

@@ -155,11 +155,13 @@ const createSession = async (req, res, next) => {
     let duration = reqDuration;
 
     if (!bookingId && !subscriptionId) {
-      return res.status(400).json(
-        ApiResponse.error(
-          "Either bookingId or subscriptionId must be provided"
-        )
-      );
+      return res
+        .status(400)
+        .json(
+          ApiResponse.error(
+            "Either bookingId or subscriptionId must be provided"
+          )
+        );
     }
 
     const userId = req.user.userId;
@@ -170,9 +172,7 @@ const createSession = async (req, res, next) => {
       const booking = await Booking.findOne({ _id: bookingId, userId }).populate('serviceId');
 
       if (!booking) {
-        return res
-          .status(404)
-          .json(ApiResponse.error("Booking not found"));
+        return res.status(404).json(ApiResponse.error("Booking not found"));
       }
 
       if (booking.paymentStatus !== "paid") {
@@ -215,20 +215,20 @@ const createSession = async (req, res, next) => {
       }
 
       if (subscription.endDate && subscription.endDate < new Date()) {
-        return res
-          .status(400)
-          .json(ApiResponse.error("Subscription expired"));
+        return res.status(400).json(ApiResponse.error("Subscription expired"));
       }
 
       // 🔥 IMPORTANT FIX
       therapistId = bodyTherapistId || null;
 
       if (!therapistId) {
-        return res.status(400).json(
-          ApiResponse.error(
-            "therapistId is required for subscription session booking"
-          )
-        );
+        return res
+          .status(400)
+          .json(
+            ApiResponse.error(
+              "therapistId is required for subscription session booking"
+            )
+          );
       }
     }
 
@@ -280,18 +280,13 @@ const createSession = async (req, res, next) => {
     );
     await session.populate("therapistId", "name email role");
 
-    return res.status(201).json(
-      ApiResponse.success(
-        { session },
-        "Session created successfully"
-      )
-    );
+    return res
+      .status(201)
+      .json(ApiResponse.success({ session }, "Session created successfully"));
   } catch (error) {
     next(error);
   }
 };
-
-
 
 // Update session by ID
 const updateSession = async (req, res, next) => {
@@ -299,7 +294,10 @@ const updateSession = async (req, res, next) => {
     const { status, notes, duration, time } = req.body;
 
     // Check if session belongs to user
-    const session = await Session.findOne({ _id: req.params.id, userId: req.user.userId });
+    const session = await Session.findOne({
+      _id: req.params.id,
+      userId: req.user.userId,
+    });
     if (!session) {
       return res.status(404).json(ApiResponse.error("Session not found"));
     }
@@ -335,47 +333,55 @@ const updateSession = async (req, res, next) => {
         // Mark old time slot as available
         await Availability.updateOne(
           { therapistId: session.therapistId, date: session.date },
-          { 
-            $set: { 
-              "timeSlots.$[elem].status": "available" 
-            } 
+          {
+            $set: {
+              "timeSlots.$[elem].status": "available",
+            },
           },
-          { 
+          {
             arrayFilters: [
-              { 
-                "elem.start": session.time, 
-                "elem.status": "booked" 
-              }
-            ]
+              {
+                "elem.start": session.time,
+                "elem.status": "booked",
+              },
+            ],
           }
         );
 
         // Mark new time slot as booked
         await Availability.updateOne(
           { therapistId: session.therapistId, date: session.date },
-          { 
-            $set: { 
-              "timeSlots.$[elem].status": "booked" 
-            } 
+          {
+            $set: {
+              "timeSlots.$[elem].status": "booked",
+            },
           },
-          { 
+          {
             arrayFilters: [
-              { 
-                "elem.start": time, 
-                "elem.status": "available" 
-              }
-            ]
+              {
+                "elem.start": time,
+                "elem.status": "available",
+              },
+            ],
           }
         );
       } catch (availabilityError) {
-        console.error('Error updating availability status during session update:', availabilityError);
+        console.error(
+          "Error updating availability status during session update:",
+          availabilityError
+        );
         // Continue with response even if availability update fails
       }
     }
 
     res
       .status(200)
-      .json(ApiResponse.success({ session: updatedSession }, "Session updated successfully"));
+      .json(
+        ApiResponse.success(
+          { session: updatedSession },
+          "Session updated successfully"
+        )
+      );
   } catch (error) {
     next(error);
   }
@@ -401,22 +407,25 @@ const deleteSession = async (req, res, next) => {
       try {
         await Availability.updateOne(
           { therapistId: session.therapistId, date: session.date },
-          { 
-            $set: { 
-              "timeSlots.$[elem].status": "available" 
-            } 
+          {
+            $set: {
+              "timeSlots.$[elem].status": "available",
+            },
           },
-          { 
+          {
             arrayFilters: [
-              { 
-                "elem.start": session.time, 
-                "elem.status": "booked" 
-              }
-            ]
+              {
+                "elem.start": session.time,
+                "elem.status": "booked",
+              },
+            ],
           }
         );
       } catch (availabilityError) {
-        console.error('Error updating availability status after session deletion:', availabilityError);
+        console.error(
+          "Error updating availability status after session deletion:",
+          availabilityError
+        );
         // Continue with response even if availability update fails
       }
     }
@@ -464,7 +473,7 @@ const rescheduleUserSession = async (req, res, next) => {
       date,
       time,
       startTime,
-      status: "scheduled", // Reset status to scheduled
+      status: "scheduled",
     };
 
     // Include duration and endTime if provided
@@ -488,41 +497,47 @@ const rescheduleUserSession = async (req, res, next) => {
       try {
         // Mark old time slot as available
         await Availability.updateOne(
-          { therapistId: updatedSession.therapistId, date: updatedSession.date },
-          { 
-            $set: { 
-              "timeSlots.$[elem].status": "available" 
-            } 
+          {
+            therapistId: updatedSession.therapistId,
+            date: updatedSession.date,
           },
-          { 
+          {
+            $set: {
+              "timeSlots.$[elem].status": "available",
+            },
+          },
+          {
             arrayFilters: [
-              { 
-                "elem.start": updatedSession.time, 
-                "elem.status": "booked" 
-              }
-            ]
+              {
+                "elem.start": updatedSession.time,
+                "elem.status": "booked",
+              },
+            ],
           }
         );
 
         // Mark new time slot as booked
         await Availability.updateOne(
           { therapistId: updatedSession.therapistId, date },
-          { 
-            $set: { 
-              "timeSlots.$[elem].status": "booked" 
-            } 
+          {
+            $set: {
+              "timeSlots.$[elem].status": "booked",
+            },
           },
-          { 
+          {
             arrayFilters: [
-              { 
-                "elem.start": time, 
-                "elem.status": "available" 
-              }
-            ]
+              {
+                "elem.start": time,
+                "elem.status": "available",
+              },
+            ],
           }
         );
       } catch (availabilityError) {
-        console.error('Error updating availability status during reschedule:', availabilityError);
+        console.error(
+          "Error updating availability status during reschedule:",
+          availabilityError
+        );
         // Continue with response even if availability update fails
       }
     }
@@ -750,22 +765,22 @@ const createAdminSession = async (req, res, next) => {
       try {
         await Availability.updateOne(
           { therapistId: sessionData.therapistId, date: sessionData.date },
-          { 
-            $set: { 
-              "timeSlots.$[elem].status": "booked" 
-            } 
+          {
+            $set: {
+              "timeSlots.$[elem].status": "booked",
+            },
           },
-          { 
+          {
             arrayFilters: [
-              { 
-                "elem.start": sessionData.time, 
-                "elem.status": "available" 
-              }
-            ]
+              {
+                "elem.start": sessionData.time,
+                "elem.status": "available",
+              },
+            ],
           }
         );
       } catch (availabilityError) {
-        console.error('Error updating availability status:', availabilityError);
+        console.error("Error updating availability status:", availabilityError);
         // Continue with response even if availability update fails
       }
     }
@@ -860,40 +875,43 @@ const updateAdminSession = async (req, res, next) => {
         // Mark old time slot as available
         await Availability.updateOne(
           { therapistId: currentSession.therapistId, date: oldDate },
-          { 
-            $set: { 
-              "timeSlots.$[elem].status": "available" 
-            } 
+          {
+            $set: {
+              "timeSlots.$[elem].status": "available",
+            },
           },
-          { 
+          {
             arrayFilters: [
-              { 
-                "elem.start": oldTime, 
-                "elem.status": "booked" 
-              }
-            ]
+              {
+                "elem.start": oldTime,
+                "elem.status": "booked",
+              },
+            ],
           }
         );
 
         // Mark new time slot as booked
         await Availability.updateOne(
           { therapistId: currentSession.therapistId, date: newDate },
-          { 
-            $set: { 
-              "timeSlots.$[elem].status": "booked" 
-            } 
+          {
+            $set: {
+              "timeSlots.$[elem].status": "booked",
+            },
           },
-          { 
+          {
             arrayFilters: [
-              { 
-                "elem.start": newTime, 
-                "elem.status": "available" 
-              }
-            ]
+              {
+                "elem.start": newTime,
+                "elem.status": "available",
+              },
+            ],
           }
         );
       } catch (availabilityError) {
-        console.error('Error updating availability status during admin session update:', availabilityError);
+        console.error(
+          "Error updating availability status during admin session update:",
+          availabilityError
+        );
         // Continue with response even if availability update fails
       }
     }
@@ -936,22 +954,25 @@ const deleteAdminSession = async (req, res, next) => {
       try {
         await Availability.updateOne(
           { therapistId: session.therapistId, date: session.date },
-          { 
-            $set: { 
-              "timeSlots.$[elem].status": "available" 
-            } 
+          {
+            $set: {
+              "timeSlots.$[elem].status": "available",
+            },
           },
-          { 
+          {
             arrayFilters: [
-              { 
-                "elem.start": session.time, 
-                "elem.status": "booked" 
-              }
-            ]
+              {
+                "elem.start": session.time,
+                "elem.status": "booked",
+              },
+            ],
           }
         );
       } catch (availabilityError) {
-        console.error('Error updating availability status after session deletion:', availabilityError);
+        console.error(
+          "Error updating availability status after session deletion:",
+          availabilityError
+        );
         // Continue with response even if availability update fails
       }
     }
@@ -1028,41 +1049,47 @@ const rescheduleAdminSession = async (req, res, next) => {
       try {
         // Mark old time slot as available
         await Availability.updateOne(
-          { therapistId: updatedSession.therapistId, date: updatedSession.date },
-          { 
-            $set: { 
-              "timeSlots.$[elem].status": "available" 
-            } 
+          {
+            therapistId: updatedSession.therapistId,
+            date: updatedSession.date,
           },
-          { 
+          {
+            $set: {
+              "timeSlots.$[elem].status": "available",
+            },
+          },
+          {
             arrayFilters: [
-              { 
-                "elem.start": updatedSession.time, 
-                "elem.status": "booked" 
-              }
-            ]
+              {
+                "elem.start": updatedSession.time,
+                "elem.status": "booked",
+              },
+            ],
           }
         );
 
         // Mark new time slot as booked
         await Availability.updateOne(
           { therapistId: updatedSession.therapistId, date },
-          { 
-            $set: { 
-              "timeSlots.$[elem].status": "booked" 
-            } 
+          {
+            $set: {
+              "timeSlots.$[elem].status": "booked",
+            },
           },
-          { 
+          {
             arrayFilters: [
-              { 
-                "elem.start": time, 
-                "elem.status": "available" 
-              }
-            ]
+              {
+                "elem.start": time,
+                "elem.status": "available",
+              },
+            ],
           }
         );
       } catch (availabilityError) {
-        console.error('Error updating availability status during reschedule:', availabilityError);
+        console.error(
+          "Error updating availability status during reschedule:",
+          availabilityError
+        );
         // Continue with response even if availability update fails
       }
     }
@@ -1078,7 +1105,7 @@ const rescheduleAdminSession = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
-}; 
+};
 // Admin function to accept session
 const acceptSession = async (req, res, next) => {
   try {
@@ -1109,30 +1136,41 @@ const acceptSession = async (req, res, next) => {
     if (updatedSession.therapistId) {
       try {
         await Availability.updateOne(
-          { therapistId: updatedSession.therapistId, date: updatedSession.date },
-          { 
-            $set: { 
-              "timeSlots.$[elem].status": "booked" 
-            } 
+          {
+            therapistId: updatedSession.therapistId,
+            date: updatedSession.date,
           },
-          { 
+          {
+            $set: {
+              "timeSlots.$[elem].status": "booked",
+            },
+          },
+          {
             arrayFilters: [
-              { 
-                "elem.start": updatedSession.time, 
-                "elem.status": "available" 
-              }
-            ]
+              {
+                "elem.start": updatedSession.time,
+                "elem.status": "available",
+              },
+            ],
           }
         );
       } catch (availabilityError) {
-        console.error('Error updating availability status during session accept:', availabilityError);
+        console.error(
+          "Error updating availability status during session accept:",
+          availabilityError
+        );
         // Continue with response even if availability update fails
       }
     }
 
     res
       .status(200)
-      .json(ApiResponse.success({ session: updatedSession }, "Session accepted successfully"));
+      .json(
+        ApiResponse.success(
+          { session: updatedSession },
+          "Session accepted successfully"
+        )
+      );
   } catch (error) {
     next(error);
   }
@@ -1168,30 +1206,41 @@ const rejectSession = async (req, res, next) => {
     if (updatedSession.therapistId) {
       try {
         await Availability.updateOne(
-          { therapistId: updatedSession.therapistId, date: updatedSession.date },
-          { 
-            $set: { 
-              "timeSlots.$[elem].status": "available" 
-            } 
+          {
+            therapistId: updatedSession.therapistId,
+            date: updatedSession.date,
           },
-          { 
+          {
+            $set: {
+              "timeSlots.$[elem].status": "available",
+            },
+          },
+          {
             arrayFilters: [
-              { 
-                "elem.start": updatedSession.time, 
-                "elem.status": "booked" 
-              }
-            ]
+              {
+                "elem.start": updatedSession.time,
+                "elem.status": "booked",
+              },
+            ],
           }
         );
       } catch (availabilityError) {
-        console.error('Error updating availability status during session reject:', availabilityError);
+        console.error(
+          "Error updating availability status during session reject:",
+          availabilityError
+        );
         // Continue with response even if availability update fails
       }
     }
 
     res
       .status(200)
-      .json(ApiResponse.success({ session: updatedSession }, "Session rejected successfully"));
+      .json(
+        ApiResponse.success(
+          { session: updatedSession },
+          "Session rejected successfully"
+        )
+      );
   } catch (error) {
     next(error);
   }
@@ -1215,7 +1264,7 @@ module.exports = {
   updateAdminSession,
   deleteAdminSession,
   rescheduleAdminSession,
-  
+
   // Session approval functions
   acceptSession,
   rejectSession,
