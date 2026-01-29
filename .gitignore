@@ -17,6 +17,7 @@ node_modules/
 *.lock
 uploads
 /uploads/**
+logs
 
 
 # Runtime data

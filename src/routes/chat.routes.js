@@ -22,7 +22,45 @@ router.post('/leave', (req, res) => {
 });
 
 // Send a chat message
-router.post('/send', sendMessage);
+router.post('/send/:sessionId', sendMessage);
+
+// Debug endpoint to check session info
+router.get('/debug/:sessionId', async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+        const session = await Session.findById(sessionId)
+            .populate('userId', 'name email')
+            .populate('therapistId', 'name email');
+
+        if (!session) {
+            return res.status(404).json({
+                success: false,
+                message: 'Session not found in database',
+                sessionId: sessionId
+            });
+        }
+
+        res.json({
+            success: true,
+            message: 'Session found',
+            sessionId: sessionId,
+            session: {
+                _id: session._id,
+                userId: session.userId,
+                therapistId: session.therapistId,
+                status: session.status,
+                date: session.date,
+                time: session.time
+            }
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching session info',
+            error: error.message
+        });
+    }
+});
 
 // Get chat messages for a session
 router.get('/:sessionId', getChatMessages);

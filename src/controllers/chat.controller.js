@@ -7,10 +7,39 @@ const getChatMessages = async (req, res, next) => {
     try {
         const { sessionId } = req.params;
 
-        // Verify the session belongs to the user
-        const session = await Session.findOne({ _id: sessionId, userId: req.user.userId });
+        // Debug logging
+        console.log('Chat request debug info:');
+        console.log('- Session ID from params:', sessionId);
+        console.log('- User ID from token:', req.user.userId);
+        console.log('- User role:', req.user.role);
+
+        // First, try to find the session regardless of user
+        const sessionExists = await Session.findById(sessionId);
+        console.log('- Session exists in DB:', !!sessionExists);
+        if (sessionExists) {
+            console.log('- Session userId:', sessionExists.userId);
+            console.log('- Session therapistId:', sessionExists.therapistId);
+            console.log('- Session status:', sessionExists.status);
+        }
+
+        // Verify the session belongs to the user or therapist
+        let session = await Session.findOne({
+            _id: sessionId,
+            $or: [
+                { userId: req.user.userId },
+                { therapistId: req.user.userId }
+            ]
+        });
+
         if (!session) {
-            return res.status(404).json(ApiResponse.error('Session not found'));
+            // If not found, check if user is admin
+            if (req.user.role === 'admin') {
+                session = await Session.findById(sessionId);
+            }
+        }
+
+        if (!session) {
+            return res.status(404).json(ApiResponse.error('Session not found or unauthorized access'));
         }
 
         const messages = await ChatMessage.find({ sessionId })
@@ -19,6 +48,7 @@ const getChatMessages = async (req, res, next) => {
 
         res.status(200).json(ApiResponse.success({ messages }, 'Chat messages retrieved successfully'));
     } catch (error) {
+        console.error('Chat controller error:', error);
         next(error);
     }
 };
@@ -29,17 +59,53 @@ const sendMessage = async (req, res, next) => {
         const { sessionId } = req.params;
         const { message } = req.body;
 
-        // Verify the session belongs to the user
-        const session = await Session.findOne({ _id: sessionId, userId: req.user.userId });
+        // Debug logging
+        console.log('Send message debug info:');
+        console.log('- Session ID from params:', sessionId);
+        console.log('- User ID from token:', req.user.userId);
+        console.log('- User role:', req.user.role);
+        console.log('- Message:', message);
+
+        // First, try to find the session regardless of user
+        const sessionExists = await Session.findById(sessionId);
+        console.log('- Session exists in DB:', !!sessionExists);
+        if (sessionExists) {
+            console.log('- Session userId:', sessionExists.userId);
+            console.log('- Session therapistId:', sessionExists.therapistId);
+            console.log('- Session status:', sessionExists.status);
+        }
+
+        // Verify the session belongs to the user or therapist
+        let session = await Session.findOne({
+            _id: sessionId,
+            $or: [
+                { userId: req.user.userId },
+                { therapistId: req.user.userId }
+            ]
+        });
+
         if (!session) {
-            return res.status(404).json(ApiResponse.error('Session not found'));
+            // If not found, check if user is admin
+            if (req.user.role === 'admin') {
+                session = await Session.findById(sessionId);
+            }
+        }
+
+        if (!session) {
+            return res.status(404).json(ApiResponse.error('Session not found or unauthorized access'));
+        }
+
+        // Determine sender type
+        let senderType = 'user';
+        if (req.user.role === 'therapist' || req.user.role === 'admin') {
+            senderType = 'therapist';
         }
 
         const chatMessage = new ChatMessage({
             sessionId,
-            senderId: req.user.userId, // Current user is the sender
+            senderId: req.user.userId,
             message,
-            senderType: 'user' // Could be 'user' or 'therapist'
+            senderType
         });
 
         await chatMessage.save();
@@ -48,6 +114,7 @@ const sendMessage = async (req, res, next) => {
 
         res.status(201).json(ApiResponse.success({ message: chatMessage }, 'Message sent successfully'));
     } catch (error) {
+        console.error('Send message error:', error);
         next(error);
     }
 };
