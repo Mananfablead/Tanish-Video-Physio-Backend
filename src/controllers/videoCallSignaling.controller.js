@@ -11,8 +11,11 @@ const generateCallToken = async (req, res) => {
         const requesterId = req.user.userId;
         const requesterRole = req.user.role;
 
+        logger.info(`Generate call token request - sessionId: ${sessionId}, userId: ${userId}, role: ${role}, requesterId: ${requesterId}, requesterRole: ${requesterRole}`);
+
         // Validate input
         if (!sessionId || !userId || !role) {
+            logger.warn('Missing required fields in generate call token request');
             return res.status(400).json({
                 success: false,
                 message: 'sessionId, userId, and role are required'
@@ -24,7 +27,10 @@ const generateCallToken = async (req, res) => {
             .populate('userId')
             .populate('therapistId');
 
+        logger.info(`Session found - ID: ${session._id}, Status: ${session.status}, Date: ${session.date}, Time: ${session.time}`);
+
         if (!session) {
+            logger.warn(`Session not found - sessionId: ${sessionId}`);
             return res.status(404).json({
                 success: false,
                 message: 'Session not found'
@@ -36,7 +42,10 @@ const generateCallToken = async (req, res) => {
         const isAdmin = requesterRole === 'admin';
         const isUser = session.userId && session.userId._id.toString() === requesterId;
 
+        logger.info(`Authorization check - isTherapist: ${isTherapist}, isAdmin: ${isAdmin}, isUser: ${isUser}, requesterId: ${requesterId}`);
+
         if (!isTherapist && !isAdmin && !isUser) {
+            logger.warn(`Unauthorized access attempt - requesterId: ${requesterId}, sessionId: ${sessionId}`);
             return res.status(403).json({
                 success: false,
                 message: 'Unauthorized to generate call token'
@@ -46,19 +55,52 @@ const generateCallToken = async (req, res) => {
         // Check if target user is part of the session
         const targetUser = await User.findById(userId);
         if (!targetUser) {
+            logger.warn(`Target user not found - userId: ${userId}`);
             return res.status(404).json({
                 success: false,
                 message: 'User not found'
             });
         }
 
+        logger.info(`Target user found - userId: ${userId}, userName: ${targetUser.name}`);
+
         const isTargetUser = session.userId && session.userId._id.toString() === userId;
         const isTargetTherapist = session.therapistId && session.therapistId._id.toString() === userId;
 
+        logger.info(`Target user authorization - isTargetUser: ${isTargetUser}, isTargetTherapist: ${isTargetTherapist}, userId: ${userId}`);
+
         if (!isTargetUser && !isTargetTherapist) {
+            logger.warn(`Target user not part of session - userId: ${userId}, sessionId: ${sessionId}`);
             return res.status(403).json({
                 success: false,
                 message: 'User is not part of this session'
+            });
+        }
+
+        // Check session status
+        logger.info(`Session status check - Current status: ${session.status}, Session ID: ${sessionId}`);
+        if (session.status !== 'scheduled' && session.status !== 'live' && session.status !== 'pending') {
+            logger.warn(`Session status forbidden - Status: ${session.status}, Session ID: ${sessionId}`);
+            return res.status(403).json({
+                success: false,
+                message: 'Session is not active at this time'
+            });
+        }
+
+        // Check if call has started within the valid time frame
+        const now = new Date();
+        // Use the startTime field which is already in the correct timezone
+        const sessionTime = new Date(session.startTime);
+
+        logger.info(`Time validation check - Now: ${now.toISOString()}, Session Time: ${sessionTime.toISOString()}, Session ID: ${sessionId}`);
+        logger.info(`Time window - Min: ${new Date(sessionTime.getTime() - 30 * 60000).toISOString()}, Max: ${new Date(sessionTime.getTime() + 60 * 60000).toISOString()}`);
+
+        // Allow generating tokens 24 hours before and 60 minutes after session start time (development mode)
+        if (now < new Date(sessionTime.getTime() - 24 * 60 * 60000) || now > new Date(sessionTime.getTime() + 60 * 60000)) {
+            logger.warn(`Time validation failed - Now: ${now.toISOString()}, Session Time: ${sessionTime.toISOString()}, Session ID: ${sessionId}`);
+            return res.status(403).json({
+                success: false,
+                message: 'Session is not active at this time'
             });
         }
 

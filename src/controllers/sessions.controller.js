@@ -1,7 +1,9 @@
 const Session = require("../models/Session.model");
 const Booking = require("../models/Booking.model");
+const Service = require("../models/Service.model");
 const Availability = require("../models/Availability.model");
 const ApiResponse = require("../utils/apiResponse");
+const { parseDurationString } = require("../utils/session.utils");
 
 // Get all sessions for authenticated user
 const getUserSessions = async (req, res, next) => {
@@ -146,8 +148,11 @@ const createSession = async (req, res, next) => {
       time,
       type,
       status,
-      duration,
+      duration: reqDuration,
     } = req.body;
+
+    // Use a mutable variable for duration that can be auto-populated
+    let duration = reqDuration;
 
     if (!bookingId && !subscriptionId) {
       return res.status(400).json(
@@ -162,7 +167,7 @@ const createSession = async (req, res, next) => {
 
     /* ================= BOOKING FLOW ================= */
     if (bookingId) {
-      const booking = await Booking.findOne({ _id: bookingId, userId });
+      const booking = await Booking.findOne({ _id: bookingId, userId }).populate('serviceId');
 
       if (!booking) {
         return res
@@ -177,6 +182,15 @@ const createSession = async (req, res, next) => {
       }
 
       therapistId = booking.therapistId;
+
+      // Auto-populate duration from service if not provided
+      if (!duration && booking.serviceId && booking.serviceId.duration) {
+        const parsedDuration = parseDurationString(booking.serviceId.duration);
+        console.log(`Auto-populating duration from service: ${booking.serviceId.duration} -> ${parsedDuration} minutes`);
+        if (parsedDuration) {
+          duration = parsedDuration;
+        }
+      }
     }
 
     /* ================= SUBSCRIPTION FLOW ================= */
@@ -573,9 +587,12 @@ const createAdminSession = async (req, res, next) => {
       time,
       type,
       status,
-      duration,
+      duration: reqDuration,
       notes,
     } = req.body;
+
+    // Use a mutable variable for duration that can be auto-populated
+    let duration = reqDuration;
 
     // Validate that either bookingId or subscriptionId is provided
     if (!bookingId && !subscriptionId) {
@@ -605,7 +622,7 @@ const createAdminSession = async (req, res, next) => {
     // Handle booking-based session
     if (bookingId) {
       const Booking = require("../models/Booking.model");
-      booking = await Booking.findById(bookingId);
+      booking = await Booking.findById(bookingId).populate('serviceId');
       if (!booking) {
         return res.status(404).json(ApiResponse.error("Booking not found"));
       }
@@ -619,6 +636,15 @@ const createAdminSession = async (req, res, next) => {
               "Cannot create session: Booking payment status is not paid"
             )
           );
+      }
+
+      // Auto-populate duration from service if not provided
+      if (!duration && booking.serviceId && booking.serviceId.duration) {
+        const parsedDuration = parseDurationString(booking.serviceId.duration);
+        console.log(`Auto-populating duration from service: ${booking.serviceId.duration} -> ${parsedDuration} minutes`);
+        if (parsedDuration) {
+          duration = parsedDuration;
+        }
       }
     }
 
