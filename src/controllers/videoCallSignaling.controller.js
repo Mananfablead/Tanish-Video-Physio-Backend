@@ -96,7 +96,9 @@ const generateCallToken = async (req, res) => {
         logger.info(`Time window - Min: ${new Date(sessionTime.getTime() - 30 * 60000).toISOString()}, Max: ${new Date(sessionTime.getTime() + 60 * 60000).toISOString()}`);
 
         // Allow generating tokens 24 hours before and 60 minutes after session start time (development mode)
-        if (now < new Date(sessionTime.getTime() - 24 * 60 * 60000) || now > new Date(sessionTime.getTime() + 60 * 60000)) {
+        // Temporarily relaxed for debugging - remove this in production
+        logger.info(`DEBUG: Time validation check - Now: ${now.toISOString()}, Session Time: ${sessionTime.toISOString()}, Diff: ${now - sessionTime}ms`);
+        if (now < new Date(sessionTime.getTime() - 48 * 60 * 60000) || now > new Date(sessionTime.getTime() + 120 * 60000)) {
             logger.warn(`Time validation failed - Now: ${now.toISOString()}, Session Time: ${sessionTime.toISOString()}, Session ID: ${sessionId}`);
             return res.status(403).json({
                 success: false,
@@ -526,3 +528,4 @@ module.exports = {
     forceEndCall,
     muteParticipant
 };
+

@@ -49,7 +49,6 @@ const setupChatHandlers = (io, socket) => {
         }
 
         socket.leave(sessionId);
-        logger.info(`User ${socket.user.userId} left session room ${sessionId}`);
 
         socket.to(sessionId).emit('user-left', {
             userId: socket.user.userId,
@@ -85,9 +84,7 @@ const setupChatHandlers = (io, socket) => {
                 message: chatMessage
             });
 
-            logger.info(`Message sent in session ${sessionId} by user ${socket.user.userId}`);
         } catch (error) {
-            logger.error('Error sending message:', error);
             socket.emit('error', { message: 'Failed to send message' });
         }
     });

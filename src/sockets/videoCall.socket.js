@@ -121,6 +121,7 @@ const setupVideoCallHandlers = (io, socket) => {
             // Notify others in the room
             socket.to(roomId).emit('participant-joined', {
                 userId: userId,
+                socketId: socket.id,
                 roomId: roomId,
                 roomType: roomType,
                 isTherapist: isTherapist || (roomInfo.therapistId && roomInfo.therapistId._id.toString() === userId),

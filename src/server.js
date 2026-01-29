@@ -27,6 +27,7 @@ app.use(
           "data:",
           "blob:",
           "http://localhost:5000", // backend
+            "http://localhost:8080",
           "http://localhost:8081", // frontend
         ],
         mediaSrc: [
@@ -34,6 +35,7 @@ app.use(
           "data:",
           "blob:",
           "http://localhost:5000",
+            "http://localhost:8080",
           "http://localhost:8081",
         ],
       },
@@ -56,7 +58,7 @@ const corsOptions = {
                 callback(null, true);
             } else {
                 // Check if origin matches localhost:8080 specifically for development
-                if (origin === 'http://localhost:8080') {
+                if (origin === 'http://localhost:8080' || origin === 'http://localhost:8081') {
                     callback(null, true);
                 } else {
                     callback(null, Error('Not allowed by CORS'));
