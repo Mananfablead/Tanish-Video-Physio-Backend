@@ -8,9 +8,7 @@ const subscriptionSchema = new mongoose.Schema({
     },
     planId: {
         type: String,
-        required: [true, 'Plan ID is required'],
-        enum: ["daily", "weekly", "monthly", "quarterly", "yearly"]
-
+        required: [true, 'Plan ID is required']
     },
     planName: {
         type: String,
