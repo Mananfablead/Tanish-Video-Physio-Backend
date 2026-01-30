@@ -33,8 +33,10 @@ const setupVideoCallHandlers = (io, socket) => {
                 // Check if user has permission to join the call
                 isUser = session.userId && session.userId._id.toString() === userId;
                 isTherapist = session.therapistId && session.therapistId._id.toString() === userId;
+                const isAdmin = socket.user.role === 'admin';
 
-                if (!isUser && !isTherapist) {
+                // Allow admins to join for monitoring purposes
+                if (!isUser && !isTherapist && !isAdmin) {
                     socket.emit('error', { message: 'Unauthorized to join this session' });
                     return;
                 }
@@ -77,8 +79,10 @@ const setupVideoCallHandlers = (io, socket) => {
                 isParticipant = groupSession.participants.some(
                     p => p.userId._id.toString() === userId && p.status === 'accepted'
                 );
+                const isAdmin = socket.user.role === 'admin';
 
-                if (!isTherapist && !isParticipant) {
+                // Allow admins to join for monitoring purposes
+                if (!isTherapist && !isParticipant && !isAdmin) {
                     socket.emit('error', { message: 'Unauthorized to join this group session' });
                     return;
                 }
