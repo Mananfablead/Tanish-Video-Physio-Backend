@@ -68,9 +68,26 @@ const getServiceById = async (req, res, next) => {
 const getAllServicesAdmin = async (req, res, next) => {
     try {
         const services = await Service.find();
-        // Convert relative paths to absolute URLs
-        const servicesWithAbsoluteUrls = services.map(service => convertToAbsoluteUrls(service.toObject()));
-        res.status(200).json(ApiResponse.success({ services: servicesWithAbsoluteUrls }, 'All services retrieved successfully'));
+        
+        // Add purchase count for each service
+        const Booking = require('../models/Booking.model');
+        const servicesWithPurchaseCount = await Promise.all(services.map(async (service) => {
+            // Count paid bookings for this service
+            const purchaseCount = await Booking.countDocuments({
+                serviceId: service._id,
+                paymentStatus: 'paid'
+            });
+            
+            // Convert relative paths to absolute URLs
+            const serviceWithAbsoluteUrls = convertToAbsoluteUrls(service.toObject());
+            
+            return {
+                ...serviceWithAbsoluteUrls,
+                purchaseCount
+            };
+        }));
+        
+        res.status(200).json(ApiResponse.success({ services: servicesWithPurchaseCount }, 'All services with purchase counts retrieved successfully'));
     } catch (error) {
         next(error);
     }
