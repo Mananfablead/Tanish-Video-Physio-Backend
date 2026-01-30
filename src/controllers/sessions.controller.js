@@ -555,7 +555,7 @@ const updateSession = async (req, res, next) => {
 
         // Mark new time slot as booked
         await Availability.updateOne(
-          { therapistId: session.therapistId, date: session.date },
+          { therapistId: session.therapistId, date: date },
           {
             $set: {
               "timeSlots.$[elem].status": "booked",
@@ -737,11 +737,11 @@ const rescheduleUserSession = async (req, res, next) => {
     // Update availability statuses: mark old time slot as available and new time slot as booked
     if (updatedSession.therapistId) {
       try {
-        // Mark old time slot as available
+        // Mark OLD time slot as available (using the original session data)
         await Availability.updateOne(
           {
             therapistId: updatedSession.therapistId,
-            date: updatedSession.date,
+            date: session.date, // Use original session date, not updated date
           },
           {
             $set: {
@@ -751,14 +751,14 @@ const rescheduleUserSession = async (req, res, next) => {
           {
             arrayFilters: [
               {
-                "elem.start": updatedSession.time,
+                "elem.start": session.time, // Use original session time, not updated time
                 "elem.status": "booked",
               },
             ],
           }
         );
 
-        // Mark new time slot as booked
+        // Mark NEW time slot as booked
         await Availability.updateOne(
           { therapistId: updatedSession.therapistId, date },
           {
@@ -1362,11 +1362,11 @@ const rescheduleAdminSession = async (req, res, next) => {
     // Update availability statuses: mark old time slot as available and new time slot as booked
     if (updatedSession.therapistId) {
       try {
-        // Mark old time slot as available
+        // Mark OLD time slot as available (using the original session data)
         await Availability.updateOne(
           {
             therapistId: updatedSession.therapistId,
-            date: updatedSession.date,
+            date: session.date, // Use original session date, not updated date
           },
           {
             $set: {
@@ -1376,14 +1376,14 @@ const rescheduleAdminSession = async (req, res, next) => {
           {
             arrayFilters: [
               {
-                "elem.start": updatedSession.time,
+                "elem.start": session.time, // Use original session time, not updated time
                 "elem.status": "booked",
               },
             ],
           }
         );
 
-        // Mark new time slot as booked
+        // Mark NEW time slot as booked
         await Availability.updateOne(
           { therapistId: updatedSession.therapistId, date },
           {
