@@ -2,9 +2,141 @@ const Session = require("../models/Session.model");
 const Booking = require("../models/Booking.model");
 const Service = require("../models/Service.model");
 const Availability = require("../models/Availability.model");
+const Subscription = require("../models/Subscription.model");
+const SubscriptionPlan = require("../models/SubscriptionPlan.model");
 const ApiResponse = require("../utils/apiResponse");
 const { parseDurationString } = require("../utils/session.utils");
 const { generateJoinLink } = require("../utils/videoCall.utils");
+
+// Helper function to check subscription session limits
+const checkSubscriptionLimits = async (subscriptionId, userId = null) => {
+  try {
+    // Find subscription with user verification if userId provided
+    let subscription;
+    if (userId) {
+      subscription = await Subscription.findOne({ _id: subscriptionId, userId }).populate('planId');
+    } else {
+      subscription = await Subscription.findById(subscriptionId).populate('planId');
+    }
+    
+    console.log(`Checking subscription limits for ID: ${subscriptionId}, User: ${userId}`);
+    console.log(`Subscription found:`, subscription ? { id: subscription._id, planId: subscription.planId, status: subscription.status } : 'null');
+    
+    if (!subscription) {
+      console.log(`No subscription found for ID: ${subscriptionId}`);
+      return { allowed: true, message: "No subscription found" };
+    }
+    
+    console.log(`Subscription data:`, { 
+      id: subscription._id, 
+      planId: subscription.planId, 
+      planIdType: typeof subscription.planId,
+      status: subscription.status 
+    });
+    
+    if (!subscription.planId) {
+      console.log(`No planId found in subscription: ${subscriptionId}`);
+      return { allowed: true, message: "No planId found in subscription" };
+    }
+    
+    // Try to find the plan
+    console.log(`Looking up plan with planId: ${subscription.planId}`);
+    const plan = await SubscriptionPlan.findOne({ planId: subscription.planId });
+    console.log(`Plan lookup result:`, plan ? { id: plan._id, name: plan.name, sessions: plan.sessions } : 'null');
+    
+    if (!plan) {
+      console.log(`Plan not found for planId: ${subscription.planId}`);
+      return { allowed: true, message: "Plan not found" };
+    }
+    
+    // 0 means unlimited sessions
+    if (plan.sessions === 0) {
+      console.log(`Unlimited sessions for subscription: ${subscriptionId}`);
+      return { allowed: true, message: "Unlimited sessions" };
+    }
+    
+    // Count all non-cancelled sessions
+    console.log(`Counting sessions for subscription: ${subscription._id}`);
+    const usedSessions = await Session.countDocuments({
+      subscriptionId: subscription._id,
+      status: { $ne: "cancelled" }
+    });
+    console.log(`Found ${usedSessions} used sessions for subscription ${subscription._id}`);
+    
+    const remainingSessions = plan.sessions - usedSessions;
+    
+    console.log(`Subscription ${subscriptionId} - Plan: ${plan.name}, Total: ${plan.sessions}, Used: ${usedSessions}, Remaining: ${remainingSessions}`);
+    
+    if (remainingSessions <= 0) {
+      return { 
+        allowed: false, 
+        message: `Session limit reached. You have used all ${plan.sessions} sessions in your plan.`,
+        used: usedSessions,
+        total: plan.sessions
+      };
+    }
+    
+    return { 
+      allowed: true, 
+      used: usedSessions,
+      total: plan.sessions,
+      remaining: remainingSessions
+    };
+    
+  } catch (error) {
+    console.error("Error checking subscription limits:", error);
+    return { allowed: false, message: "Error checking session limits" };
+  }
+};
+
+// Helper function to check service session limits
+const checkServiceLimits = async (bookingId) => {
+  try {
+    const booking = await Booking.findById(bookingId).populate('serviceId');
+    
+    if (!booking || !booking.serviceId) {
+      console.log(`No booking or service found for ID: ${bookingId}`);
+      return { allowed: true, message: "No booking or service found" };
+    }
+    
+    // Check if the service has session limits (0 means unlimited)
+    if (!booking.serviceId.sessions || booking.serviceId.sessions === 0) {
+      console.log(`Unlimited sessions for service: ${bookingId}`);
+      return { allowed: true, message: "Unlimited sessions" };
+    }
+    
+    // Count all non-cancelled sessions for this specific booking
+    const usedSessions = await Session.countDocuments({
+      bookingId: booking._id,
+      status: { $ne: "cancelled" }
+    });
+    
+    const remainingSessions = booking.serviceId.sessions - usedSessions;
+    
+    console.log(`Booking ${bookingId} - Service: ${booking.serviceId.name}, Total: ${booking.serviceId.sessions}, Used: ${usedSessions}, Remaining: ${remainingSessions}`);
+    
+    if (remainingSessions <= 0) {
+      return { 
+        allowed: false, 
+        message: `Session limit reached. You have used all ${booking.serviceId.sessions} sessions in your service.`,
+        used: usedSessions,
+        total: booking.serviceId.sessions
+      };
+    }
+    
+    return { 
+      allowed: true, 
+      message: `Sessions remaining: ${remainingSessions}/${booking.serviceId.sessions}`,
+      used: usedSessions,
+      total: booking.serviceId.sessions,
+      remaining: remainingSessions
+    };
+    
+  } catch (error) {
+    console.error("Error checking service limits:", error);
+    return { allowed: false, message: "Error checking session limits" };
+  }
+};
 
 // Get all sessions for authenticated user
 const getUserSessions = async (req, res, next) => {
@@ -196,13 +328,14 @@ const createSession = async (req, res, next) => {
 
     /* ================= SUBSCRIPTION FLOW ================= */
     if (subscriptionId) {
-      const Subscription = require("../models/Subscription.model");
-
+      console.log(`Looking up subscription ${subscriptionId} for user ${userId}`);
       const subscription = await Subscription.findOne({
         _id: subscriptionId,
         userId,
-      });
+      }).populate('planId');
 
+      console.log(`Subscription lookup result:`, subscription ? { id: subscription._id, planId: subscription.planId, status: subscription.status } : 'null');
+      
       if (!subscription) {
         return res
           .status(404)
@@ -219,6 +352,14 @@ const createSession = async (req, res, next) => {
         return res.status(400).json(ApiResponse.error("Subscription expired"));
       }
 
+      // 🔥 CHECK SESSION LIMITS using helper function
+      const limitCheck = await checkSubscriptionLimits(subscriptionId, userId);
+      if (!limitCheck.allowed) {
+        return res
+          .status(400)
+          .json(ApiResponse.error(limitCheck.message));
+      }
+
       // 🔥 IMPORTANT FIX
       therapistId = bodyTherapistId || null;
 
@@ -232,6 +373,54 @@ const createSession = async (req, res, next) => {
           );
       }
     }
+    
+    /* ================= BOOKING FLOW WITH SERVICE LIMITS ================= */
+    if (bookingId) {
+      // Check service session limits if it's a service-based booking
+      const serviceLimitCheck = await checkServiceLimits(bookingId);
+      if (!serviceLimitCheck.allowed) {
+        return res
+          .status(400)
+          .json(ApiResponse.error(serviceLimitCheck.message));
+      }
+    }
+
+    /* ================= SLOT VALIDATION ================= */
+    // Fetch the availability to get the slot information
+    const availability = await Availability.findOne({ therapistId, date });
+    if (availability) {
+      const selectedSlot = availability.timeSlots.find(slot => slot.start === time);
+      if (selectedSlot) {
+        // Calculate the slot duration in minutes
+        const [startHour, startMinute] = selectedSlot.start.split(':').map(Number);
+        const [endHour, endMinute] = selectedSlot.end.split(':').map(Number);
+        
+        const slotStartTime = new Date();
+        slotStartTime.setHours(startHour, startMinute, 0, 0);
+        
+        const slotEndTime = new Date();
+        slotEndTime.setHours(endHour, endMinute, 0, 0);
+        
+        const slotDurationMinutes = (slotEndTime - slotStartTime) / (1000 * 60);
+        
+        // Check if service duration fits in the selected slot
+        if (bookingId) {
+          const booking = await Booking.findOne({ _id: bookingId, userId }).populate('serviceId');
+          if (booking && booking.serviceId && booking.serviceId.duration) {
+            const serviceDuration = parseDurationString(booking.serviceId.duration);
+            if (serviceDuration > slotDurationMinutes) {
+              return res
+                .status(400)
+                .json(
+                  ApiResponse.error(
+                    `Selected service requires ${serviceDuration} minutes but selected slot is only ${slotDurationMinutes} minutes. Please select a larger time slot.`
+                  )
+                );
+            }
+          }
+        }
+      }
+    }
 
     /* ================= TIME ================= */
     const startTime = new Date(`${date}T${time}:00`);
@@ -241,7 +430,10 @@ const createSession = async (req, res, next) => {
         : null;
 
     /* ================= CREATE SESSION ================= */
-    const session = await Session.create({
+    console.log(`Creating session with subscriptionId: ${subscriptionId}, userId: ${userId}`);
+    console.log(`Subscription data being passed:`, { subscriptionId, subscriptionIdType: typeof subscriptionId });
+    
+    const sessionData = {
       bookingId: bookingId || undefined,
       subscriptionId: subscriptionId || undefined,
       therapistId,
@@ -253,6 +445,18 @@ const createSession = async (req, res, next) => {
       type: type || "1-on-1",
       status: status || "scheduled",
       duration: duration || 0,
+    };
+    
+    console.log(`Session data being created:`, sessionData);
+    
+    const session = await Session.create(sessionData);
+    
+    console.log(`Session created successfully: ${session._id}`);
+    console.log(`Created session data:`, { 
+      id: session._id, 
+      subscriptionId: session.subscriptionId, 
+      subscriptionIdType: typeof session.subscriptionId,
+      userId: session.userId 
     });
 
     /* ================= AVAILABILITY UPDATE ================= */
@@ -463,6 +667,43 @@ const rescheduleUserSession = async (req, res, next) => {
     // Auto-generate new startTime from date and time
     const startTime = new Date(`${date}T${time}:00`);
 
+    /* ================= RESCHEDULE SLOT VALIDATION ================= */
+    // Fetch the availability to get the slot information
+    const availability = await Availability.findOne({ therapistId: session.therapistId, date: date });
+    if (availability) {
+      const selectedSlot = availability.timeSlots.find(slot => slot.start === time);
+      if (selectedSlot) {
+        // Calculate the slot duration in minutes
+        const [startHour, startMinute] = selectedSlot.start.split(':').map(Number);
+        const [endHour, endMinute] = selectedSlot.end.split(':').map(Number);
+        
+        const slotStartTime = new Date();
+        slotStartTime.setHours(startHour, startMinute, 0, 0);
+        
+        const slotEndTime = new Date();
+        slotEndTime.setHours(endHour, endMinute, 0, 0);
+        
+        const slotDurationMinutes = (slotEndTime - slotStartTime) / (1000 * 60);
+        
+        // Check if service duration fits in the selected slot
+        if (session.bookingId) {
+          const booking = await Booking.findById(session.bookingId).populate('serviceId');
+          if (booking && booking.serviceId && booking.serviceId.duration) {
+            const serviceDuration = parseDurationString(booking.serviceId.duration);
+            if (serviceDuration > slotDurationMinutes) {
+              return res
+                .status(400)
+                .json(
+                  ApiResponse.error(
+                    `Selected service requires ${serviceDuration} minutes but selected slot is only ${slotDurationMinutes} minutes. Please select a larger time slot.`
+                  )
+                );
+            }
+          }
+        }
+      }
+    }
+
     // Calculate endTime based on duration if provided
     let endTime = null;
     if (duration && typeof duration === "number" && duration > 0) {
@@ -654,6 +895,14 @@ const createAdminSession = async (req, res, next) => {
           );
       }
 
+      // Check service session limits if it's a service-based booking
+      const serviceLimitCheck = await checkServiceLimits(bookingId);
+      if (!serviceLimitCheck.allowed) {
+        return res
+          .status(400)
+          .json(ApiResponse.error(`Cannot create session: ${serviceLimitCheck.message}`));
+      }
+
       // Auto-populate duration from service if not provided
       if (!duration && booking.serviceId && booking.serviceId.duration) {
         const parsedDuration = parseDurationString(booking.serviceId.duration);
@@ -666,11 +915,7 @@ const createAdminSession = async (req, res, next) => {
 
     // Handle subscription-based session
     if (subscriptionId) {
-      const Subscription = require("../models/Subscription.model");
-      const SubscriptionPlan = require("../models/SubscriptionPlan.model");
-      const sessionModel = require("../models/Session.model");
-
-      subscription = await Subscription.findById(subscriptionId);
+      subscription = await Subscription.findById(subscriptionId).populate('planId');
       if (!subscription) {
         return res
           .status(404)
@@ -698,30 +943,55 @@ const createAdminSession = async (req, res, next) => {
           );
       }
 
-      // Check session limits if the subscription plan has a limit
-      const plan = await SubscriptionPlan.findById(subscription.planId);
-      if (plan && plan.sessions > 0) {
-        // 0 means unlimited sessions
-        // Count completed sessions for this subscription
-        const completedSessionsCount = await sessionModel.countDocuments({
-          subscriptionId: subscription._id,
-          status: "completed",
-        });
-
-        if (completedSessionsCount >= plan.sessions) {
-          return res
-            .status(400)
-            .json(
-              ApiResponse.error(
-                `Cannot create session: Maximum session limit of ${plan.sessions} reached for this subscription`
-              )
-            );
-        }
+      // 🔥 CHECK SESSION LIMITS using helper function
+      const limitCheck = await checkSubscriptionLimits(subscriptionId, userId);
+      if (!limitCheck.allowed) {
+        return res
+          .status(400)
+          .json(ApiResponse.error(`Cannot create session: ${limitCheck.message}`));
       }
     }
 
     // Auto-generate startTime from date and time
     const startTime = new Date(`${date}T${time}:00`);
+
+    /* ================= ADMIN SLOT VALIDATION ================= */
+    // Fetch the availability to get the slot information
+    const availability = await Availability.findOne({ therapistId: therapistId, date: date });
+    if (availability) {
+      const selectedSlot = availability.timeSlots.find(slot => slot.start === time);
+      if (selectedSlot) {
+        // Calculate the slot duration in minutes
+        const [startHour, startMinute] = selectedSlot.start.split(':').map(Number);
+        const [endHour, endMinute] = selectedSlot.end.split(':').map(Number);
+        
+        const slotStartTime = new Date();
+        slotStartTime.setHours(startHour, startMinute, 0, 0);
+        
+        const slotEndTime = new Date();
+        slotEndTime.setHours(endHour, endMinute, 0, 0);
+        
+        const slotDurationMinutes = (slotEndTime - slotStartTime) / (1000 * 60);
+        
+        // Check if service duration fits in the selected slot
+        if (bookingId) {
+          const Booking = require("../models/Booking.model");
+          const booking = await Booking.findById(bookingId).populate('serviceId');
+          if (booking && booking.serviceId && booking.serviceId.duration) {
+            const serviceDuration = parseDurationString(booking.serviceId.duration);
+            if (serviceDuration > slotDurationMinutes) {
+              return res
+                .status(400)
+                .json(
+                  ApiResponse.error(
+                    `Selected service requires ${serviceDuration} minutes but selected slot is only ${slotDurationMinutes} minutes. Please select a larger time slot.`
+                  )
+                );
+            }
+          }
+        }
+      }
+    }
 
     // Calculate endTime based on duration if provided
     let endTime = null;
@@ -1011,8 +1281,52 @@ const rescheduleAdminSession = async (req, res, next) => {
         .json(ApiResponse.error("Cannot reschedule live or completed session"));
     }
 
+    // Ensure bookingId exists to check service duration
+    if (!session.bookingId) {
+      return res
+        .status(400)
+        .json(ApiResponse.error("Cannot reschedule subscription-based session using this endpoint"));
+    }
+
     // Auto-generate new startTime from date and time
     const startTime = new Date(`${date}T${time}:00`);
+
+    /* ================= RESCHEDULE SLOT VALIDATION ================= */
+    // Fetch the availability to get the slot information
+    const availability = await Availability.findOne({ therapistId: session.therapistId, date: date });
+    if (availability) {
+      const selectedSlot = availability.timeSlots.find(slot => slot.start === time);
+      if (selectedSlot) {
+        // Calculate the slot duration in minutes
+        const [startHour, startMinute] = selectedSlot.start.split(':').map(Number);
+        const [endHour, endMinute] = selectedSlot.end.split(':').map(Number);
+        
+        const slotStartTime = new Date();
+        slotStartTime.setHours(startHour, startMinute, 0, 0);
+        
+        const slotEndTime = new Date();
+        slotEndTime.setHours(endHour, endMinute, 0, 0);
+        
+        const slotDurationMinutes = (slotEndTime - slotStartTime) / (1000 * 60);
+        
+        // Check if service duration fits in the selected slot
+        if (session.bookingId) {
+          const booking = await Booking.findById(session.bookingId).populate('serviceId');
+          if (booking && booking.serviceId && booking.serviceId.duration) {
+            const serviceDuration = parseDurationString(booking.serviceId.duration);
+            if (serviceDuration > slotDurationMinutes) {
+              return res
+                .status(400)
+                .json(
+                  ApiResponse.error(
+                    `Selected service requires ${serviceDuration} minutes but selected slot is only ${slotDurationMinutes} minutes. Please select a larger time slot.`
+                  )
+                );
+            }
+          }
+        }
+      }
+    }
 
     // Calculate endTime based on duration if provided
     let endTime = null;
@@ -1277,4 +1591,7 @@ module.exports = {
   // Session approval functions
   acceptSession,
   rejectSession,
+  
+  // Helper functions
+  checkSubscriptionLimits
 };

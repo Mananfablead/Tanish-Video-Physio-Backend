@@ -1,6 +1,7 @@
 const razorpay = require('../config/razorpay');
 const Subscription = require('../models/Subscription.model');
 const SubscriptionPlan = require('../models/SubscriptionPlan.model');
+const Session = require('../models/Session.model');
 const ApiResponse = require('../utils/apiResponse');
 
 // Get available subscription plans
@@ -120,58 +121,56 @@ const getUserSubscriptions = async (req, res, next) => {
             // Convert to plain object to modify
             const subscriptionObj = subscription.toObject();
 
-            // Validate that planId is a valid ObjectId before querying
-            const isValidObjectId = require('mongoose').Types.ObjectId.isValid(subscription.planId);
-            const plan = isValidObjectId ? await SubscriptionPlan.findById(subscription.planId) : null;
+            // Handle both ObjectId and string planId
+            let plan = null;
+            if (subscription.planId) {
+                // Try to find by ObjectId first
+                const isValidObjectId = require('mongoose').Types.ObjectId.isValid(subscription.planId);
+                if (isValidObjectId) {
+                    plan = await SubscriptionPlan.findById(subscription.planId);
+                } else {
+                    // Try to find by planId string
+                    plan = await SubscriptionPlan.findOne({ planId: subscription.planId });
+                }
+            }
 
             if (plan && plan.sessions > 0) {
-                // Count sessions for this user related to this subscription
-                // Since we don't have direct mapping between sessions and subscriptions,
-                // we'll count sessions based on bookings made during the subscription period
-                const bookingModel = require('../models/Booking.model');
-                const sessionModel = require('../models/Session.model');
+                // Count all sessions for this subscription (more accurate approach)
+                const Booking = require('../models/Booking.model');
 
-                // Find bookings made during the subscription period
+                // Count all non-cancelled sessions for this specific subscription
+                const usedSessions = await Session.countDocuments({
+                    subscriptionId: subscription._id,
+                    status: { $ne: "cancelled" } // Don't count cancelled sessions
+                });
+
+                // Also count bookings made during subscription period for additional context
                 let bookingCount = 0;
-                let completedSessionCount = 0;
-
                 if (subscription.startDate) {
-                    const endDate = subscription.endDate || new Date(); // Use current date if no end date
-
-                    // Count bookings created during subscription period
-                    bookingCount = await bookingModel.countDocuments({
+                    const endDate = subscription.endDate || new Date();
+                    bookingCount = await Booking.countDocuments({
                         userId: req.user.userId,
                         createdAt: {
                             $gte: subscription.startDate,
                             $lte: endDate
                         }
                     });
-
-                    // Count completed sessions during subscription period
-                    completedSessionCount = await sessionModel.countDocuments({
-                        userId: req.user.userId,
-                        createdAt: {
-                            $gte: subscription.startDate,
-                            $lte: endDate
-                        },
-                        status: 'completed'
-                    });
                 }
 
                 // Add session information to the subscription object
                 subscriptionObj.sessionInfo = {
                     totalAllowed: plan.sessions,
-                    sessionsUsed: completedSessionCount, // Using completed sessions as the measure
-                    sessionsRemaining: Math.max(0, plan.sessions - completedSessionCount),
+                    sessionsUsed: usedSessions,
+                    sessionsRemaining: Math.max(0, plan.sessions - usedSessions),
                     bookingsMade: bookingCount
                 };
                 
                 // Add "kitna bacha hai" information
                 subscriptionObj.availableSessions = {
                     total: plan.sessions,
-                    used: completedSessionCount,
-                    remaining: Math.max(0, plan.sessions - completedSessionCount),
-                    percentageUsed: Math.round((completedSessionCount / plan.sessions) * 100)
+                    used: usedSessions,
+                    remaining: Math.max(0, plan.sessions - usedSessions),
+                    percentageUsed: Math.round((usedSessions / plan.sessions) * 100)
                 };
             } else {
                 // Unlimited sessions
@@ -190,6 +189,53 @@ const getUserSubscriptions = async (req, res, next) => {
                     percentageUsed: 0
                 };
             }
+            
+            // Additionally, get user's purchased services with their session information
+            const Service = require('../models/Service.model');
+            const BookingModel = require('../models/Booking.model');
+            
+            // Get all bookings for the user that are paid (representing purchased services)
+            const userBookings = await BookingModel.find({
+                userId: req.user.userId,
+                paymentStatus: 'paid'
+            }).populate('serviceId');
+            
+            // Process each booking to get session information
+            const purchasedServicesWithSessionInfo = await Promise.all(userBookings.map(async (booking) => {
+                if (!booking.serviceId || !booking.serviceId.sessions || booking.serviceId.sessions === 0) {
+                    // Service has unlimited sessions
+                    return {
+                        ...booking.toObject(),
+                        serviceSessionInfo: {
+                            total: 'unlimited',
+                            used: 0, // Would need to count actual sessions separately
+                            remaining: 'unlimited',
+                            percentageUsed: 0
+                        }
+                    };
+                }
+                
+                // Count all non-cancelled sessions for this specific booking
+                const usedSessions = await Session.countDocuments({
+                    bookingId: booking._id,
+                    status: { $ne: "cancelled" } // Don't count cancelled sessions
+                });
+                
+                const remainingSessions = booking.serviceId.sessions - usedSessions;
+                
+                return {
+                    ...booking.toObject(),
+                    serviceSessionInfo: {
+                        total: booking.serviceId.sessions,
+                        used: usedSessions,
+                        remaining: Math.max(0, booking.serviceId.sessions - usedSessions),
+                        percentageUsed: Math.round((usedSessions / booking.serviceId.sessions) * 100)
+                    }
+                };
+            }));
+            
+            // Add purchased services with session information to the subscription object
+            subscriptionObj.purchasedServices = purchasedServicesWithSessionInfo;
 
             return subscriptionObj;
         }));
@@ -213,56 +259,59 @@ const getAllSubscriptions = async (req, res, next) => {
             // Convert to plain object to modify
             const subscriptionObj = subscription.toObject();
 
-            // Validate that planId is a valid ObjectId before querying
-            const isValidObjectId = require('mongoose').Types.ObjectId.isValid(subscription.planId);
-            const plan = isValidObjectId ? await SubscriptionPlan.findById(subscription.planId) : null;
+            // Handle both ObjectId and string planId
+            let plan = null;
+            if (subscription.planId) {
+                console.log(`Looking up plan for subscription ${subscription._id}, planId: ${subscription.planId}`);
+                // Try to find by ObjectId first
+                const isValidObjectId = require('mongoose').Types.ObjectId.isValid(subscription.planId);
+                console.log(`Is valid ObjectId: ${isValidObjectId}`);
+                if (isValidObjectId) {
+                    plan = await SubscriptionPlan.findById(subscription.planId);
+                } else {
+                    // Try to find by planId string
+                    plan = await SubscriptionPlan.findOne({ planId: subscription.planId });
+                }
+                console.log(`Found plan:`, plan ? { name: plan.name, sessions: plan.sessions } : 'null');
+            }
 
             if (plan && plan.sessions > 0) {
-                // Count sessions for this user related to this subscription
-                const bookingModel = require('../models/Booking.model');
-                const sessionModel = require('../models/Session.model');
+                // Count all sessions for this subscription (more accurate approach)
+                const Booking = require('../models/Booking.model');
 
-                // Find bookings made during the subscription period
+                // Count all non-cancelled sessions for this specific subscription
+                const usedSessions = await Session.countDocuments({
+                    subscriptionId: subscription._id,
+                    status: { $ne: "cancelled" } // Don't count cancelled sessions
+                });
+
+                // Also count bookings made during subscription period for additional context
                 let bookingCount = 0;
-                let completedSessionCount = 0;
-
                 if (subscription.userId && subscription.startDate) {
-                    const endDate = subscription.endDate || new Date(); // Use current date if no end date
-
-                    // Count bookings created during subscription period
-                    bookingCount = await bookingModel.countDocuments({
+                    const endDate = subscription.endDate || new Date();
+                    bookingCount = await Booking.countDocuments({
                         userId: subscription.userId,
                         createdAt: {
                             $gte: subscription.startDate,
                             $lte: endDate
                         }
                     });
-
-                    // Count completed sessions during subscription period
-                    completedSessionCount = await sessionModel.countDocuments({
-                        userId: subscription.userId,
-                        createdAt: {
-                            $gte: subscription.startDate,
-                            $lte: endDate
-                        },
-                        status: 'completed'
-                    });
                 }
 
                 // Add session information to the subscription object
                 subscriptionObj.sessionInfo = {
                     totalAllowed: plan.sessions,
-                    sessionsUsed: completedSessionCount,
-                    sessionsRemaining: Math.max(0, plan.sessions - completedSessionCount),
+                    sessionsUsed: usedSessions,
+                    sessionsRemaining: Math.max(0, plan.sessions - usedSessions),
                     bookingsMade: bookingCount
                 };
                 
                 // Add "kitna bacha hai" (how many left) information
                 subscriptionObj.availableSessions = {
-                    total: plan.sessions === 0 ? 'unlimited' : plan.sessions,
-                    used: completedSessionCount,
-                    remaining: plan.sessions === 0 ? 'unlimited' : Math.max(0, plan.sessions - completedSessionCount),
-                    percentageUsed: plan.sessions === 0 ? 0 : Math.round((completedSessionCount / plan.sessions) * 100)
+                    total: plan.sessions,
+                    used: usedSessions,
+                    remaining: Math.max(0, plan.sessions - usedSessions),
+                    percentageUsed: Math.round((usedSessions / plan.sessions) * 100)
                 };
             } else {
                 // Unlimited sessions
@@ -281,6 +330,53 @@ const getAllSubscriptions = async (req, res, next) => {
                     percentageUsed: 0
                 };
             }
+            
+            // Additionally, get user's purchased services with their session information
+            const Service = require('../models/Service.model');
+            const BookingModel = require('../models/Booking.model');
+            
+            // Get all bookings for the user that are paid (representing purchased services)
+            const userBookings = await BookingModel.find({
+                userId: subscription.userId,
+                paymentStatus: 'paid'
+            }).populate('serviceId');
+            
+            // Process each booking to get session information
+            const purchasedServicesWithSessionInfo = await Promise.all(userBookings.map(async (booking) => {
+                if (!booking.serviceId || !booking.serviceId.sessions || booking.serviceId.sessions === 0) {
+                    // Service has unlimited sessions
+                    return {
+                        ...booking.toObject(),
+                        serviceSessionInfo: {
+                            total: 'unlimited',
+                            used: 0, // Would need to count actual sessions separately
+                            remaining: 'unlimited',
+                            percentageUsed: 0
+                        }
+                    };
+                }
+                
+                // Count all non-cancelled sessions for this specific booking
+                const usedSessions = await Session.countDocuments({
+                    bookingId: booking._id,
+                    status: { $ne: "cancelled" } // Don't count cancelled sessions
+                });
+                
+                const remainingSessions = booking.serviceId.sessions - usedSessions;
+                
+                return {
+                    ...booking.toObject(),
+                    serviceSessionInfo: {
+                        total: booking.serviceId.sessions,
+                        used: usedSessions,
+                        remaining: Math.max(0, booking.serviceId.sessions - usedSessions),
+                        percentageUsed: Math.round((usedSessions / booking.serviceId.sessions) * 100)
+                    }
+                };
+            }));
+            
+            // Add purchased services with session information to the subscription object
+            subscriptionObj.purchasedServices = purchasedServicesWithSessionInfo;
 
             return subscriptionObj;
         }));

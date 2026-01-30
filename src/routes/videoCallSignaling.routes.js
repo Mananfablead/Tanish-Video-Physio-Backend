@@ -10,7 +10,8 @@ const {
     getCallQualityMetrics,
     getActiveCalls,
     forceEndCall,
-    muteParticipant
+    muteParticipant,
+    getSessionParticipants
 } = require('../controllers/videoCallSignaling.controller');
 
 const router = express.Router();
@@ -33,5 +34,8 @@ router.get('/logs/:sessionId/metrics', authorizeAdmin, getCallQualityMetrics);
 router.get('/active', authorizeAdmin, getActiveCalls);
 router.post('/force-end', authorizeAdmin, forceEndCall);
 router.post('/mute-participant', authorizeAdmin, muteParticipant);
+
+// Get participants for a session
+router.get('/session/:sessionId/participants', getSessionParticipants);
 
 module.exports = router;

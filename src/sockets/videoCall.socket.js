@@ -504,7 +504,8 @@ const setupVideoCallHandlers = (io, socket) => {
 
             io.to(roomId).emit('call-ended', {
                 endedBy: userId,
-                message: 'Call ended by therapist'
+                message: 'Call ended by therapist',
+                initiatorRole: socket.user.role // Send the role of who initiated the termination
             });
         } catch (error) {
             logger.error('Error ending call:', error);

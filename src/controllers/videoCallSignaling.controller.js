@@ -516,6 +516,75 @@ const muteParticipant = async (req, res) => {
     }
 };
 
+// Get participant details for a session
+const getSessionParticipants = async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+        const userId = req.user.userId;
+
+        // Import the Session model
+        const Session = require('../models/Session.model');
+
+        // Verify session exists and user has access
+        const session = await Session.findById(sessionId)
+            .populate('userId', 'name email firstName lastName')
+            .populate('therapistId', 'name email firstName lastName');
+
+        if (!session) {
+            return res.status(404).json({ message: 'Session not found' });
+        }
+
+        // Check if user has access to this session
+        const isAdmin = req.user.role === 'admin';
+        const isTherapist = req.user.role === 'therapist' && session.therapistId && session.therapistId._id.toString() === userId;
+        const isUser = session.userId && session.userId._id.toString() === userId;
+
+        if (!isAdmin && !isTherapist && !isUser) {
+            return res.status(403).json({ message: 'Access denied' });
+        }
+
+        // Prepare participant details
+        const participants = [];
+
+        // Add user (patient) as participant
+        if (session.userId) {
+            participants.push({
+                userId: session.userId._id,
+                name: session.userId.name || `${session.userId.firstName} ${session.userId.lastName}`,
+                email: session.userId.email,
+                role: 'patient',
+                isSelf: session.userId._id.toString() === userId
+            });
+        }
+
+        // Add therapist as participant
+        if (session.therapistId) {
+            participants.push({
+                userId: session.therapistId._id,
+                name: session.therapistId.name || `${session.therapistId.firstName} ${session.therapistId.lastName}`,
+                email: session.therapistId.email,
+                role: 'therapist',
+                isTherapist: true,
+                isSelf: session.therapistId._id.toString() === userId
+            });
+        }
+
+        res.json({
+            success: true,
+            data: {
+                sessionId: session._id,
+                sessionDate: session.date,
+                sessionTime: session.time,
+                participants
+            }
+        });
+    } catch (error) {
+        const logger = require('../utils/logger');
+        logger.error('Error getting session participants:', error);
+        res.status(500).json({ message: 'Failed to get session participants' });
+    }
+};
+
 module.exports = {
     generateCallToken,
     verifyCallToken,
@@ -526,6 +595,7 @@ module.exports = {
     getCallQualityMetrics,
     getActiveCalls,
     forceEndCall,
-    muteParticipant
+    muteParticipant,
+    getSessionParticipants
 };
 

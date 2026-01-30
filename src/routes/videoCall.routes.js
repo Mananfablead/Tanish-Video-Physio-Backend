@@ -5,7 +5,8 @@ const {
     getCallLogs,
     getCallLogById,
     updateCallLog,
-    deleteCallLog
+    deleteCallLog,
+    getSessionParticipants
 } = require('../controllers/videoCall.controller');
 
 const router = express.Router();
@@ -33,5 +34,8 @@ router.put('/:id', updateCallLog);
 
 // Delete call log (admin only)
 router.delete('/:id', deleteCallLog);
+
+// Get participants for a session
+router.get('/session/:sessionId/participants', getSessionParticipants);
 
 module.exports = router;
