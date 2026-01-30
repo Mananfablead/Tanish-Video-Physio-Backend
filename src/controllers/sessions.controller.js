@@ -4,6 +4,7 @@ const Service = require("../models/Service.model");
 const Availability = require("../models/Availability.model");
 const ApiResponse = require("../utils/apiResponse");
 const { parseDurationString } = require("../utils/session.utils");
+const { generateJoinLink } = require("../utils/videoCall.utils");
 
 // Get all sessions for authenticated user
 const getUserSessions = async (req, res, next) => {
