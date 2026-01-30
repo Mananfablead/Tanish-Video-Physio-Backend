@@ -10,7 +10,12 @@ const {
     addParticipant,
     updateParticipantStatus,
     removeParticipant,
-    getGroupSessionsForParticipant
+    getGroupSessionsForParticipant,
+    startGroupCall,
+    endGroupCall,
+    getGroupCallParticipants,
+    muteGroupParticipant,
+    getActiveGroupCalls
 } = require('../controllers/groupSession.controller');
 
 
@@ -27,5 +32,12 @@ router.delete('/:id/participants/:userId', auth, removeParticipant);
 // Routes for participants
 router.get('/my-sessions', auth, getGroupSessionsForParticipant);
 router.put('/:id/participants/:userId/status', auth, updateParticipantStatus);
+
+// Video call specific routes
+router.post('/:id/start-call', auth, startGroupCall);
+router.post('/:id/end-call', auth, endGroupCall);
+router.get('/:id/participants-status', auth, getGroupCallParticipants);
+router.post('/:id/mute-participant', auth, muteGroupParticipant);
+router.get('/active-calls', auth, getActiveGroupCalls);
 
 module.exports = router;

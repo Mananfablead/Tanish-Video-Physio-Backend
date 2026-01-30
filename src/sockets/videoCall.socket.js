@@ -582,6 +582,138 @@ const setupVideoCallHandlers = (io, socket) => {
 
         // Note: Socket.io automatically removes user from rooms on disconnect
     });
+
+    // Group call specific events
+    socket.on('group-call-start', async (data) => {
+        try {
+            const { groupSessionId } = data;
+            const userId = socket.user.userId;
+
+            const groupSession = await GroupSession.findById(groupSessionId);
+
+            if (!groupSession) {
+                socket.emit('error', { message: 'Group session not found' });
+                return;
+            }
+
+            // Only therapist can start group call
+            if (groupSession.therapistId.toString() !== userId) {
+                socket.emit('error', { message: 'Only therapist can start group call' });
+                return;
+            }
+
+            // Broadcast to all participants in the group room
+            socket.to(groupSessionId).emit('group-call-started', {
+                groupSessionId,
+                startedBy: userId,
+                timestamp: new Date()
+            });
+
+            logger.info(`Group call started for session ${groupSessionId} by user ${userId}`);
+        } catch (error) {
+            logger.error('Error starting group call:', error);
+            socket.emit('error', { message: 'Failed to start group call' });
+        }
+    });
+
+    socket.on('group-call-end', async (data) => {
+        try {
+            const { groupSessionId } = data;
+            const userId = socket.user.userId;
+
+            const groupSession = await GroupSession.findById(groupSessionId);
+
+            if (!groupSession) {
+                socket.emit('error', { message: 'Group session not found' });
+                return;
+            }
+
+            // Only therapist can end group call
+            if (groupSession.therapistId.toString() !== userId) {
+                socket.emit('error', { message: 'Only therapist can end group call' });
+                return;
+            }
+
+            // Broadcast to all participants
+            socket.to(groupSessionId).emit('group-call-ended', {
+                groupSessionId,
+                endedBy: userId,
+                timestamp: new Date()
+            });
+
+            logger.info(`Group call ended for session ${groupSessionId} by user ${userId}`);
+        } catch (error) {
+            logger.error('Error ending group call:', error);
+            socket.emit('error', { message: 'Failed to end group call' });
+        }
+    });
+
+    socket.on('participant-muted', async (data) => {
+        try {
+            const { groupSessionId, userId, isMuted } = data;
+            const therapistId = socket.user.userId;
+
+            const groupSession = await GroupSession.findById(groupSessionId);
+
+            if (!groupSession) {
+                socket.emit('error', { message: 'Group session not found' });
+                return;
+            }
+
+            // Only therapist can mute participants
+            if (groupSession.therapistId.toString() !== therapistId) {
+                socket.emit('error', { message: 'Only therapist can mute participants' });
+                return;
+            }
+
+            // Broadcast to all participants
+            socket.to(groupSessionId).emit('participant-status-changed', {
+                userId,
+                isMuted,
+                isVideoOff: data.isVideoOff || false,
+                changedBy: therapistId
+            });
+
+            logger.info(`Participant ${userId} ${isMuted ? 'muted' : 'unmuted'} in group session ${groupSessionId}`);
+        } catch (error) {
+            logger.error('Error muting participant:', error);
+            socket.emit('error', { message: 'Failed to update participant status' });
+        }
+    });
+
+    socket.on('screen-share-start', async (data) => {
+        try {
+            const { groupSessionId, userId } = data;
+
+            // Broadcast screen share start to other participants
+            socket.to(groupSessionId).emit('participant-screen-sharing', {
+                userId,
+                isSharing: true,
+                timestamp: new Date()
+            });
+
+            logger.info(`User ${userId} started screen sharing in group session ${groupSessionId}`);
+        } catch (error) {
+            logger.error('Error handling screen share start:', error);
+        }
+    });
+
+    socket.on('screen-share-stop', async (data) => {
+        try {
+            const { groupSessionId, userId } = data;
+
+            // Broadcast screen share stop to other participants
+            socket.to(groupSessionId).emit('participant-screen-sharing', {
+                userId,
+                isSharing: false,
+                timestamp: new Date()
+            });
+
+            logger.info(`User ${userId} stopped screen sharing in group session ${groupSessionId}`);
+        } catch (error) {
+            logger.error('Error handling screen share stop:', error);
+        }
+    });
 };
 
 module.exports = setupVideoCallHandlers;

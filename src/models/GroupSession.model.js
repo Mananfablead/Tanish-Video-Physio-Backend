@@ -49,6 +49,40 @@ const groupSessionSchema = new mongoose.Schema({
         enum: ['scheduled', 'active', 'completed', 'cancelled'],
         default: 'scheduled'
     },
+    callStartedAt: {
+        type: Date,
+        default: null
+    },
+    callEndedAt: {
+        type: Date,
+        default: null
+    },
+    isActiveCall: {
+        type: Boolean,
+        default: false
+    },
+    currentParticipants: [{
+        userId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User'
+        },
+        joinedAt: {
+            type: Date,
+            default: Date.now
+        },
+        leftAt: {
+            type: Date,
+            default: null
+        },
+        isMuted: {
+            type: Boolean,
+            default: false
+        },
+        isVideoOff: {
+            type: Boolean,
+            default: false
+        }
+    }],
     createdAt: {
         type: Date,
         default: Date.now
