@@ -2180,3 +2180,115 @@
 {"level":"info","message":"Generate call token request - sessionId: 697c7bf483b3f424128b4a8f, userId: 6979dea1511c8daa0d0923a6, role: admin, requesterId: 6979dea1511c8daa0d0923a6, requesterRole: admin","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:09.070Z"}
 {"level":"info","message":"Session found - ID: 697c7bf483b3f424128b4a8f, Status: live, Date: 2026-01-30, Time: 15:05","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:09.104Z"}
 {"level":"info","message":"Authorization check - isTherapist: true, isAdmin: true, isUser: false, requesterId: 6979dea1511c8daa0d0923a6","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:09.110Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:29.744Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:29.799Z"}
+{"level":"info","message":"User 6979de27511c8daa0d09239d joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:29.879Z"}
+{"level":"info","message":"User 6979de27511c8daa0d09239d joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:29.907Z"}
+{"level":"info","message":"User 6979de27511c8daa0d09239d joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:29.928Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:29.975Z"}
+{"level":"info","message":"User 6979de27511c8daa0d09239d joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:29.982Z"}
+{"level":"info","message":"User 6979de27511c8daa0d09239d joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:29.993Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.054Z"}
+{"level":"info","message":"User 6979de27511c8daa0d09239d joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.072Z"}
+{"level":"info","message":"User 6979de27511c8daa0d09239d joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.128Z"}
+{"level":"info","message":"User 6979de27511c8daa0d09239d joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.155Z"}
+{"level":"info","message":"User 6979de27511c8daa0d09239d joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.218Z"}
+{"level":"info","message":"User 6979de27511c8daa0d09239d joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.233Z"}
+{"level":"info","message":"User 6979de27511c8daa0d09239d joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.279Z"}
+{"level":"info","message":"User 6979de27511c8daa0d09239d joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.298Z"}
+{"level":"info","message":"User 6979de27511c8daa0d09239d joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.308Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.320Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.329Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.338Z"}
+{"level":"info","message":"User 6979de27511c8daa0d09239d joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.346Z"}
+{"level":"info","message":"User 6979de27511c8daa0d09239d joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.355Z"}
+{"level":"info","message":"User 6979de27511c8daa0d09239d joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.426Z"}
+{"level":"info","message":"User 6979de27511c8daa0d09239d joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.448Z"}
+{"level":"info","message":"User 6979de27511c8daa0d09239d joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.476Z"}
+{"level":"info","message":"User 6979de27511c8daa0d09239d joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.506Z"}
+{"level":"info","message":"User 6979de27511c8daa0d09239d joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.513Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.523Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.535Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.544Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.578Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.592Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.606Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.611Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.671Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.680Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.699Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.719Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.733Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.753Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.769Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.785Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.832Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.993Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:30.999Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:31.046Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:31.058Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:31.076Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:31.096Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:31.113Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:31.127Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:31.139Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:31.210Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:31.230Z"}
+{"level":"info","message":"User 6979de27511c8daa0d09239d joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:31.281Z"}
+{"level":"info","message":"User 6979de27511c8daa0d09239d joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:31.329Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:31.463Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:31.604Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:31.702Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:31.806Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:31.814Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:31.832Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:31.872Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:32.013Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:34.041Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:34.049Z"}
+{"level":"info","message":"Generate call token request - sessionId: 697c7bf483b3f424128b4a8f, userId: 6979dea1511c8daa0d0923a6, role: admin, requesterId: 6979dea1511c8daa0d0923a6, requesterRole: admin","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:34.862Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:34.906Z"}
+{"level":"info","message":"User 6979dea1511c8daa0d0923a6 joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:34.958Z"}
+{"level":"info","message":"Session found - ID: 697c7bf483b3f424128b4a8f, Status: live, Date: 2026-01-30, Time: 15:05","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:34.979Z"}
+{"level":"info","message":"Authorization check - isTherapist: true, isAdmin: true, isUser: false, requesterId: 6979dea1511c8daa0d0923a6","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:34.991Z"}
+{"level":"info","message":"Target user found - userId: 6979dea1511c8daa0d0923a6, userName: Dr. Khhushbu Joshi","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:35.000Z"}
+{"level":"info","message":"Target user authorization - isTargetUser: false, isTargetTherapist: true, userId: 6979dea1511c8daa0d0923a6","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:35.010Z"}
+{"level":"info","message":"Session status check - Current status: live, Session ID: 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:35.018Z"}
+{"level":"info","message":"Time validation check - Now: 2026-01-30T10:28:35.025Z, Session Time: 2026-01-30T09:35:00.000Z, Session ID: 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:35.025Z"}
+{"level":"info","message":"Time window - Min: 2026-01-30T09:05:00.000Z, Max: 2026-01-30T10:35:00.000Z","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:35.033Z"}
+{"level":"info","message":"DEBUG: Time validation check - Now: 2026-01-30T10:28:35.025Z, Session Time: 2026-01-30T09:35:00.000Z, Diff: 3215025ms","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:35.038Z"}
+{"level":"info","message":"Call token generated for user 6979dea1511c8daa0d0923a6 in session 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:28:35.046Z"}
+{"level":"info","message":"User 6979de27511c8daa0d09239d disconnected from chat","service":"tanish-physio-backend","timestamp":"2026-01-30T10:29:00.966Z"}
+{"level":"info","message":"Socket b0zKX9hOCR0BY1tyAAA_ disconnected from video call","service":"tanish-physio-backend","timestamp":"2026-01-30T10:29:00.967Z"}
+{"level":"info","message":"User 6979de27511c8daa0d09239d disconnected from chat","service":"tanish-physio-backend","timestamp":"2026-01-30T10:29:00.975Z"}
+{"level":"info","message":"Socket pSwIY8B-oC1GAvbjAAAb disconnected from video call","service":"tanish-physio-backend","timestamp":"2026-01-30T10:29:00.981Z"}
+{"level":"info","message":"User 6979de27511c8daa0d09239d disconnected from chat","service":"tanish-physio-backend","timestamp":"2026-01-30T10:29:00.987Z"}
+{"level":"info","message":"Socket W8hcl1qDlqhgOU6JAAAa disconnected from video call","service":"tanish-physio-backend","timestamp":"2026-01-30T10:29:00.989Z"}
+{"level":"info","message":"User 6979de27511c8daa0d09239d disconnected from chat","service":"tanish-physio-backend","timestamp":"2026-01-30T10:29:00.990Z"}
+{"level":"info","message":"Socket tOdtgJy2jRoPUNXcAAAT disconnected from video call","service":"tanish-physio-backend","timestamp":"2026-01-30T10:29:00.993Z"}
+{"level":"info","message":"User 6979de27511c8daa0d09239d disconnected from chat","service":"tanish-physio-backend","timestamp":"2026-01-30T10:29:00.996Z"}
+{"level":"info","message":"Socket 7Sy4njQtKaAH1tZCAAAS disconnected from video call","service":"tanish-physio-backend","timestamp":"2026-01-30T10:29:00.997Z"}
+{"level":"info","message":"User 6979de27511c8daa0d09239d disconnected from chat","service":"tanish-physio-backend","timestamp":"2026-01-30T10:29:01.000Z"}
+{"level":"info","message":"Socket YEPZ-IVbfsOT3b0MAAAP disconnected from video call","service":"tanish-physio-backend","timestamp":"2026-01-30T10:29:01.002Z"}
+{"level":"info","message":"User 6979de27511c8daa0d09239d disconnected from chat","service":"tanish-physio-backend","timestamp":"2026-01-30T10:29:01.004Z"}
+{"level":"info","message":"Socket 7-RSw2rYNzc2Fj07AAAN disconnected from video call","service":"tanish-physio-backend","timestamp":"2026-01-30T10:29:01.019Z"}
+{"level":"info","message":"User 6979de27511c8daa0d09239d disconnected from chat","service":"tanish-physio-backend","timestamp":"2026-01-30T10:29:01.024Z"}
+{"level":"info","message":"Socket xjsWgNAWa-QxuKcpAAAJ disconnected from video call","service":"tanish-physio-backend","timestamp":"2026-01-30T10:29:01.027Z"}
+{"level":"info","message":"User 6979de27511c8daa0d09239d disconnected from chat","service":"tanish-physio-backend","timestamp":"2026-01-30T10:29:01.029Z"}
+{"level":"info","message":"Socket cx9sM0TTytD3OiZ4AAAI disconnected from video call","service":"tanish-physio-backend","timestamp":"2026-01-30T10:29:01.034Z"}
+{"level":"info","message":"User 6979de27511c8daa0d09239d disconnected from chat","service":"tanish-physio-backend","timestamp":"2026-01-30T10:29:01.040Z"}
+{"level":"info","message":"Socket yw8z55SkTKa0hzz_AAAF disconnected from video call","service":"tanish-physio-backend","timestamp":"2026-01-30T10:29:01.050Z"}
+{"level":"info","message":"User 6979de27511c8daa0d09239d disconnected from chat","service":"tanish-physio-backend","timestamp":"2026-01-30T10:29:01.055Z"}
+{"level":"info","message":"Socket hMyrkNrwEA-9jFfFAAAE disconnected from video call","service":"tanish-physio-backend","timestamp":"2026-01-30T10:29:01.057Z"}
+{"level":"info","message":"Generate call token request - sessionId: 697c7bf483b3f424128b4a8f, userId: 6979de27511c8daa0d09239d, role: patient, requesterId: 6979de27511c8daa0d09239d, requesterRole: patient","service":"tanish-physio-backend","timestamp":"2026-01-30T10:29:37.190Z"}
+{"level":"info","message":"Session found - ID: 697c7bf483b3f424128b4a8f, Status: live, Date: 2026-01-30, Time: 15:05","service":"tanish-physio-backend","timestamp":"2026-01-30T10:29:37.209Z"}
+{"level":"info","message":"Authorization check - isTherapist: false, isAdmin: false, isUser: true, requesterId: 6979de27511c8daa0d09239d","service":"tanish-physio-backend","timestamp":"2026-01-30T10:29:37.212Z"}
+{"level":"info","message":"Target user found - userId: 6979de27511c8daa0d09239d, userName: akash vasaniya","service":"tanish-physio-backend","timestamp":"2026-01-30T10:29:37.218Z"}
+{"level":"info","message":"Target user authorization - isTargetUser: true, isTargetTherapist: false, userId: 6979de27511c8daa0d09239d","service":"tanish-physio-backend","timestamp":"2026-01-30T10:29:37.220Z"}
+{"level":"info","message":"Session status check - Current status: live, Session ID: 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:29:37.221Z"}
+{"level":"info","message":"Time validation check - Now: 2026-01-30T10:29:37.222Z, Session Time: 2026-01-30T09:35:00.000Z, Session ID: 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:29:37.222Z"}
+{"level":"info","message":"Time window - Min: 2026-01-30T09:05:00.000Z, Max: 2026-01-30T10:35:00.000Z","service":"tanish-physio-backend","timestamp":"2026-01-30T10:29:37.224Z"}
+{"level":"info","message":"DEBUG: Time validation check - Now: 2026-01-30T10:29:37.222Z, Session Time: 2026-01-30T09:35:00.000Z, Diff: 3277222ms","service":"tanish-physio-backend","timestamp":"2026-01-30T10:29:37.231Z"}
+{"level":"info","message":"Call token generated for user 6979de27511c8daa0d09239d in session 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:29:37.234Z"}
+{"level":"info","message":"User 6979de27511c8daa0d09239d joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:29:37.451Z"}
+{"level":"info","message":"User 6979de27511c8daa0d09239d joined session room 697c7bf483b3f424128b4a8f","service":"tanish-physio-backend","timestamp":"2026-01-30T10:29:37.468Z"}
