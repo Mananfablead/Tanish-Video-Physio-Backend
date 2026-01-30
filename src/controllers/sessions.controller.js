@@ -316,6 +316,19 @@ const createSession = async (req, res, next) => {
 
       therapistId = booking.therapistId;
 
+      // 🔥 ONE SESSION PER DAY LIMIT
+      const existingSession = await Session.findOne({
+        userId: userId,
+        date: date,
+        status: { $ne: "cancelled" }
+      });
+
+      if (existingSession) {
+        return res
+          .status(400)
+          .json(ApiResponse.error("You can only create one session per day. Please choose a different date."));
+      }
+
       // Auto-populate duration from service if not provided
       if (!duration && booking.serviceId && booking.serviceId.duration) {
         const parsedDuration = parseDurationString(booking.serviceId.duration);
@@ -893,6 +906,19 @@ const createAdminSession = async (req, res, next) => {
               "Cannot create session: Booking payment status is not paid"
             )
           );
+      }
+
+      // 🔥 ONE SESSION PER DAY LIMIT (for admin too)
+      const existingSession = await Session.findOne({
+        userId: userId,
+        date: date,
+        status: { $ne: "cancelled" }
+      });
+
+      if (existingSession) {
+        return res
+          .status(400)
+          .json(ApiResponse.error(`User can only have one session per day. A session already exists for ${date}.`));
       }
 
       // Check service session limits if it's a service-based booking
