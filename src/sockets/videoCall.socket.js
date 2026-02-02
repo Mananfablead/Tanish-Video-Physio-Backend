@@ -309,13 +309,23 @@ const setupVideoCallHandlers = (io, socket) => {
     // Handle WebRTC signaling - offer
     socket.on('offer', (data) => {
         try {
-            const { roomId, offer, senderId } = data;
+            const { roomId, offer, senderId, targetSocketId } = data;
             
-            // Broadcast offer to other participants in the room
-            socket.to(roomId).emit('offer', {
-                offer,
-                senderId
-            });
+            if (targetSocketId) {
+                // Send to specific target participant
+                socket.to(targetSocketId).emit('offer', {
+                    offer,
+                    senderId
+                });
+                logger.info(`Offer forwarded from ${senderId} to ${targetSocketId}`);
+            } else {
+                // Broadcast to all other participants in the room
+                socket.to(roomId).emit('offer', {
+                    offer,
+                    senderId
+                });
+                logger.info(`Offer broadcast from ${senderId} to room ${roomId}`);
+            }
         } catch (error) {
             logger.error('Error handling offer:', error);
             socket.emit('error', { message: 'Failed to send offer' });
@@ -325,13 +335,14 @@ const setupVideoCallHandlers = (io, socket) => {
     // Handle WebRTC signaling - answer
     socket.on('answer', (data) => {
         try {
-            const { roomId, answer, senderId, targetId } = data;
+            const { roomId, answer, senderId, targetSocketId } = data;
             
             // Send answer to the specific target participant
-            socket.to(targetId).emit('answer', {
+            socket.to(targetSocketId).emit('answer', {
                 answer,
                 senderId
             });
+            logger.info(`Answer sent from ${senderId} to ${targetSocketId}`);
         } catch (error) {
             logger.error('Error handling answer:', error);
             socket.emit('error', { message: 'Failed to send answer' });
@@ -341,20 +352,22 @@ const setupVideoCallHandlers = (io, socket) => {
     // Handle ICE candidates
     socket.on('ice-candidate', (data) => {
         try {
-            const { roomId, candidate, senderId, targetId } = data;
+            const { roomId, candidate, senderId, targetSocketId } = data;
             
             // Forward ICE candidate to target participant
-            if (targetId) {
-                socket.to(targetId).emit('ice-candidate', {
+            if (targetSocketId) {
+                socket.to(targetSocketId).emit('ice-candidate', {
                     candidate,
                     senderId
                 });
+                logger.info(`ICE candidate forwarded from ${senderId} to ${targetSocketId}`);
             } else {
                 // Broadcast to all other participants in the room
                 socket.to(roomId).emit('ice-candidate', {
                     candidate,
                     senderId
                 });
+                logger.info(`ICE candidate broadcast from ${senderId} to room ${roomId}`);
             }
         } catch (error) {
             logger.error('Error handling ICE candidate:', error);

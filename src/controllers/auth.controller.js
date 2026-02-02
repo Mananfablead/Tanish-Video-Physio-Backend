@@ -31,8 +31,8 @@ const register = async (req, res, next) => {
 
         await user.save();
 
-        // Generate token
-        const token = generateToken({ userId: user._id, role: user.role });
+        // Generate token with explicit userId string conversion
+        const token = generateToken({ userId: user._id.toString(), role: user.role });
 
         res.status(201).json(
             ApiResponse.success({
@@ -86,9 +86,9 @@ const login = async (req, res, next) => {
                 .json(ApiResponse.error("Invalid email or password", 401));
         }
 
-        // Generate token
+        // Generate token with explicit string conversion
         const token = generateToken({
-            userId: user._id,
+            userId: user._id.toString(),
             role: user.role,
         });
 
@@ -473,8 +473,19 @@ const createAdminUser = async (req, res, next) => {
 
         await adminUser.save();
 
-        // Generate token
-        const token = generateToken({ userId: adminUser._id, role: adminUser.role });
+        // Log the created admin user ID for debugging
+        console.log("🔐 Admin user created with ID:", adminUser._id.toString());
+
+        // Generate token with explicit userId
+        const token = generateToken({ 
+            userId: adminUser._id.toString(), 
+            role: adminUser.role 
+        });
+
+        console.log("🎟️ Admin JWT token payload:", {
+            userId: adminUser._id.toString(),
+            role: adminUser.role
+        });
 
         res.status(201).json(
             ApiResponse.success({
