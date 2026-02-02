@@ -142,6 +142,7 @@ const checkServiceLimits = async (bookingId) => {
 const getUserSessions = async (req, res, next) => {
   try {
     const sessions = await Session.find({ userId: req.user.userId })
+      .sort({ createdAt: -1 }) // Descending order by creation time
       .populate("bookingId", "serviceName therapistName date time")
       .populate("subscriptionId", "planId planName startDate endDate status")
       .populate("therapistId", "name email role");
@@ -234,6 +235,7 @@ const getAllSessions = async (req, res, next) => {
     }
 
     const sessions = await Session.find()
+      .sort({ createdAt: -1 }) // Descending order by creation time
       .populate("bookingId", "serviceName therapistName date time")
       .populate("subscriptionId", "planId planName startDate endDate status")
       .populate("therapistId", "name email role")
@@ -264,6 +266,7 @@ const getUserUpcomingSessions = async (req, res, next) => {
       startTime: { $gte: now, $lte: thirtyMinutesFromNow },
       status: { $in: ["scheduled", "live"] },
     })
+      .sort({ createdAt: -1 }) // Descending order by creation time
       .populate("bookingId", "serviceName therapistName date time")
       .populate("subscriptionId", "planId planName startDate endDate status")
       .populate("therapistId", "name email role");
@@ -301,6 +304,7 @@ const getAllUpcomingSessions = async (req, res, next) => {
       startTime: { $gte: now, $lte: thirtyMinutesFromNow },
       status: { $in: ["scheduled", "live"] },
     })
+      .sort({ createdAt: -1 }) // Descending order by creation time
       .populate("bookingId", "serviceName therapistName date time")
       .populate("subscriptionId", "planId planName startDate endDate status")
       .populate("therapistId", "name email role")
