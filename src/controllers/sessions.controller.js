@@ -146,14 +146,81 @@ const getUserSessions = async (req, res, next) => {
       .populate("subscriptionId", "planId planName startDate endDate status")
       .populate("therapistId", "name email role");
 
+    // Update statuses as needed
+    const updatedSessions = await updateSessionStatusesIfNeeded(sessions);
+
     res
       .status(200)
       .json(
-        ApiResponse.success({ sessions }, "Sessions retrieved successfully")
+        ApiResponse.success({ sessions: updatedSessions }, "Sessions retrieved successfully")
       );
   } catch (error) {
     next(error);
   }
+};
+
+// Function to update session status based on time and status
+const updateSessionStatusIfNeeded = async (session) => {
+  if (!session || !session.startTime || !session.status) {
+    return session;
+  }
+
+  const now = new Date();
+  const sessionStartTime = new Date(session.startTime);
+  const oneHourAfterStart = new Date(sessionStartTime.getTime() + 60 * 60000); // Add 1 hour
+
+  // If session is Live and current time is past 1 hour after start time
+  if (session.status === "live" && now > oneHourAfterStart) {
+    await Session.findByIdAndUpdate(session._id, {
+      status: "completed",
+      completedAt: now
+    });
+    return { ...session.toObject(), status: "completed", completedAt: now };
+  }
+  
+  // If session is Scheduled and current time is past 1 hour after start time
+  if (session.status === "scheduled" && now > oneHourAfterStart) {
+    await Session.findByIdAndUpdate(session._id, {
+      status: "missed",
+      missedAt: now
+    });
+    return { ...session.toObject(), status: "missed", missedAt: now };
+  }
+
+  return session;
+};
+
+// Function to update session statuses in bulk
+const updateSessionStatusesIfNeeded = async (sessions) => {
+  return await Promise.all(sessions.map(async (session) => {
+    if (!session || !session.startTime || !session.status) {
+      return session;
+    }
+
+    const now = new Date();
+    const sessionStartTime = new Date(session.startTime);
+    const oneHourAfterStart = new Date(sessionStartTime.getTime() + 60 * 60000); // Add 1 hour
+
+    // If session is Live and current time is past 1 hour after start time
+    if (session.status === "live" && now > oneHourAfterStart) {
+      await Session.findByIdAndUpdate(session._id, {
+        status: "completed",
+        completedAt: now
+      });
+      return { ...session.toObject(), status: "completed", completedAt: now };
+    }
+    
+    // If session is Scheduled and current time is past 1 hour after start time
+    if (session.status === "scheduled" && now > oneHourAfterStart) {
+      await Session.findByIdAndUpdate(session._id, {
+        status: "missed",
+        missedAt: now
+      });
+      return { ...session.toObject(), status: "missed", missedAt: now };
+    }
+
+    return session;
+  }));
 };
 
 // Get all sessions for admin
@@ -172,10 +239,13 @@ const getAllSessions = async (req, res, next) => {
       .populate("therapistId", "name email role")
       .populate("userId", "name email");
 
+    // Update statuses as needed
+    const updatedSessions = await updateSessionStatusesIfNeeded(sessions);
+
     res
       .status(200)
       .json(
-        ApiResponse.success({ sessions }, "All sessions retrieved successfully")
+        ApiResponse.success({ sessions: updatedSessions }, "All sessions retrieved successfully")
       );
   } catch (error) {
     next(error);
@@ -198,11 +268,14 @@ const getUserUpcomingSessions = async (req, res, next) => {
       .populate("subscriptionId", "planId planName startDate endDate status")
       .populate("therapistId", "name email role");
 
+    // Update statuses as needed
+    const updatedSessions = await updateSessionStatusesIfNeeded(sessions);
+
     res
       .status(200)
       .json(
         ApiResponse.success(
-          { sessions },
+          { sessions: updatedSessions },
           "Upcoming sessions retrieved successfully"
         )
       );
@@ -233,11 +306,14 @@ const getAllUpcomingSessions = async (req, res, next) => {
       .populate("therapistId", "name email role")
       .populate("userId", "name email");
 
+    // Update statuses as needed
+    const updatedSessions = await updateSessionStatusesIfNeeded(sessions);
+
     res
       .status(200)
       .json(
         ApiResponse.success(
-          { sessions },
+          { sessions: updatedSessions },
           "All upcoming sessions retrieved successfully"
         )
       );
@@ -261,9 +337,12 @@ const getSessionById = async (req, res, next) => {
       return res.status(404).json(ApiResponse.error("Session not found"));
     }
 
+    // Update status as needed
+    const updatedSession = await updateSessionStatusIfNeeded(session);
+
     res
       .status(200)
-      .json(ApiResponse.success({ session }, "Session retrieved successfully"));
+      .json(ApiResponse.success({ session: updatedSession }, "Session retrieved successfully"));
   } catch (error) {
     next(error);
   }
@@ -315,6 +394,19 @@ const createSession = async (req, res, next) => {
       }
 
       therapistId = booking.therapistId;
+
+      // 🔥 ONE SESSION PER DAY LIMIT
+      const existingSession = await Session.findOne({
+        userId: userId,
+        date: date,
+        status: { $ne: "cancelled" }
+      });
+
+      if (existingSession) {
+        return res
+          .status(400)
+          .json(ApiResponse.error("You can only create one session per day. Please choose a different date."));
+      }
 
       // Auto-populate duration from service if not provided
       if (!duration && booking.serviceId && booking.serviceId.duration) {
@@ -507,6 +599,16 @@ const updateSession = async (req, res, next) => {
       return res.status(404).json(ApiResponse.error("Session not found"));
     }
 
+    // Update status as needed first
+    const sessionWithUpdatedStatus = await updateSessionStatusIfNeeded(session);
+    
+    // Prevent updating if session is completed, missed, or live
+    if (sessionWithUpdatedStatus.status === "completed" || sessionWithUpdatedStatus.status === "missed" || sessionWithUpdatedStatus.status === "live") {
+      return res
+        .status(400)
+        .json(ApiResponse.error("Cannot update completed, missed, or live session"));
+    }
+
     // Prepare update object
     const updateFields = { status, notes };
 
@@ -518,7 +620,7 @@ const updateSession = async (req, res, next) => {
     // If time is provided, update time fields
     if (time !== undefined) {
       updateFields.time = time;
-      const startTime = new Date(`${session.date}T${time}:00`);
+      const startTime = new Date(`${sessionWithUpdatedStatus.date}T${time}:00`);
       updateFields.startTime = startTime;
     }
 
@@ -657,11 +759,14 @@ const rescheduleUserSession = async (req, res, next) => {
       return res.status(404).json(ApiResponse.error("Session not found"));
     }
 
-    // Check if session can be rescheduled (should not be live or completed)
-    if (session.status === "live" || session.status === "completed") {
+    // Update status as needed first
+    const sessionWithUpdatedStatus = await updateSessionStatusIfNeeded(session);
+    
+    // Check if session can be rescheduled (should not be live, completed, or missed)
+    if (sessionWithUpdatedStatus.status === "live" || sessionWithUpdatedStatus.status === "completed" || sessionWithUpdatedStatus.status === "missed") {
       return res
         .status(400)
-        .json(ApiResponse.error("Cannot reschedule live or completed session"));
+        .json(ApiResponse.error("Cannot reschedule live, completed, or missed session"));
     }
 
     // Auto-generate new startTime from date and time
@@ -686,8 +791,8 @@ const rescheduleUserSession = async (req, res, next) => {
         const slotDurationMinutes = (slotEndTime - slotStartTime) / (1000 * 60);
         
         // Check if service duration fits in the selected slot
-        if (session.bookingId) {
-          const booking = await Booking.findById(session.bookingId).populate('serviceId');
+        if (sessionWithUpdatedStatus.bookingId) {
+          const booking = await Booking.findById(sessionWithUpdatedStatus.bookingId).populate('serviceId');
           if (booking && booking.serviceId && booking.serviceId.duration) {
             const serviceDuration = parseDurationString(booking.serviceId.duration);
             if (serviceDuration > slotDurationMinutes) {
@@ -817,9 +922,12 @@ const getAdminSessionById = async (req, res, next) => {
       return res.status(404).json(ApiResponse.error("Session not found"));
     }
 
+    // Update status as needed
+    const updatedSession = await updateSessionStatusIfNeeded(session);
+
     res
       .status(200)
-      .json(ApiResponse.success({ session }, "Session retrieved successfully"));
+      .json(ApiResponse.success({ session: updatedSession }, "Session retrieved successfully"));
   } catch (error) {
     next(error);
   }
@@ -893,6 +1001,19 @@ const createAdminSession = async (req, res, next) => {
               "Cannot create session: Booking payment status is not paid"
             )
           );
+      }
+
+      // 🔥 ONE SESSION PER DAY LIMIT (for admin too)
+      const existingSession = await Session.findOne({
+        userId: userId,
+        date: date,
+        status: { $ne: "cancelled" }
+      });
+
+      if (existingSession) {
+        return res
+          .status(400)
+          .json(ApiResponse.error(`User can only have one session per day. A session already exists for ${date}.`));
       }
 
       // Check service session limits if it's a service-based booking
@@ -1100,6 +1221,18 @@ const updateAdminSession = async (req, res, next) => {
       return res.status(404).json(ApiResponse.error("Session not found"));
     }
 
+    // Update status as needed first
+    const sessionWithUpdatedStatus = await updateSessionStatusIfNeeded(currentSession);
+    
+    // Prevent updating certain statuses if session has become completed or missed
+    if (sessionWithUpdatedStatus.status === "completed" || sessionWithUpdatedStatus.status === "missed") {
+      if (status && status !== "completed" && status !== "missed") {
+        return res
+          .status(400)
+          .json(ApiResponse.error("Cannot update status of completed or missed session"));
+      }
+    }
+
     // Prepare update object
     const updateFields = {};
     if (status !== undefined) updateFields.status = status;
@@ -1113,10 +1246,10 @@ const updateAdminSession = async (req, res, next) => {
       updateFields.startTime = new Date(`${date}T${time}:00`);
     } else if (time && !date) {
       // If only time is provided, use the existing date
-      updateFields.startTime = new Date(`${currentSession.date}T${time}:00`);
+      updateFields.startTime = new Date(`${sessionWithUpdatedStatus.date}T${time}:00`);
     } else if (date && !time) {
       // If only date is provided, use the existing time
-      updateFields.startTime = new Date(`${date}T${currentSession.time}:00`);
+      updateFields.startTime = new Date(`${date}T${sessionWithUpdatedStatus.time}:00`);
     }
 
     // Update session
@@ -1274,15 +1407,18 @@ const rescheduleAdminSession = async (req, res, next) => {
       return res.status(404).json(ApiResponse.error("Session not found"));
     }
 
-    // Check if session can be rescheduled (should not be live or completed)
-    if (session.status === "live" || session.status === "completed") {
+    // Update status as needed first
+    const sessionWithUpdatedStatus = await updateSessionStatusIfNeeded(session);
+    
+    // Check if session can be rescheduled (should not be live, completed, or missed)
+    if (sessionWithUpdatedStatus.status === "live" || sessionWithUpdatedStatus.status === "completed" || sessionWithUpdatedStatus.status === "missed") {
       return res
         .status(400)
-        .json(ApiResponse.error("Cannot reschedule live or completed session"));
+        .json(ApiResponse.error("Cannot reschedule live, completed, or missed session"));
     }
 
     // Ensure bookingId exists to check service duration
-    if (!session.bookingId) {
+    if (!sessionWithUpdatedStatus.bookingId) {
       return res
         .status(400)
         .json(ApiResponse.error("Cannot reschedule subscription-based session using this endpoint"));

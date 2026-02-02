@@ -260,16 +260,53 @@ const getAdminDashboard = async (req, res, next) => {
         // Get service statistics
         const Service = require('../models/Service.model');
         const totalServices = await Service.countDocuments({ status: 'active' });
+        
+        // Get pending bookings
+        const pendingBookings = await Booking.countDocuments({ status: 'pending' });
+        
+        // Calculate monthly growth rate (comparing current month to previous month)
+        const currentMonth = new Date();
+        const previousMonth = new Date();
+        previousMonth.setMonth(currentMonth.getMonth() - 1);
+        
+        const currentMonthStart = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+        const currentMonthEnd = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+        
+        const previousMonthStart = new Date(previousMonth.getFullYear(), previousMonth.getMonth(), 1);
+        const previousMonthEnd = new Date(previousMonth.getFullYear(), previousMonth.getMonth() + 1, 0);
+        
+        const currentMonthUsers = await User.countDocuments({ 
+            role: 'patient', 
+            createdAt: { $gte: currentMonthStart, $lte: currentMonthEnd } 
+        });
+        
+        const previousMonthUsers = await User.countDocuments({ 
+            role: 'patient', 
+            createdAt: { $gte: previousMonthStart, $lte: previousMonthEnd } 
+        });
+        
+        const monthlyGrowthRate = previousMonthUsers > 0 
+            ? parseFloat(((currentMonthUsers - previousMonthUsers) / previousMonthUsers * 100).toFixed(2))
+            : currentMonthUsers > 0 ? 100 : 0;
+        
+        // Calculate customer satisfaction score based on session ratings
+        const completedSessions = await Session.find({ status: 'completed' }).select('rating');
+        const totalRatings = completedSessions.filter(session => session.rating !== undefined).length;
+        const averageRating = totalRatings > 0 
+            ? parseFloat((completedSessions.reduce((sum, session) => sum + (session.rating || 0), 0) / totalRatings).toFixed(2))
+            : 0;
+        
+        const customerSatisfactionScore = averageRating;
 
         // Generate chart data (last 6 months)
         const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        const currentMonth = new Date().getMonth();
+        const currentMonthIndex = new Date().getMonth();
         
         // Revenue chart data
         const revenueChart = [];
         for (let i = 5; i >= 0; i--) {
-            const monthIndex = (currentMonth - i + 12) % 12;
-            const year = new Date().getFullYear() - (currentMonth - i < 0 ? 1 : 0);
+            const monthIndex = (currentMonthIndex - i + 12) % 12;
+            const year = new Date().getFullYear() - (currentMonthIndex - i < 0 ? 1 : 0);
             
             const startDate = new Date(year, monthIndex, 1);
             const endDate = new Date(year, monthIndex + 1, 0);
@@ -321,8 +358,8 @@ const getAdminDashboard = async (req, res, next) => {
         // User growth chart (last 6 months)
         const userGrowthChart = [];
         for (let i = 5; i >= 0; i--) {
-            const monthIndex = (currentMonth - i + 12) % 12;
-            const year = new Date().getFullYear() - (currentMonth - i < 0 ? 1 : 0);
+            const monthIndex = (currentMonthIndex - i + 12) % 12;
+            const year = new Date().getFullYear() - (currentMonthIndex - i < 0 ? 1 : 0);
             
             const startDate = new Date(year, monthIndex, 1);
             const endDate = new Date(year, monthIndex + 1, 0);
@@ -469,9 +506,10 @@ const getAdminDashboard = async (req, res, next) => {
                     totalRevenue,
                     upcomingSessions,
                     completedToday,
-                    avgRating: 4.8,
-                    conversionRate: 68,
-                    totalServices
+                    totalServices,
+                    pendingBookings,
+                    monthlyGrowthRate,
+                    customerSatisfactionScore
                 },
                 revenueChart,
                 sessionsChart,
