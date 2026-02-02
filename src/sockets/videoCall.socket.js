@@ -319,7 +319,7 @@ const setupVideoCallHandlers = (io, socket) => {
     // Handle WebRTC signaling - offer
     socket.on('offer', (data) => {
         try {
-            const { roomId, offer, senderId } = data;
+            const { roomId, offer, senderId, targetSocketId } = data;
             
             // Broadcast offer to other participants in the room
             socket.to(roomId).emit('offer', {
@@ -340,10 +340,10 @@ const setupVideoCallHandlers = (io, socket) => {
     // Handle WebRTC signaling - answer
     socket.on('answer', (data) => {
         try {
-            const { roomId, answer, senderId, targetId } = data;
+            const { roomId, answer, senderId, targetSocketId } = data;
             
             // Send answer to the specific target participant
-            socket.to(targetId).emit('answer', {
+            socket.to(targetSocketId).emit('answer', {
                 answer,
                 senderId
             });
@@ -361,11 +361,11 @@ const setupVideoCallHandlers = (io, socket) => {
     // Handle ICE candidates
     socket.on('ice-candidate', (data) => {
         try {
-            const { roomId, candidate, senderId, targetId } = data;
+            const { roomId, candidate, senderId, targetSocketId } = data;
             
             // Forward ICE candidate to target participant
-            if (targetId) {
-                socket.to(targetId).emit('ice-candidate', {
+            if (targetSocketId) {
+                socket.to(targetSocketId).emit('ice-candidate', {
                     candidate,
                     senderId
                 });

@@ -199,6 +199,7 @@ const startServer = async () => {
                 const token = socket.handshake.auth.token || socket.handshake.query.token;
                 
                 if (!token) {
+                    console.error('❌ Socket authentication error: No token provided');
                     return next(new Error('Authentication error: No token provided'));
                 }
                 
@@ -208,16 +209,34 @@ const startServer = async () => {
                 
                 const decoded = jwt.verify(token, config.JWT_SECRET);
                 
+                // Validate required fields in token
+                if (!decoded.userId) {
+                    console.error('❌ Socket authentication error: Token missing userId');
+                    console.error('Token payload:', decoded);
+                    return next(new Error('Authentication error: Invalid token payload'));
+                }
+                
+                if (!decoded.role) {
+                    console.error('❌ Socket authentication error: Token missing role');
+                    return next(new Error('Authentication error: Invalid token payload'));
+                }
+                
                 // Attach user info to socket
                 socket.user = {
-                    userId: decoded.userId,
+                    userId: decoded.userId.toString(), // Ensure string format
                     role: decoded.role,
                     sessionId: decoded.sessionId
                 };
                 
+                console.log(`✅ Socket ${socket.id} authenticated:`, {
+                    userId: socket.user.userId,
+                    role: socket.user.role
+                });
+                
                 next();
             } catch (error) {
-                console.error('Socket authentication error:', error);
+                console.error('❌ Socket authentication error:', error);
+                console.error('Token provided:', socket.handshake.auth.token || socket.handshake.query.token);
                 next(new Error('Authentication error')); 
             }
         });
