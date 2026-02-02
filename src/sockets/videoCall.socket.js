@@ -267,10 +267,16 @@ const setupVideoCallHandlers = (io, socket) => {
 
             await callLog.save();
 
+            // Automatically start recording when call starts
+            callLog.recordingStatus = 'recording';
+            callLog.recordingStartTime = new Date();
+            await callLog.save();
+
             io.to(roomId).emit('call-started', {
                 roomId: roomId,
                 startedBy: userId,
-                callLogId: callLog._id
+                callLogId: callLog._id,
+                recordingStarted: true
             });
         } catch (error) {
             logger.error('Error starting call:', error);
@@ -523,13 +529,23 @@ const setupVideoCallHandlers = (io, socket) => {
                     }
                 }
 
+                // Stop recording if it was active
+                if (callLog.recordingStatus === 'recording') {
+                    callLog.recordingStatus = 'completed';
+                    callLog.recordingEndTime = new Date();
+                    if (callLog.recordingStartTime) {
+                        callLog.recordingDuration = (callLog.recordingEndTime - callLog.recordingStartTime) / 1000;
+                    }
+                }
+
                 await callLog.save();
             }
 
             io.to(roomId).emit('call-ended', {
                 endedBy: userId,
                 message: 'Call ended by therapist',
-                initiatorRole: socket.user.role // Send the role of who initiated the termination
+                initiatorRole: socket.user.role, // Send the role of who initiated the termination
+                recordingStopped: true
             });
         } catch (error) {
             logger.error('Error ending call:', error);

@@ -3941,6 +3941,179 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "Start Recording",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"callLogId\": \"call_log_id_here\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/video-call/recording/start",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "video-call", "recording", "start"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Stop Recording",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"callLogId\": \"call_log_id_here\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/video-call/recording/stop",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "video-call", "recording", "stop"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Recording",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "recording",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "callLogId",
+                  "value": "call_log_id_here",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/video-call/recording/upload",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "video-call", "recording", "upload"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get User Recordings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/video-call/recordings/user?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "video-call", "recordings", "user"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Recordings (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/video-call/recordings?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "video-call", "recordings"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Recording by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/video-call/recordings/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "video-call", "recordings", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "recording_id_here"
+                }
+              ]
+            }
+          },
+          "response": []
         }
       ]
     },

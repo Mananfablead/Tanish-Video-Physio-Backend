@@ -91,16 +91,38 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // // Serve static files
-// Serve static files from public/uploads directory
+// Serve static files from uploads directory
 const PUBLIC_UPLOADS_DIR = path.join(__dirname, '..', 'public', 'uploads');
+const RECORDINGS_UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
 
 if (!fs.existsSync(PUBLIC_UPLOADS_DIR)) {
     fs.mkdirSync(PUBLIC_UPLOADS_DIR, { recursive: true });
 }
 
+// Serve static files from both public uploads and recordings directory
 app.use(
     '/uploads',
     express.static(PUBLIC_UPLOADS_DIR, {
+        setHeaders: (res) => {
+            res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+        },
+    })
+);
+
+// Create recordings directory if it doesn't exist
+if (!fs.existsSync(RECORDINGS_UPLOADS_DIR)) {
+    fs.mkdirSync(RECORDINGS_UPLOADS_DIR, { recursive: true });
+}
+
+// Serve recordings from the recordings directory
+const RECORDINGS_DIR = path.join(RECORDINGS_UPLOADS_DIR, 'recordings');
+if (!fs.existsSync(RECORDINGS_DIR)) {
+    fs.mkdirSync(RECORDINGS_DIR, { recursive: true });
+}
+
+app.use(
+    '/uploads/recordings',
+    express.static(RECORDINGS_DIR, {
         setHeaders: (res) => {
             res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
         },

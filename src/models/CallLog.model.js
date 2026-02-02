@@ -50,6 +50,26 @@ const callLogSchema = new mongoose.Schema({
         type: String,
         trim: true
     },
+    recordingStatus: {
+        type: String,
+        enum: ['pending', 'recording', 'completed', 'failed'],
+        default: 'pending'
+    },
+    recordingStartTime: {
+        type: Date
+    },
+    recordingEndTime: {
+        type: Date
+    },
+    recordingDuration: {
+        type: Number // Duration in seconds
+    },
+    recordingSize: {
+        type: Number // Size in bytes
+    },
+    recordingFormat: {
+        type: String // Format of the recording (mp4, webm, etc)
+    },
     createdAt: {
         type: Date,
         default: Date.now
