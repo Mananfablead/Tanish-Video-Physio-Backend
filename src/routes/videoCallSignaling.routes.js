@@ -11,7 +11,13 @@ const {
     getActiveCalls,
     forceEndCall,
     muteParticipant,
-    getSessionParticipants
+    getSessionParticipants,
+    startRecording,
+    stopRecording,
+    uploadRecording,
+    getUserRecordings,
+    getAllRecordings,
+    getRecordingById
 } = require('../controllers/videoCallSignaling.controller');
 
 const router = express.Router();
@@ -37,5 +43,13 @@ router.post('/mute-participant', authorizeAdmin, muteParticipant);
 
 // Get participants for a session
 router.get('/session/:sessionId/participants', getSessionParticipants);
+
+// Recording routes
+router.post('/recording/start', startRecording);
+router.post('/recording/stop', stopRecording);
+router.post('/recording/upload', require('../middlewares/upload.middleware').recordingsUpload, uploadRecording);
+router.get('/recordings/user', getUserRecordings);
+router.get('/recordings', getAllRecordings);
+router.get('/recordings/:id', getRecordingById);
 
 module.exports = router;

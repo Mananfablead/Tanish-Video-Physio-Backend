@@ -586,6 +586,286 @@ const getSessionParticipants = async (req, res) => {
     }
 };
 
+// Recording-related functions
+
+// Start recording for a call
+const startRecording = async (req, res) => {
+    try {
+        const { callLogId } = req.body;
+        const userId = req.user.userId;
+
+        // Find the call log
+        const callLog = await CallLog.findById(callLogId);
+        if (!callLog) {
+            return res.status(404).json({ message: 'Call log not found' });
+        }
+
+        // Check if user has access to start recording for this call
+        const isAdmin = req.user.role === 'admin';
+        const isTherapist = req.user.role === 'therapist';
+
+        // Check if user is a participant in the call
+        const isParticipant = callLog.participants.some(p => p.userId.toString() === userId);
+
+        if (!isAdmin && !isTherapist && !isParticipant) {
+            return res.status(403).json({ message: 'Access denied' });
+        }
+
+        // Update recording status
+        callLog.recordingStatus = 'recording';
+        callLog.recordingStartTime = new Date();
+
+        await callLog.save();
+
+        // Populate the updated call log
+        await callLog.populate('participants.userId', 'name email');
+
+        res.json({
+            message: 'Recording started successfully',
+            callLog
+        });
+    } catch (error) {
+        logger.error('Error starting recording:', error);
+        res.status(500).json({ message: 'Failed to start recording' });
+    }
+};
+
+// Stop recording for a call
+const stopRecording = async (req, res) => {
+    try {
+        const { callLogId } = req.body;
+        const userId = req.user.userId;
+
+        // Find the call log
+        const callLog = await CallLog.findById(callLogId);
+        if (!callLog) {
+            return res.status(404).json({ message: 'Call log not found' });
+        }
+
+        // Check if user has access to stop recording for this call
+        const isAdmin = req.user.role === 'admin';
+        const isTherapist = req.user.role === 'therapist';
+
+        // Check if user is a participant in the call
+        const isParticipant = callLog.participants.some(p => p.userId.toString() === userId);
+
+        if (!isAdmin && !isTherapist && !isParticipant) {
+            return res.status(403).json({ message: 'Access denied' });
+        }
+
+        // Update recording status
+        callLog.recordingStatus = 'completed';
+        callLog.recordingEndTime = new Date();
+
+        // Calculate duration
+        if (callLog.recordingStartTime) {
+            callLog.recordingDuration = (callLog.recordingEndTime - callLog.recordingStartTime) / 1000; // in seconds
+        }
+
+        await callLog.save();
+
+        // Populate the updated call log
+        await callLog.populate('participants.userId', 'name email');
+
+        res.json({
+            message: 'Recording stopped successfully',
+            callLog
+        });
+    } catch (error) {
+        logger.error('Error stopping recording:', error);
+        res.status(500).json({ message: 'Failed to stop recording' });
+    }
+};
+
+// Upload recorded video
+const uploadRecording = async (req, res) => {
+    try {
+        const { callLogId } = req.body;
+
+        if (!req.file) {
+            return res.status(400).json({ message: 'Recording file is required' });
+        }
+
+        const userId = req.user.userId;
+
+        // Find the call log
+        const callLog = await CallLog.findById(callLogId);
+        if (!callLog) {
+            return res.status(404).json({ message: 'Call log not found' });
+        }
+
+        // Check if user has access to upload recording for this call
+        const isAdmin = req.user.role === 'admin';
+        const isTherapist = req.user.role === 'therapist';
+
+        // Check if user is a participant in the call
+        const isParticipant = callLog.participants.some(p => p.userId.toString() === userId);
+
+        if (!isAdmin && !isTherapist && !isParticipant) {
+            return res.status(403).json({ message: 'Access denied' });
+        }
+
+        // Create uploads directory if it doesn't exist
+        const uploadDir = require('path').join(__dirname, '..', '..', 'uploads', 'recordings');
+        if (!require('fs').existsSync(uploadDir)) {
+            require('fs').mkdirSync(uploadDir, { recursive: true });
+        }
+
+        // Generate unique filename
+        const fileName = `recording_${callLogId}_${Date.now()}_${require('uuid').v4()}.webm`;
+        const filePath = require('path').join(uploadDir, fileName);
+
+        // Move uploaded file to our destination
+        const tempPath = req.file.path;
+        require('fs').renameSync(tempPath, filePath);
+
+        // Update call log with recording info
+        callLog.recordingUrl = `/uploads/recordings/${fileName}`;
+        callLog.recordingStatus = 'completed';
+        callLog.recordingEndTime = new Date();
+
+        // Calculate duration if not already calculated
+        if (callLog.recordingStartTime && !callLog.recordingDuration) {
+            callLog.recordingDuration = (callLog.recordingEndTime - callLog.recordingStartTime) / 1000; // in seconds
+        }
+
+        // Get file size
+        const stats = require('fs').statSync(filePath);
+        callLog.recordingSize = stats.size;
+        callLog.recordingFormat = require('path').extname(fileName).substring(1);
+
+        await callLog.save();
+
+        // Populate the updated call log
+        await callLog.populate('participants.userId', 'name email');
+
+        res.json({
+            message: 'Recording uploaded successfully',
+            callLog
+        });
+    } catch (error) {
+        logger.error('Error uploading recording:', error);
+        res.status(500).json({ message: 'Failed to upload recording' });
+    }
+};
+
+// Get recordings for a user
+const getUserRecordings = async (req, res) => {
+    try {
+        const { page = 1, limit = 10 } = req.query;
+        const userId = req.user.userId;
+        const skip = (page - 1) * limit;
+
+        // Find call logs where user is a participant and has a recording
+        const callLogs = await CallLog.find({
+            'participants.userId': userId,
+            recordingUrl: { $exists: true, $ne: null },
+            recordingStatus: 'completed'
+        })
+            .populate('sessionId', 'date time')
+            .populate('groupSessionId', 'title')
+            .populate('participants.userId', 'name email')
+            .sort({ callStartedAt: -1 })
+            .skip(skip)
+            .limit(parseInt(limit));
+
+        const total = await CallLog.countDocuments({
+            'participants.userId': userId,
+            recordingUrl: { $exists: true, $ne: null },
+            recordingStatus: 'completed'
+        });
+
+        res.json({
+            recordings: callLogs,
+            pagination: {
+                page: parseInt(page),
+                limit: parseInt(limit),
+                total,
+                pages: Math.ceil(total / limit)
+            }
+        });
+    } catch (error) {
+        logger.error('Error getting user recordings:', error);
+        res.status(500).json({ message: 'Failed to get recordings' });
+    }
+};
+
+// Get all recordings (admin only)
+const getAllRecordings = async (req, res) => {
+    try {
+        const { page = 1, limit = 10 } = req.query;
+        const skip = (page - 1) * limit;
+
+        // Only admin can access all recordings
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ message: 'Access denied. Admin only.' });
+        }
+
+        const recordings = await CallLog.find({
+            recordingUrl: { $exists: true, $ne: null }
+        })
+            .populate('sessionId', 'date time')
+            .populate('groupSessionId', 'title')
+            .populate('participants.userId', 'name email')
+            .sort({ callStartedAt: -1 })
+            .skip(skip)
+            .limit(parseInt(limit));
+
+        const total = await CallLog.countDocuments({
+            recordingUrl: { $exists: true, $ne: null }
+        });
+
+        res.json({
+            recordings,
+            pagination: {
+                page: parseInt(page),
+                limit: parseInt(limit),
+                total,
+                pages: Math.ceil(total / limit)
+            }
+        });
+    } catch (error) {
+        logger.error('Error getting all recordings:', error);
+        res.status(500).json({ message: 'Failed to get recordings' });
+    }
+};
+
+// Get recording by ID
+const getRecordingById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.userId;
+
+        const callLog = await CallLog.findById(id)
+            .populate('sessionId', 'date time')
+            .populate('groupSessionId', 'title')
+            .populate('participants.userId', 'name email');
+
+        if (!callLog) {
+            return res.status(404).json({ message: 'Recording not found' });
+        }
+
+        // Check if user has access to this recording
+        const isAdmin = req.user.role === 'admin';
+        const isTherapist = req.user.role === 'therapist';
+        const isParticipant = callLog.participants.some(p => p.userId.toString() === userId);
+
+        if (!isAdmin && !isTherapist && !isParticipant) {
+            return res.status(403).json({ message: 'Access denied' });
+        }
+
+        // Verify recording exists
+        if (!callLog.recordingUrl) {
+            return res.status(404).json({ message: 'Recording not found' });
+        }
+
+        res.json({ callLog });
+    } catch (error) {
+        logger.error('Error getting recording:', error);
+        res.status(500).json({ message: 'Failed to get recording' });
+    }
+};
+
 module.exports = {
     generateCallToken,
     verifyCallToken,
@@ -597,6 +877,12 @@ module.exports = {
     getActiveCalls,
     forceEndCall,
     muteParticipant,
-    getSessionParticipants
+    getSessionParticipants,
+    startRecording,
+    stopRecording,
+    uploadRecording,
+    getUserRecordings,
+    getAllRecordings,
+    getRecordingById
 };
 
