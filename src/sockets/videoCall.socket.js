@@ -320,6 +320,11 @@ const setupVideoCallHandlers = (io, socket) => {
                 offer,
                 senderId
             });
+            // Also emit to specific WebRTC event
+            socket.to(roomId).emit('webrtc-offer-received', {
+                offer,
+                senderId
+            });
         } catch (error) {
             logger.error('Error handling offer:', error);
             socket.emit('error', { message: 'Failed to send offer' });
@@ -333,6 +338,11 @@ const setupVideoCallHandlers = (io, socket) => {
             
             // Send answer to the specific target participant
             socket.to(targetId).emit('answer', {
+                answer,
+                senderId
+            });
+            // Also emit to specific WebRTC event
+            socket.to(targetId).emit('webrtc-answer-received', {
                 answer,
                 senderId
             });
@@ -353,9 +363,19 @@ const setupVideoCallHandlers = (io, socket) => {
                     candidate,
                     senderId
                 });
+                // Also emit to specific WebRTC event
+                socket.to(targetId).emit('webrtc-ice-candidate-received', {
+                    candidate,
+                    senderId
+                });
             } else {
                 // Broadcast to all other participants in the room
                 socket.to(roomId).emit('ice-candidate', {
+                    candidate,
+                    senderId
+                });
+                // Also emit to specific WebRTC event
+                socket.to(roomId).emit('webrtc-ice-candidate-received', {
                     candidate,
                     senderId
                 });
