@@ -19,6 +19,27 @@ const convertToAbsoluteUrls = (service) => {
     return service;
 };
 
+// Helper function to check if a service has expired based on validity period
+const isServiceExpired = (booking, service) => {
+    if (!service) return false;
+    
+    // Use the new method from the service model if available
+    if (service.checkExpirationStatus) {
+        const status = service.checkExpirationStatus(booking.createdAt);
+        return status.isExpired;
+    }
+    
+    // Fallback to manual calculation
+    if (!service.validity || service.validity === 0) return false;
+    
+    const purchaseDate = new Date(booking.createdAt);
+    const expiryDate = new Date(purchaseDate);
+    expiryDate.setDate(purchaseDate.getDate() + service.validity); // Add validity days
+    
+    const now = new Date();
+    return now > expiryDate;
+};
+
 // Helper function to safely parse JSON
 const safeJsonParse = (str, defaultValue = []) => {
     if (!str) return defaultValue;
@@ -39,9 +60,49 @@ const safeJsonParse = (str, defaultValue = []) => {
 // Get all services
 const getAllServices = async (req, res, next) => {
     try {
-        const services = await Service.find({ status: 'active' });
-        // Convert relative paths to absolute URLs
-        const servicesWithAbsoluteUrls = services.map(service => convertToAbsoluteUrls(service.toObject()));
+        const services = await Service.find({ status: 'active' })
+            .sort({ createdAt: -1 }); // Sort by createdAt descending
+        
+        // Convert relative paths to absolute URLs and add expiration info if user is authenticated
+        let servicesWithAbsoluteUrls = services.map(service => convertToAbsoluteUrls(service.toObject()));
+        
+        // If user is authenticated, add expiration information for their purchased services
+        if (req.user && req.user.userId) {
+            const Booking = require('../models/Booking.model');
+            
+            // Get user's paid bookings
+            const userBookings = await Booking.find({
+                userId: req.user.userId,
+                paymentStatus: 'paid'
+            }).populate('serviceId');
+            
+            // Create a map of serviceId to booking for quick lookup
+            const serviceBookingMap = {};
+            userBookings.forEach(booking => {
+                if (booking.serviceId) {
+                    serviceBookingMap[booking.serviceId._id.toString()] = booking;
+                }
+            });
+            
+            // Add expiration information to services
+            servicesWithAbsoluteUrls = servicesWithAbsoluteUrls.map(service => {
+                const userBooking = serviceBookingMap[service._id.toString()];
+                if (userBooking) {
+                    const isExpired = isServiceExpired(userBooking, service);
+                    const purchaseDate = userBooking.purchaseDate || userBooking.createdAt;
+                    return {
+                        ...service,
+                        isExpired: isExpired,
+                        expiryDate: service.validity ? 
+                            new Date(new Date(purchaseDate).setDate(new Date(purchaseDate).getDate() + service.validity)) : 
+                            null,
+                        purchaseDate: purchaseDate
+                    };
+                }
+                return service;
+            });
+        }
+        
         res.status(200).json(ApiResponse.success({ services: servicesWithAbsoluteUrls }, 'Services retrieved successfully'));
     } catch (error) {
         next(error);
@@ -67,9 +128,10 @@ const getServiceById = async (req, res, next) => {
 // Get all services (admin only)
 const getAllServicesAdmin = async (req, res, next) => {
     try {
-        const services = await Service.find();
+        const services = await Service.find()
+            .sort({ createdAt: -1 }); // Sort by createdAt descending
         
-        // Add purchase count for each service
+        // Add purchase count and expiration stats for each service
         const Booking = require('../models/Booking.model');
         const servicesWithPurchaseCount = await Promise.all(services.map(async (service) => {
             // Count paid bookings for this service
@@ -78,12 +140,27 @@ const getAllServicesAdmin = async (req, res, next) => {
                 paymentStatus: 'paid'
             });
             
+            // Count expired services
+            const allBookings = await Booking.find({
+                serviceId: service._id,
+                paymentStatus: 'paid'
+            });
+            
+            let expiredCount = 0;
+            allBookings.forEach(booking => {
+                if (isServiceExpired(booking, service)) {
+                    expiredCount++;
+                }
+            });
+            
             // Convert relative paths to absolute URLs
             const serviceWithAbsoluteUrls = convertToAbsoluteUrls(service.toObject());
             
             return {
                 ...serviceWithAbsoluteUrls,
-                purchaseCount
+                purchaseCount,
+                expiredCount,
+                activeCount: purchaseCount - expiredCount
             };
         }));
         

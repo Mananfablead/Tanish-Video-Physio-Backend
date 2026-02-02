@@ -120,6 +120,32 @@ const deleteSubscriptionPlan = async (req, res, next) => {
     }
 };
 
+// Helper function to check if a subscription has expired
+const isSubscriptionExpired = (subscription) => {
+    // Use the new method from the subscription model if available
+    if (subscription.checkExpirationStatus) {
+        const status = subscription.checkExpirationStatus();
+        return status.isExpired;
+    }
+    
+    // Fallback to manual calculation
+    if (!subscription.endDate) return false;
+    const now = new Date();
+    return new Date(subscription.endDate) < now;
+};
+
+// Helper function to check if a service has expired based on validity period
+const isServiceExpired = (booking, service) => {
+    if (!service || !service.validity || service.validity === 0) return false;
+    
+    const purchaseDate = new Date(booking.purchaseDate || booking.createdAt);
+    const expiryDate = new Date(purchaseDate);
+    expiryDate.setDate(purchaseDate.getDate() + service.validity); // Add validity days
+    
+    const now = new Date();
+    return now > expiryDate;
+};
+
 // Get subscriptions for authenticated user
 const getUserSubscriptions = async (req, res, next) => {
     try {
@@ -213,12 +239,18 @@ const getUserSubscriptions = async (req, res, next) => {
                 paymentStatus: 'paid'
             }).populate('serviceId');
             
-            // Process each booking to get session information
+            // Process each booking to get session information and expiration status
             const purchasedServicesWithSessionInfo = await Promise.all(userBookings.map(async (booking) => {
+                const isExpired = isServiceExpired(booking, booking.serviceId);
+                
                 if (!booking.serviceId || !booking.serviceId.sessions || booking.serviceId.sessions === 0) {
                     // Service has unlimited sessions
                     return {
                         ...booking.toObject(),
+                        isExpired: isExpired,
+                        expiryDate: booking.serviceId && booking.serviceId.validity ? 
+                            new Date(new Date(booking.purchaseDate || booking.createdAt).setDate(new Date(booking.purchaseDate || booking.createdAt).getDate() + booking.serviceId.validity)) : 
+                            null,
                         serviceSessionInfo: {
                             total: 'unlimited',
                             used: 0, // Would need to count actual sessions separately
@@ -238,6 +270,10 @@ const getUserSubscriptions = async (req, res, next) => {
                 
                 return {
                     ...booking.toObject(),
+                    isExpired: isExpired,
+                    expiryDate: booking.serviceId && booking.serviceId.validity ? 
+                        new Date(new Date(booking.createdAt).setDate(new Date(booking.createdAt).getDate() + booking.serviceId.validity)) : 
+                        null,
                     serviceSessionInfo: {
                         total: booking.serviceId.sessions,
                         used: usedSessions,
@@ -266,11 +302,16 @@ const getAllSubscriptions = async (req, res, next) => {
             .populate('userId', 'name email')
             .populate('planId')
             .sort({ createdAt: -1 });
-
-        // Enrich each subscription with session information
+        
+        // Enrich each subscription with session information and expiration status
         const enrichedSubscriptions = await Promise.all(subscriptions.map(async (subscription) => {
             // Convert to plain object to modify
             const subscriptionObj = subscription.toObject();
+            
+            // Check if subscription has expired
+            const isExpired = isSubscriptionExpired(subscription);
+            subscriptionObj.isExpired = isExpired;
+            subscriptionObj.status = isExpired ? 'expired' : subscription.status;
 
             // Handle both ObjectId and string planId
             let plan = null;
@@ -354,12 +395,18 @@ const getAllSubscriptions = async (req, res, next) => {
                 paymentStatus: 'paid'
             }).populate('serviceId');
             
-            // Process each booking to get session information
+            // Process each booking to get session information and expiration status
             const purchasedServicesWithSessionInfo = await Promise.all(userBookings.map(async (booking) => {
+                const isExpired = isServiceExpired(booking, booking.serviceId);
+                
                 if (!booking.serviceId || !booking.serviceId.sessions || booking.serviceId.sessions === 0) {
                     // Service has unlimited sessions
                     return {
                         ...booking.toObject(),
+                        isExpired: isExpired,
+                        expiryDate: booking.serviceId && booking.serviceId.validity ? 
+                            new Date(new Date(booking.purchaseDate || booking.createdAt).setDate(new Date(booking.purchaseDate || booking.createdAt).getDate() + booking.serviceId.validity)) : 
+                            null,
                         serviceSessionInfo: {
                             total: 'unlimited',
                             used: 0, // Would need to count actual sessions separately
@@ -379,6 +426,10 @@ const getAllSubscriptions = async (req, res, next) => {
                 
                 return {
                     ...booking.toObject(),
+                    isExpired: isExpired,
+                    expiryDate: booking.serviceId && booking.serviceId.validity ? 
+                        new Date(new Date(booking.createdAt).setDate(new Date(booking.createdAt).getDate() + booking.serviceId.validity)) : 
+                        null,
                     serviceSessionInfo: {
                         total: booking.serviceId.sessions,
                         used: usedSessions,
@@ -400,6 +451,63 @@ const getAllSubscriptions = async (req, res, next) => {
     }
 };
 
+// Get expired subscriptions for admin
+const getExpiredSubscriptions = async (req, res, next) => {
+    try {
+        const now = new Date();
+        const expiredSubscriptions = await Subscription.find({
+            endDate: { $lt: now },
+            status: 'active'
+        })
+        .populate('userId', 'name email')
+        .populate('planId')
+        .sort({ endDate: 1 }); // Sort by expiry date
+        
+        res.status(200).json(ApiResponse.success({ 
+            subscriptions: expiredSubscriptions,
+            count: expiredSubscriptions.length 
+        }, 'Expired subscriptions retrieved successfully'));
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Get expired services for admin
+const getExpiredServices = async (req, res, next) => {
+    try {
+        const Booking = require('../models/Booking.model');
+        const Service = require('../models/Service.model');
+        
+        // Get all paid bookings
+        const paidBookings = await Booking.find({ paymentStatus: 'paid' })
+            .populate('serviceId')
+            .populate('userId', 'name email');
+        
+        // Filter expired services
+        const expiredServices = paidBookings.filter(booking => 
+            booking.serviceId && isServiceExpired(booking, booking.serviceId)
+        );
+        
+        // Add expiration details
+        const expiredServicesWithDetails = expiredServices.map(booking => ({
+            ...booking.toObject(),
+            expiryDate: booking.serviceId.validity ? 
+                new Date(new Date(booking.purchaseDate || booking.createdAt).setDate(new Date(booking.purchaseDate || booking.createdAt).getDate() + booking.serviceId.validity)) : 
+                null,
+            daysSinceExpiry: booking.serviceId.validity ? 
+                Math.floor((new Date() - new Date(new Date(booking.purchaseDate || booking.createdAt).setDate(new Date(booking.purchaseDate || booking.createdAt).getDate() + booking.serviceId.validity))) / (1000 * 60 * 60 * 24)) : 
+                0
+        }));
+        
+        res.status(200).json(ApiResponse.success({ 
+            services: expiredServicesWithDetails,
+            count: expiredServicesWithDetails.length 
+        }, 'Expired services retrieved successfully'));
+    } catch (error) {
+        next(error);
+    }
+};
+
 module.exports = {
     getSubscriptionPlans,
     createSubscriptionPlan,
@@ -408,5 +516,7 @@ module.exports = {
     updateSubscriptionPlan,
     deleteSubscriptionPlan,
     getUserSubscriptions,
-    getAllSubscriptions
+    getAllSubscriptions,
+    getExpiredSubscriptions,
+    getExpiredServices
 };

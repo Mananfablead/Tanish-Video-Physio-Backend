@@ -179,20 +179,45 @@ const getProfile = async (req, res, next) => {
                 booking.status === 'confirmed' &&
                 booking.paymentStatus === 'paid'
             )
-            .map(booking => ({
-                id: booking.serviceId._id,
-                name: booking.serviceId.name,
-                description: booking.serviceId.description,
-                category: booking.serviceId.category,
-                price: booking.serviceId.price,
-                duration: booking.serviceId.duration,
-                bookingId: booking._id,
-                bookingDate: booking.date,
-                bookingTime: booking.time,
-                bookingStatus: booking.status,
-                paymentStatus: booking.paymentStatus,
-                amountPaid: booking.amount
-            }));
+            .map(booking => {
+                // Calculate expiration status based on service validity
+                const service = booking.serviceId;
+                let isExpired = false;
+                let expiryDate = null;
+                
+                if (service.validity && service.validity > 0) {
+                    const purchaseDate = booking.purchaseDate || booking.createdAt;
+                    const calculatedExpiryDate = new Date(purchaseDate);
+                    calculatedExpiryDate.setDate(calculatedExpiryDate.getDate() + service.validity);
+                    
+                    expiryDate = calculatedExpiryDate;
+                    isExpired = new Date() > calculatedExpiryDate;
+                }
+                
+                return {
+                    id: service._id,
+                    name: service.name,
+                    description: service.description,
+                    category: service.category,
+                    price: service.price,
+                    duration: service.duration,
+                    validity: service.validity,
+                    bookingId: booking._id,
+                    bookingDate: booking.date,
+                    bookingTime: booking.time,
+                    bookingStatus: booking.status,
+                    paymentStatus: booking.paymentStatus,
+                    amountPaid: booking.amount,
+                    purchaseDate: booking.purchaseDate || booking.createdAt,
+                    expiryDate,
+                    isExpired,
+                    serviceSessionInfo: {
+                        total: service.sessions,
+                        used: 0, // This would need to be calculated based on actual usage
+                        remaining: service.sessions
+                    }
+                };
+            });
 
         // Add subscription data and purchased services to the response
         const responseData = {

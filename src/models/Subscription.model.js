@@ -71,4 +71,53 @@ const subscriptionSchema = new mongoose.Schema({
     timestamps: true
 });
 
+// Add virtual field to calculate if subscription is expired
+subscriptionSchema.virtual('isExpired').get(function() {
+    if (!this.endDate) return false;
+    
+    const now = new Date();
+    return new Date(this.endDate) < now;
+});
+
+// Add method to check expiration status
+subscriptionSchema.methods.checkExpirationStatus = function() {
+    if (!this.endDate) {
+        return {
+            isExpired: false,
+            expiryDate: null,
+            status: 'active',
+            daysRemaining: Infinity
+        };
+    }
+    
+    const expiryDate = new Date(this.endDate);
+    const now = new Date();
+    const isExpired = now > expiryDate;
+    
+    // Calculate days remaining (negative if expired)
+    const timeDiff = expiryDate.getTime() - now.getTime();
+    const daysRemaining = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
+    
+    let status;
+    if (isExpired) {
+        status = 'expired';
+    } else if (daysRemaining <= 7) {
+        status = 'expiring_soon';
+    } else {
+        status = 'active';
+    }
+    
+    return {
+        isExpired,
+        expiryDate,
+        status,
+        daysRemaining
+    };
+};
+
+// Ensure virtual fields are serialized
+subscriptionSchema.set('toJSON', {
+    virtuals: true
+});
+
 module.exports = mongoose.model('Subscription', subscriptionSchema);
