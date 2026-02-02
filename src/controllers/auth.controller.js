@@ -106,6 +106,7 @@ const login = async (req, res, next) => {
                         email: user.email,
                         name: user.name,
                         role: user.role,
+                        phone: user.phone,
                     },
                 },
                 "Login successful"
