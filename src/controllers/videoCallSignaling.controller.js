@@ -44,6 +44,7 @@ const generateCallToken = async (req, res) => {
 
         logger.info(`Authorization check - isTherapist: ${isTherapist}, isAdmin: ${isAdmin}, isUser: ${isUser}, requesterId: ${requesterId}`);
 
+        // Allow admins to join any session for monitoring purposes
         if (!isTherapist && !isAdmin && !isUser) {
             logger.warn(`Unauthorized access attempt - requesterId: ${requesterId}, sessionId: ${sessionId}`);
             return res.status(403).json({

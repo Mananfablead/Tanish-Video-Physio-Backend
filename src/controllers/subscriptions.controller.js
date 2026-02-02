@@ -49,8 +49,21 @@ const createSubscriptionPlan = async (req, res, next) => {
 const getAllSubscriptionPlans = async (req, res, next) => {
     try {
         const plans = await SubscriptionPlan.find().sort({ createdAt: -1 });
+        
+        // Add subscriber count for each plan
+        const plansWithSubscriberCount = await Promise.all(plans.map(async (plan) => {
+            const subscriberCount = await Subscription.countDocuments({
+                planId: plan.planId,
+                status: { $in: ['active', 'expired'] }
+            });
+            
+            return {
+                ...plan.toObject(),
+                subscriberCount
+            };
+        }));
 
-        res.status(200).json(ApiResponse.success({ plans }, 'All subscription plans retrieved successfully'));
+        res.status(200).json(ApiResponse.success({ plans: plansWithSubscriberCount }, 'All subscription plans with subscriber counts retrieved successfully'));
     } catch (error) {
         next(error);
     }
