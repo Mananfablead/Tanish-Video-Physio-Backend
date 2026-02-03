@@ -246,9 +246,11 @@ const getAdminDashboard = async (req, res, next) => {
         const totalRevenue = payments.reduce((sum, payment) => sum + payment.amount, 0);
 
         // Get upcoming sessions
+        const nowForCount = new Date();
+        const twentyFourHoursLaterForCount = new Date(nowForCount.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
         const upcomingSessions = await Session.countDocuments({ 
-            status: { $in: ['scheduled', 'pending'] },
-            startTime: { $gte: new Date() }
+            status: { $in: ['scheduled', 'live'] },
+            startTime: { $gte: nowForCount, $lte: twentyFourHoursLaterForCount }
         });
 
         // Get completed sessions today
@@ -475,10 +477,13 @@ const getAdminDashboard = async (req, res, next) => {
     const upcomingSessionsData = [];
     
     // Get upcoming and live sessions
+    const now = new Date();
+    const twentyFourHoursLater = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
+    
     const dashboardUpcomingSessions = await Session.find({
         $or: [
-            { status: 'scheduled', startTime: { $gte: new Date() } },
-            { status: 'live' }
+            { status: 'scheduled', startTime: { $gte: now, $lte: twentyFourHoursLater } }, // Sessions within 24 hours
+            { status: 'live' } // All live sessions
         ]
     })
     .populate('userId', 'name')
