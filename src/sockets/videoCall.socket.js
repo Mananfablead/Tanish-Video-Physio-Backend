@@ -4,6 +4,44 @@ const GroupSession = require('../models/GroupSession.model');
 const CallLog = require('../models/CallLog.model');
 const logger = require('../utils/logger');
 
+// Room-based participant registry
+// Map<roomId, Map<socketId, Participant>>
+const roomParticipants = new Map();
+
+// Helper function to get room participants
+const getRoomParticipants = (roomId) => {
+    if (!roomParticipants.has(roomId)) {
+        roomParticipants.set(roomId, new Map());
+    }
+    return roomParticipants.get(roomId);
+};
+
+// Helper function to add participant to room
+const addParticipantToRoom = (roomId, socketId, participant) => {
+    const room = getRoomParticipants(roomId);
+    room.set(socketId, participant);
+    logger.info(`Added participant ${socketId} to room ${roomId}`);
+    return participant;
+};
+
+// Helper function to remove participant from room
+const removeParticipantFromRoom = (roomId, socketId) => {
+    const room = getRoomParticipants(roomId);
+    const participant = room.get(socketId);
+    if (participant) {
+        room.delete(socketId);
+        logger.info(`Removed participant ${socketId} from room ${roomId}`);
+        return participant;
+    }
+    return null;
+};
+
+// Helper function to get all participants in room
+const getAllParticipantsInRoom = (roomId) => {
+    const room = getRoomParticipants(roomId);
+    return Array.from(room.values());
+};
+
 // Function to setup video call socket handlers
 const setupVideoCallHandlers = (io, socket) => {
     // Join a video call room (both 1-on-1 and group)
@@ -19,7 +57,7 @@ const setupVideoCallHandlers = (io, socket) => {
             if (sessionId) {
                 // 1-on-1 session
                 roomType = 'session';
-
+                
                 // Verify session exists and user has access
                 const session = await Session.findById(sessionId)
                     .populate('userId')
@@ -43,7 +81,7 @@ const setupVideoCallHandlers = (io, socket) => {
 
                 roomInfo = session;
 
-                // Check session status first
+                // Check session status
                 if (session.status !== 'scheduled' && session.status !== 'live' && session.status !== 'pending') {
                     socket.emit('error', { message: 'Session is not active at this time' });
                     return;
@@ -51,11 +89,9 @@ const setupVideoCallHandlers = (io, socket) => {
 
                 // Check if call has started within the valid time frame
                 const now = new Date();
-                // Use the startTime field which is already in the correct timezone
                 const sessionTime = new Date(session.startTime);
 
                 // Allow joining 24 hours before and 60 minutes after session start time
-                // Development mode: Extended window for testing
                 if (now < new Date(sessionTime.getTime() - 24 * 60 * 60000) || now > new Date(sessionTime.getTime() + 60 * 60000)) {
                     socket.emit('error', { message: 'Session is not active at this time' });
                     return;
@@ -102,10 +138,8 @@ const setupVideoCallHandlers = (io, socket) => {
 
                 // Check if call has started within the valid time frame
                 const now = new Date();
-                // Use the startTime field which is already in the correct timezone
                 const sessionTime = new Date(groupSession.startTime);
 
-                // Allow joining 24 hours before and 60 minutes after session start time
                 if (now < new Date(sessionTime.getTime() - 24 * 60 * 60000) || now > new Date(sessionTime.getTime() + 60 * 60000)) {
                     socket.emit('error', { message: 'Group session is not active at this time' });
                     return;
@@ -122,17 +156,39 @@ const setupVideoCallHandlers = (io, socket) => {
             socket.join(roomId);
             logger.info(`User ${userId} joined ${roomType} room ${roomId}`);
 
-            // Notify others in the room
-            socket.to(roomId).emit('participant-joined', {
-                userId: userId,
+            // Create standardized participant object
+            const participant = {
                 socketId: socket.id,
-                roomId: roomId,
-                roomType: roomType,
+                userId: userId,
+                name: socket.user.name && socket.user.name !== 'Clinician' && socket.user.name !== 'User Unknown' 
+                    ? socket.user.name 
+                    : (socket.user.firstName && socket.user.lastName ? 
+                        `${socket.user.firstName} ${socket.user.lastName}` : null) ||
+                    socket.user.displayName || socket.user.email || `User ${userId.substring(0, 5)}`,
+                role: socket.user.role,
+                email: socket.user.email,
                 isTherapist: isTherapist || (roomInfo.therapistId && roomInfo.therapistId._id.toString() === userId),
-                isUser: isUser || isParticipant
+                isUser: isUser || isParticipant,
+                joinedAt: new Date().toISOString()
+            };
+
+            // Add participant to room registry
+            addParticipantToRoom(roomId, socket.id, participant);
+
+            // Get all current participants in the room
+            const currentParticipants = getAllParticipantsInRoom(roomId);
+
+            // Send full participant list to joining client
+            socket.emit('room-participants', {
+                participants: currentParticipants,
+                roomId: roomId,
+                roomType: roomType
             });
 
-            // Update call log if call is active - execute as promise to avoid blocking
+            // Notify others in the room about new participant
+            socket.to(roomId).emit('participant-joined', participant);
+
+            // Update call log if call is active
             (async () => {
                 try {
                     const activeCallLog = await CallLog.findOne({
@@ -180,13 +236,20 @@ const setupVideoCallHandlers = (io, socket) => {
             socket.leave(roomId);
             logger.info(`User ${userId} left ${roomType} room ${roomId}`);
 
-            socket.to(roomId).emit('participant-left', {
-                userId: userId,
-                roomId: roomId,
-                roomType: roomType
-            });
+            // Remove participant from room registry
+            const removedParticipant = removeParticipantFromRoom(roomId, socket.id);
+            
+            // Notify others in the room
+            if (removedParticipant) {
+                socket.to(roomId).emit('participant-left', {
+                    socketId: socket.id,
+                    userId: userId,
+                    roomId: roomId,
+                    roomType: roomType
+                });
+            }
 
-            // Update call log if call is active - execute as promise to avoid blocking
+            // Update call log if call is active
             (async () => {
                 try {
                     const activeCallLog = await CallLog.findOne({
@@ -319,7 +382,7 @@ const setupVideoCallHandlers = (io, socket) => {
     // Handle WebRTC signaling - offer
     socket.on('offer', (data) => {
         try {
-            const { roomId, offer, senderId, targetSocketId } = data;
+            const { roomId, offer, senderId } = data;
             
             // Broadcast offer to other participants in the room
             socket.to(roomId).emit('offer', {
@@ -340,10 +403,10 @@ const setupVideoCallHandlers = (io, socket) => {
     // Handle WebRTC signaling - answer
     socket.on('answer', (data) => {
         try {
-            const { roomId, answer, senderId, targetSocketId } = data;
+            const { roomId, answer, senderId, targetId } = data;
             
             // Send answer to the specific target participant
-            socket.to(targetSocketId).emit('answer', {
+            socket.to(targetId).emit('answer', {
                 answer,
                 senderId
             });
@@ -361,11 +424,11 @@ const setupVideoCallHandlers = (io, socket) => {
     // Handle ICE candidates
     socket.on('ice-candidate', (data) => {
         try {
-            const { roomId, candidate, senderId, targetSocketId } = data;
+            const { roomId, candidate, senderId, targetId } = data;
             
             // Forward ICE candidate to target participant
-            if (targetSocketId) {
-                socket.to(targetSocketId).emit('ice-candidate', {
+            if (targetId) {
+                socket.to(targetId).emit('ice-candidate', {
                     candidate,
                     senderId
                 });
@@ -529,23 +592,13 @@ const setupVideoCallHandlers = (io, socket) => {
                     }
                 }
 
-                // Stop recording if it was active
-                if (callLog.recordingStatus === 'recording') {
-                    callLog.recordingStatus = 'completed';
-                    callLog.recordingEndTime = new Date();
-                    if (callLog.recordingStartTime) {
-                        callLog.recordingDuration = (callLog.recordingEndTime - callLog.recordingStartTime) / 1000;
-                    }
-                }
-
                 await callLog.save();
             }
 
             io.to(roomId).emit('call-ended', {
                 endedBy: userId,
                 message: 'Call ended by therapist',
-                initiatorRole: socket.user.role, // Send the role of who initiated the termination
-                recordingStopped: true
+                initiatorRole: socket.user.role // Send the role of who initiated the termination
             });
         } catch (error) {
             logger.error('Error ending call:', error);
@@ -557,7 +610,7 @@ const setupVideoCallHandlers = (io, socket) => {
     socket.on('disconnect', () => {
         logger.info(`Socket ${socket.id} disconnected from video call`);
         
-        // Update call log if call is active - execute as promise to avoid blocking
+        // Remove participant from all rooms they were in
         (async () => {
             try {
                 // Find all rooms the user was in
@@ -565,16 +618,26 @@ const setupVideoCallHandlers = (io, socket) => {
                     if (room.has(socket.id)) {
                         const userId = socket.user?.userId;
                         if (userId) {
-                            // Determine if it's a session or group room by checking room type
-                            // For simplicity, we'll check both possibilities
-                            let roomType = null;
+                            // Remove from room registry
+                            const removedParticipant = removeParticipantFromRoom(roomId, socket.id);
+                            
+                            // Notify others in the room
+                            if (removedParticipant) {
+                                socket.to(roomId).emit('participant-left', {
+                                    socketId: socket.id,
+                                    userId: userId,
+                                    roomId: roomId
+                                });
+                            }
 
-                            // Check if this room corresponds to a session
+                            // Update call log if call is active
+                            let roomType = null;
+                            
+                            // Determine room type
                             const session = await Session.findById(roomId);
                             if (session) {
                                 roomType = 'session';
                             } else {
-                                // Check if this room corresponds to a group session
                                 const groupSession = await GroupSession.findById(roomId);
                                 if (groupSession) {
                                     roomType = 'group';
@@ -582,7 +645,6 @@ const setupVideoCallHandlers = (io, socket) => {
                             }
 
                             if (roomType) {
-                                // Update call log if call is active
                                 const activeCallLog = await CallLog.findOne({
                                     [roomType === 'group' ? 'groupSessionId' : 'sessionId']: roomId,
                                     status: 'active'
@@ -600,13 +662,6 @@ const setupVideoCallHandlers = (io, socket) => {
                                         await activeCallLog.save();
                                     }
                                 }
-
-                                // Notify others in the room
-                                socket.to(roomId).emit('participant-left', {
-                                    userId: userId,
-                                    roomId: roomId,
-                                    roomType: roomType
-                                });
                             }
                         }
                     }

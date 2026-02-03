@@ -206,6 +206,7 @@ const startServer = async () => {
                 // Verify JWT token
                 const jwt = require('jsonwebtoken');
                 const config = require('./config/env');
+                const User = require('./models/User.model');
                 
                 const decoded = jwt.verify(token, config.JWT_SECRET);
                 
@@ -221,11 +222,39 @@ const startServer = async () => {
                     return next(new Error('Authentication error: Invalid token payload'));
                 }
                 
+                // Get full user information
+                const user = await User.findById(decoded.userId);
+                if (!user) {
+                    console.error('❌ Socket authentication error: User not found');
+                    return next(new Error('Authentication error: User not found'));
+                }
+                
                 // Attach user info to socket
+                const constructedName = user.name || (user.firstName && user.lastName ? 
+                    `${user.firstName} ${user.lastName}` : null) || 
+                    user.displayName || user.email || `User ${decoded.userId.substring(0, 5)}`;
+                
+                console.log('SOCKET AUTH: User data:', {
+                    userId: decoded.userId,
+                    dbUser: {
+                        name: user.name,
+                        firstName: user.firstName,
+                        lastName: user.lastName,
+                        displayName: user.displayName,
+                        email: user.email
+                    },
+                    constructedName: constructedName
+                });
+                
                 socket.user = {
                     userId: decoded.userId.toString(), // Ensure string format
                     role: decoded.role,
-                    sessionId: decoded.sessionId
+                    sessionId: decoded.sessionId,
+                    name: constructedName,
+                    firstName: user.firstName,
+                    lastName: user.lastName,
+                    displayName: user.displayName,
+                    email: user.email
                 };
                 
                 console.log(`✅ Socket ${socket.id} authenticated:`, {
@@ -244,6 +273,7 @@ const startServer = async () => {
         // Socket connection handler
         io.on('connection', (socket) => {
             console.log('New client connected:', socket.id);
+            console.log('Socket user info:', socket.user);
             
             // Load chat and video call handlers
             const setupChatHandlers = require('./sockets/chat.socket');

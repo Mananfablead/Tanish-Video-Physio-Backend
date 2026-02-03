@@ -56,7 +56,68 @@ const setupChatHandlers = (io, socket) => {
         });
     });
 
-    // Send a message
+    // Send a message (real-time)
+    socket.on('send-message', async (data) => {
+        try {
+            const { roomId, roomType, message } = data;
+            
+            // Determine session ID based on room type
+            const sessionId = roomType === 'group' ? roomId.replace('group-', '') : roomId;
+
+            // Verify session exists and user has access
+            const session = await Session.findById(sessionId);
+            if (!session) {
+                socket.emit('error', { message: 'Session not found' });
+                return;
+            }
+
+            // Determine sender type
+            let senderType = 'user';
+            if (socket.user.role === 'therapist' || socket.user.role === 'admin') {
+                senderType = 'therapist';
+            }
+
+            // Create new message
+            const chatMessage = new ChatMessage({
+                sessionId,
+                senderId: socket.user.userId,
+                senderType: senderType,
+                message: message.content || message.message || message.text || message
+            });
+
+            await chatMessage.save();
+            await chatMessage.populate('senderId', 'name');
+
+            // Prepare message data for broadcast
+            const messageData = {
+                content: chatMessage.message,
+                senderId: socket.user.userId,
+                senderName: chatMessage.senderId.name || 'User',
+                timestamp: chatMessage.createdAt,
+                message: chatMessage // Include full message object for compatibility
+            };
+
+            // Broadcast message to room (real-time)
+            io.to(roomId).emit('message-received', {
+                ...messageData,
+                senderId: socket.user.userId,
+                senderName: chatMessage.senderId.name || 'User'
+            });
+
+            // Also emit the old event for backward compatibility
+            io.to(roomId).emit('new-message', {
+                message: chatMessage
+            });
+
+            logger.info(`Message sent by ${socket.user.userId} in room ${roomId}`);
+
+        } catch (error) {
+            logger.error('Error sending message:', error);
+            socket.emit('error', { message: 'Failed to send message' });
+        }
+    });
+
+    // Legacy new-message handler (for backward compatibility)
     socket.on('new-message', async (data) => {
         try {
             const { sessionId, message } = data;
