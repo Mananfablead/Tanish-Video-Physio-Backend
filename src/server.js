@@ -93,13 +93,12 @@ app.use(express.urlencoded({ extended: true }));
 // // Serve static files
 // Serve static files from uploads directory
 const PUBLIC_UPLOADS_DIR = path.join(__dirname, '..', 'public', 'uploads');
-const RECORDINGS_UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
 
 if (!fs.existsSync(PUBLIC_UPLOADS_DIR)) {
     fs.mkdirSync(PUBLIC_UPLOADS_DIR, { recursive: true });
 }
 
-// Serve static files from both public uploads and recordings directory
+// Serve static files from public uploads directory
 app.use(
     '/uploads',
     express.static(PUBLIC_UPLOADS_DIR, {
@@ -109,27 +108,15 @@ app.use(
     })
 );
 
-// Create recordings directory if it doesn't exist
-if (!fs.existsSync(RECORDINGS_UPLOADS_DIR)) {
-    fs.mkdirSync(RECORDINGS_UPLOADS_DIR, { recursive: true });
-}
+// Create recording directories if they don't exist
+const RECORDING_VIDEOS_DIR = path.join(PUBLIC_UPLOADS_DIR, 'recording-videos');
 
-// Serve recordings from the recordings directory
-const RECORDINGS_DIR = path.join(RECORDINGS_UPLOADS_DIR, 'recordings');
-if (!fs.existsSync(RECORDINGS_DIR)) {
-    fs.mkdirSync(RECORDINGS_DIR, { recursive: true });
+if (!fs.existsSync(RECORDING_VIDEOS_DIR)) {
+    fs.mkdirSync(RECORDING_VIDEOS_DIR, { recursive: true });
 }
-
-app.use(
-    '/uploads/recordings',
-    express.static(RECORDINGS_DIR, {
-        setHeaders: (res) => {
-            res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-        },
-    })
-);
 
 console.log('📂 Serving uploads from:', PUBLIC_UPLOADS_DIR);
+console.log('📂 Serving recording videos from:', RECORDING_VIDEOS_DIR);
 
 // const UPLOADS_DIR = path.resolve('/home/u378554361/domains/apitanishvideo.fableadtech.in/uploads');
 

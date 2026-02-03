@@ -10,8 +10,13 @@ const { v4: uuidv4 } = require('uuid');
 // Create a new call log
 const createCallLog = async (req, res) => {
     try {
+        console.log('📥 createCallLog called with body:', req.body);
+        console.log('📥 User from request:', req.user);
+
         const { sessionId, groupSessionId, type, participants } = req.body;
-        const userId = req.user.userId;
+        const userId = req.user?.userId;
+
+        console.log('📥 Extracted userId:', userId);
 
         // Validate input
         if (!sessionId && !groupSessionId) {
@@ -20,6 +25,12 @@ const createCallLog = async (req, res) => {
 
         if (!type) {
             return res.status(400).json({ message: 'Call type is required' });
+        }
+
+        // Validate user
+        if (!userId) {
+            console.error('❌ No userId found in request');
+            return res.status(400).json({ message: 'User authentication required' });
         }
 
         // Verify session exists and user has access

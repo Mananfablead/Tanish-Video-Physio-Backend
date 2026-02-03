@@ -1,6 +1,7 @@
 const razorpay = require('../config/razorpay');
 const Booking = require('../models/Booking.model');
 const Payment = require('../models/Payment.model');
+const Service = require('../models/Service.model');
 const Subscription = require('../models/Subscription.model');
 const SubscriptionPlan = require('../models/SubscriptionPlan.model');
 const User = require('../models/User.model');
@@ -212,11 +213,26 @@ const verifyPayment = async (req, res, next) => {
                 }
             );
 
-            // Update the booking status as well
-            await Booking.findByIdAndUpdate(
-                payment.bookingId,
-                { paymentStatus: 'paid' }
-            );
+            // Update booking payment status and calculate service expiry
+            const booking = await Booking.findById(payment.bookingId);
+            if (booking) {
+                // Set payment status to paid
+                booking.paymentStatus = 'paid';
+                
+                // Calculate service expiry based on the service's validity
+                const service = await Service.findById(booking.serviceId);
+                if (service && service.validity > 0) {
+                    // Calculate expiry date based on service validity
+                    const purchaseDate = booking.purchaseDate || booking.createdAt;
+                    const expiryDate = new Date(purchaseDate);
+                    expiryDate.setDate(purchaseDate.getDate() + service.validity);
+                    
+                    booking.serviceExpiryDate = expiryDate;
+                    booking.serviceValidityDays = service.validity;
+                }
+                
+                await booking.save();
+            }
 
             res.status(200).json(
                 ApiResponse.success({
@@ -317,11 +333,27 @@ const verifyGuestPayment = async (req, res, next) => {
             );
 
             // Update the booking status as well
-            await Booking.findByIdAndUpdate(
-                payment.bookingId,
-                { paymentStatus: 'paid' }
-            );
-
+            // Update booking payment status and calculate service expiry
+            const booking = await Booking.findById(payment.bookingId);
+            if (booking) {
+                // Set payment status to paid
+                booking.paymentStatus = 'paid';
+                                
+                // Calculate service expiry based on the service's validity
+                const service = await Service.findById(booking.serviceId);
+                if (service && service.validity > 0) {
+                    // Calculate expiry date based on service validity
+                    const purchaseDate = booking.purchaseDate || booking.createdAt;
+                    const expiryDate = new Date(purchaseDate);
+                    expiryDate.setDate(purchaseDate.getDate() + service.validity);
+                                    
+                    booking.serviceExpiryDate = expiryDate;
+                    booking.serviceValidityDays = service.validity;
+                }
+                                
+                await booking.save();
+            }
+            
             // If this was a guest booking, send login credentials to the user's email
             // Since we know the temporary password, we pass it instead of the hashed one
             if (payment.guestEmail && tempPassword) {
@@ -520,10 +552,26 @@ const handleWebhook = async (req, res) => {
                     }
                 }
 
-                await Booking.findByIdAndUpdate(
-                    payment.bookingId,
-                    { paymentStatus: 'paid' }
-                );
+                // Update booking payment status and calculate service expiry
+                const booking = await Booking.findById(payment.bookingId);
+                if (booking) {
+                    // Set payment status to paid
+                    booking.paymentStatus = 'paid';
+                    
+                    // Calculate service expiry based on the service's validity
+                    const service = await Service.findById(booking.serviceId);
+                    if (service && service.validity > 0) {
+                        // Calculate expiry date based on service validity
+                        const purchaseDate = booking.purchaseDate || booking.createdAt;
+                        const expiryDate = new Date(purchaseDate);
+                        expiryDate.setDate(purchaseDate.getDate() + service.validity);
+                        
+                        booking.serviceExpiryDate = expiryDate;
+                        booking.serviceValidityDays = service.validity;
+                    }
+                    
+                    await booking.save();
+                }
 
                 // If this was a guest booking, send login credentials to the user's email
                 // Since we know the temporary password, we pass it instead of the hashed one

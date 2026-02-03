@@ -7,7 +7,8 @@ const ApiResponse = require('../utils/apiResponse');
 const getAllBookings = async (req, res, next) => {
     try {
         const bookings = await Booking.find({ userId: req.user.userId })
-            .populate('serviceId', 'name price duration')
+            .sort({ createdAt: -1 }) // Sort by createdAt descending
+            .populate('serviceId', 'name price duration validity')
             .populate('therapistId', 'name email role');
 
         res.status(200).json(ApiResponse.success({ bookings }, 'Bookings retrieved successfully'));
@@ -30,7 +31,7 @@ const getBookingById = async (req, res, next) => {
         }
         
         const booking = await Booking.findOne(query)
-            .populate('serviceId', 'name price duration')
+            .populate('serviceId', 'name price duration validity')
             .populate('therapistId', 'name email role');
 
         if (!booking) {
@@ -53,7 +54,7 @@ const getBookingDetails = async (req, res, next) => {
         
         // Find the booking by ID
         const booking = await Booking.findById(bookingId)
-            .populate('serviceId', 'name price duration description')
+            .populate('serviceId', 'name price duration description validity')
             .populate('therapistId', 'name email role profilePicture');
             
         if (!booking) {
@@ -108,9 +109,7 @@ const createBooking = async (req, res, next) => {
             return res.status(404).json(ApiResponse.error('No active therapists available'));
         }
 
-  
-
-const booking = new Booking({
+        const booking = new Booking({
             serviceId,
             serviceName: service.name, // Get from service model
             therapistId: therapist._id,
@@ -118,15 +117,15 @@ const booking = new Booking({
             userId: req.user.userId, // Assign current user from auth middleware
             clientName: clientName || req.user.name, // Use provided clientName or fall back to authenticated user's name
             date,
-            createdAt: new Date(),
             notes,
-            amount: service.price 
+            amount: service.price,
+            purchaseDate: new Date() // Set purchase date when booking is created
         });
 
         await booking.save();
 
         // Populate the response
-        await booking.populate('serviceId', 'name price duration');
+        await booking.populate('serviceId', 'name price duration validity');
         await booking.populate('therapistId', 'name email role');
 
         res.status(201).json(ApiResponse.success({ booking }, 'Booking created successfully'));
@@ -166,7 +165,7 @@ const updateBooking = async (req, res, next) => {
             updateData,
             { new: true, runValidators: true }
         )
-            .populate('serviceId', 'name price duration')
+            .populate('serviceId', 'name price duration validity')
             .populate('therapistId', 'name email role');
 
         if (!booking) {
@@ -205,7 +204,7 @@ const updateBookingStatus = async (req, res, next) => {
             { status },
             { new: true, runValidators: true }
         )
-            .populate('serviceId', 'name price duration')
+            .populate('serviceId', 'name price duration validity')
             .populate('therapistId', 'name email role');
 
         if (!booking) {
@@ -236,7 +235,7 @@ const deleteBooking = async (req, res, next) => {
             { status: 'cancelled' },
             { new: true }
         )
-            .populate('serviceId', 'name price duration')
+            .populate('serviceId', 'name price duration validity')
             .populate('therapistId', 'name email role');
 
         if (!booking) {
@@ -342,7 +341,8 @@ const getAllBookingsForAdmin = async (req, res, next) => {
         }
 
         const bookings = await Booking.find()
-            .populate('serviceId', 'name price duration')
+            .sort({ createdAt: -1 }) // Sort by createdAt descending
+            .populate('serviceId', 'name price duration validity')
             .populate('therapistId', 'name email role')
             .populate('userId', 'name email phone');
 
@@ -368,7 +368,8 @@ const getBookingsByStatus = async (req, res, next) => {
         }
         
         const bookings = await Booking.find(query)
-            .populate('serviceId', 'name price duration')
+            .sort({ createdAt: -1 }) // Sort by createdAt descending
+            .populate('serviceId', 'name price duration validity')
             .populate('therapistId', 'name email role');
 
         res.status(200).json(ApiResponse.success({ bookings }, `Bookings with status '${status}' retrieved successfully`));
@@ -457,13 +458,14 @@ const createGuestBooking = async (req, res, next) => {
             time,
             notes,
             amount: service.price, // Get from service model
-            paymentStatus: 'pending' // Initially pending until payment is made
+            paymentStatus: 'pending', // Initially pending until payment is made
+            purchaseDate: new Date() // Set purchase date when booking is created
         });
 
         await booking.save();
 
         // Populate the response
-        await booking.populate('serviceId', 'name price duration');
+        await booking.populate('serviceId', 'name price duration validity');
         await booking.populate('therapistId', 'name email role');
 
         res.status(201).json(ApiResponse.success({
@@ -474,6 +476,29 @@ const createGuestBooking = async (req, res, next) => {
         next(error);
     }
 };
+
+// Helper function to calculate service expiry when booking is paid
+async function calculateServiceExpiryForBooking(bookingId) {
+    const Booking = require('../models/Booking.model');
+    const Service = require('../models/Service.model');
+    
+    const booking = await Booking.findById(bookingId);
+    if (booking && booking.paymentStatus === 'paid') {
+        // Calculate service expiry based on the service's validity
+        const service = await Service.findById(booking.serviceId);
+        if (service && service.validity > 0) {
+            // Calculate expiry date based on service validity
+            const purchaseDate = booking.purchaseDate || booking.createdAt;
+            const expiryDate = new Date(purchaseDate);
+            expiryDate.setDate(purchaseDate.getDate() + service.validity);
+            
+            booking.serviceExpiryDate = expiryDate;
+            booking.serviceValidityDays = service.validity;
+            
+            await booking.save();
+        }
+    }
+}
 
 // Helper function to send welcome email with credentials
 async function sendWelcomeEmail(email, name, username, password) {

@@ -60,9 +60,57 @@ const bookingSchema = new mongoose.Schema({
         type: Number,
         required: [true, 'Amount is required'],
         min: 0
+    },
+    purchaseDate: {
+        type: Date,
+        default: Date.now
+    },
+    serviceExpiryDate: {
+        type: Date
+    },
+    serviceValidityDays: {
+        type: Number
     }
 }, {
     timestamps: true
+});
+
+// Virtual field to check if service has expired
+bookingSchema.virtual('isServiceExpired').get(function() {
+    if (!this.serviceExpiryDate) return false;
+    
+    const now = new Date();
+    return now > this.serviceExpiryDate;
+});
+
+// Method to calculate service expiration
+bookingSchema.methods.calculateServiceExpiry = function(validityDays = null) {
+    // If validity is not provided, try to use the service's validity if populated
+    if (validityDays === null && this.serviceId && typeof this.serviceId === 'object' && this.serviceId.validity) {
+        validityDays = this.serviceId.validity;
+    }
+    
+    // If validity is still null or 0, return null (no expiration)
+    if (!validityDays || validityDays === 0) {
+        this.serviceExpiryDate = null;
+        this.serviceValidityDays = null;
+        return null;
+    }
+    
+    // Calculate expiry date based on purchase date
+    const purchaseDate = this.purchaseDate || this.createdAt;
+    const expiryDate = new Date(purchaseDate);
+    expiryDate.setDate(purchaseDate.getDate() + validityDays);
+    
+    this.serviceExpiryDate = expiryDate;
+    this.serviceValidityDays = validityDays;
+    
+    return expiryDate;
+};
+
+// Ensure virtual fields are serialized
+bookingSchema.set('toJSON', {
+    virtuals: true
 });
 
 module.exports = mongoose.model('Booking', bookingSchema);
