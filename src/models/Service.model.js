@@ -68,4 +68,50 @@ const serviceSchema = new mongoose.Schema({
     timestamps: true
 });
 
+
+
+// Add method to check expiration status
+serviceSchema.methods.checkExpirationStatus = function(purchaseDate = null) {
+    if (!this.validity || this.validity === 0) {
+        return {
+            isExpired: false,
+            expiryDate: null,
+            status: 'unlimited',
+            daysRemaining: Infinity
+        };
+    }
+    
+    const actualPurchaseDate = purchaseDate || this.purchaseDate || this.createdAt;
+    const expiryDate = new Date(actualPurchaseDate);
+    expiryDate.setDate(actualPurchaseDate.getDate() + this.validity);
+    
+    const now = new Date();
+    const isExpired = now > expiryDate;
+    
+    // Calculate days remaining (negative if expired)
+    const timeDiff = expiryDate.getTime() - now.getTime();
+    const daysRemaining = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
+    
+    let status;
+    if (isExpired) {
+        status = 'expired';
+    } else if (daysRemaining <= 7) {
+        status = 'expiring_soon';
+    } else {
+        status = 'active';
+    }
+    
+    return {
+        isExpired,
+        expiryDate,
+        status,
+        daysRemaining
+    };
+};
+
+// Ensure virtual fields are serialized
+serviceSchema.set('toJSON', {
+    virtuals: true
+});
+
 module.exports = mongoose.model('Service', serviceSchema);

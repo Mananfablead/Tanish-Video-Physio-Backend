@@ -397,6 +397,13 @@ const createSession = async (req, res, next) => {
           .json(ApiResponse.error("Booking payment not completed"));
       }
 
+      // 🔥 CHECK SERVICE EXPIRATION - NEW VALIDATION
+      if (booking.isServiceExpired) {
+        return res
+          .status(400)
+          .json(ApiResponse.error("Cannot create session: Service purchase has expired"));
+      }
+
       therapistId = booking.therapistId;
 
       // 🔥 ONE SESSION PER DAY LIMIT
@@ -445,6 +452,11 @@ const createSession = async (req, res, next) => {
       }
 
       if (subscription.endDate && subscription.endDate < new Date()) {
+        return res.status(400).json(ApiResponse.error("Subscription expired"));
+      }
+
+      // 🔥 CHECK SUBSCRIPTION EXPIRATION STATUS - NEW VALIDATION
+      if (subscription.isExpired) {
         return res.status(400).json(ApiResponse.error("Subscription expired"));
       }
 
@@ -1007,6 +1019,17 @@ const createAdminSession = async (req, res, next) => {
           );
       }
 
+      // 🔥 CHECK SERVICE EXPIRATION - NEW VALIDATION
+      if (booking.isServiceExpired) {
+        return res
+          .status(400)
+          .json(
+            ApiResponse.error(
+              "Cannot create session: Service purchase has expired"
+            )
+          );
+      }
+
       // 🔥 ONE SESSION PER DAY LIMIT (for admin too)
       const existingSession = await Session.findOne({
         userId: userId,
@@ -1061,6 +1084,15 @@ const createAdminSession = async (req, res, next) => {
       // Check subscription validity dates
       const now = new Date();
       if (subscription.endDate && subscription.endDate < now) {
+        return res
+          .status(400)
+          .json(
+            ApiResponse.error("Cannot create session: Subscription has expired")
+          );
+      }
+
+      // 🔥 CHECK SUBSCRIPTION EXPIRATION STATUS - NEW VALIDATION
+      if (subscription.isExpired) {
         return res
           .status(400)
           .json(
