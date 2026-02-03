@@ -108,16 +108,6 @@ app.use(
     })
 );
 
-// Create recording directories if they don't exist
-const RECORDING_VIDEOS_DIR = path.join(PUBLIC_UPLOADS_DIR, 'recording-videos');
-
-if (!fs.existsSync(RECORDING_VIDEOS_DIR)) {
-    fs.mkdirSync(RECORDING_VIDEOS_DIR, { recursive: true });
-}
-
-console.log('📂 Serving uploads from:', PUBLIC_UPLOADS_DIR);
-console.log('📂 Serving recording videos from:', RECORDING_VIDEOS_DIR);
-
 // const UPLOADS_DIR = path.resolve('/home/u378554361/domains/apitanishvideo.fableadtech.in/uploads');
 
 // if (!fs.existsSync(UPLOADS_DIR)) {
