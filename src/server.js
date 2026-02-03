@@ -92,39 +92,38 @@ app.use(express.urlencoded({ extended: true }));
 
 // // Serve static files
 // Serve static files from uploads directory
-const PUBLIC_UPLOADS_DIR = path.join(__dirname, '..', 'public', 'uploads');
+// const PUBLIC_UPLOADS_DIR = path.join(__dirname, '..', 'public', 'uploads');
 
-if (!fs.existsSync(PUBLIC_UPLOADS_DIR)) {
-    fs.mkdirSync(PUBLIC_UPLOADS_DIR, { recursive: true });
-}
-
-// Serve static files from public uploads directory
-app.use(
-    '/uploads',
-    express.static(PUBLIC_UPLOADS_DIR, {
-        setHeaders: (res) => {
-            res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-        },
-    })
-);
-
-// const UPLOADS_DIR = path.resolve('/home/u378554361/domains/apitanishvideo.fableadtech.in/uploads');
-
-// if (!fs.existsSync(UPLOADS_DIR)) {
-//     fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+// if (!fs.existsSync(PUBLIC_UPLOADS_DIR)) {
+//     fs.mkdirSync(PUBLIC_UPLOADS_DIR, { recursive: true });
 // }
 
+// // Serve static files from public uploads directory
 // app.use(
 //     '/uploads',
-//     express.static(UPLOADS_DIR, {
-//     express.static(UPLOADS_DIR, {
+//     express.static(PUBLIC_UPLOADS_DIR, {
 //         setHeaders: (res) => {
 //             res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
 //         },
 //     })
 // );
 
-// console.log('📂 Serving uploads from:', UPLOADS_DIR);
+const UPLOADS_DIR = path.resolve('/home/u378554361/domains/apitanishvideo.fableadtech.in/uploads');
+
+if (!fs.existsSync(UPLOADS_DIR)) {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
+app.use(
+    '/uploads',
+    express.static(UPLOADS_DIR, {
+        setHeaders: (res) => {
+            res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+        },
+    })
+);
+
+console.log('📂 Serving uploads from:', UPLOADS_DIR);
 
 // Routes
 app.use('/api', routes);
