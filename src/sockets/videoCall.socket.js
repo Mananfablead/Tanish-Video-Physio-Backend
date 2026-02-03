@@ -319,7 +319,7 @@ const setupVideoCallHandlers = (io, socket) => {
     // Handle WebRTC signaling - offer
     socket.on('offer', (data) => {
         try {
-            const { roomId, offer, senderId, targetSocketId } = data;
+            const { roomId, offer, senderId } = data;
             
             // Broadcast offer to other participants in the room
             socket.to(roomId).emit('offer', {
@@ -340,10 +340,10 @@ const setupVideoCallHandlers = (io, socket) => {
     // Handle WebRTC signaling - answer
     socket.on('answer', (data) => {
         try {
-            const { roomId, answer, senderId, targetSocketId } = data;
+            const { roomId, answer, senderId, targetId } = data;
             
             // Send answer to the specific target participant
-            socket.to(targetSocketId).emit('answer', {
+            socket.to(targetId).emit('answer', {
                 answer,
                 senderId
             });
@@ -361,11 +361,11 @@ const setupVideoCallHandlers = (io, socket) => {
     // Handle ICE candidates
     socket.on('ice-candidate', (data) => {
         try {
-            const { roomId, candidate, senderId, targetSocketId } = data;
+            const { roomId, candidate, senderId, targetId } = data;
             
             // Forward ICE candidate to target participant
-            if (targetSocketId) {
-                socket.to(targetSocketId).emit('ice-candidate', {
+            if (targetId) {
+                socket.to(targetId).emit('ice-candidate', {
                     candidate,
                     senderId
                 });
@@ -529,23 +529,13 @@ const setupVideoCallHandlers = (io, socket) => {
                     }
                 }
 
-                // Stop recording if it was active
-                if (callLog.recordingStatus === 'recording') {
-                    callLog.recordingStatus = 'completed';
-                    callLog.recordingEndTime = new Date();
-                    if (callLog.recordingStartTime) {
-                        callLog.recordingDuration = (callLog.recordingEndTime - callLog.recordingStartTime) / 1000;
-                    }
-                }
-
                 await callLog.save();
             }
 
             io.to(roomId).emit('call-ended', {
                 endedBy: userId,
                 message: 'Call ended by therapist',
-                initiatorRole: socket.user.role, // Send the role of who initiated the termination
-                recordingStopped: true
+                initiatorRole: socket.user.role // Send the role of who initiated the termination
             });
         } catch (error) {
             logger.error('Error ending call:', error);

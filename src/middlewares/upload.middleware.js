@@ -2,47 +2,43 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Configure storage for recordings
-const recordingStorage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        // Create directory if it doesn't exist
-        const dir = path.join(__dirname, '..', '..', 'uploads', 'recordings');
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
-        }
-        cb(null, dir);
-    },
-    filename: function (req, file, cb) {
-        // Generate unique filename
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, 'recording-' + uniqueSuffix + path.extname(file.originalname));
-    }
-});
-
-// File filter to only allow video files
+// File filter to only allow image files (for general uploads)
 const fileFilter = (req, file, cb) => {
-    // Accept video files
-    if (file.mimetype.startsWith('video/') ||
-        file.originalname.endsWith('.webm') ||
-        file.originalname.endsWith('.mp4') ||
-        file.originalname.endsWith('.mov') ||
-        file.originalname.endsWith('.avi')) {
+    // Accept image files
+    if (file.mimetype.startsWith('image/') ||
+        file.originalname.endsWith('.jpg') ||
+        file.originalname.endsWith('.jpeg') ||
+        file.originalname.endsWith('.png') ||
+        file.originalname.endsWith('.gif') ||
+        file.originalname.endsWith('.bmp')) {
         cb(null, true);
     } else {
-        cb(new Error('Only video files are allowed!'), false);
+        cb(new Error('Only image files are allowed!'), false);
     }
 };
 
-// Create upload instances
-const upload = multer({ 
-    storage: recordingStorage,
+// Create upload instance for general purposes
+const upload = multer({
+    storage: multer.diskStorage({
+        destination: function (req, file, cb) {
+            const dir = path.join(__dirname, '..', 'public', 'uploads', 'general');
+            if (!fs.existsSync(dir)) {
+                fs.mkdirSync(dir, { recursive: true });
+            }
+            cb(null, dir);
+        },
+        filename: function (req, file, cb) {
+            const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+            cb(null, 'upload-' + uniqueSuffix + path.extname(file.originalname));
+        }
+    }),
     fileFilter: fileFilter,
     limits: {
-        fileSize: 50 * 1024 * 1024 // 50MB limit
+        fileSize: 10 * 1024 * 1024 // 10MB limit
     }
 });
 
 module.exports = {
-    uploadRecording: upload.single('recording'),
-    recordingsUpload: upload.single('recording')
+    upload: upload.single('file'),
+    uploadMultiple: upload.array('files', 5) // Up to 5 files
 };

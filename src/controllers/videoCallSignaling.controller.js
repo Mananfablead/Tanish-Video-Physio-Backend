@@ -686,12 +686,23 @@ const uploadRecording = async (req, res) => {
             return res.status(400).json({ message: 'Recording file is required' });
         }
 
+        // Validate callLogId
+        if (!callLogId || callLogId === 'null' || callLogId === 'undefined') {
+            return res.status(400).json({
+                message: 'Valid callLogId is required',
+                error: 'callLogId is missing or invalid'
+            });
+        }
+
         const userId = req.user.userId;
 
         // Find the call log
         const callLog = await CallLog.findById(callLogId);
         if (!callLog) {
-            return res.status(404).json({ message: 'Call log not found' });
+            return res.status(404).json({
+                message: 'Call log not found',
+                error: `No call log found with ID: ${callLogId}`
+            });
         }
 
         // Check if user has access to upload recording for this call
@@ -745,7 +756,10 @@ const uploadRecording = async (req, res) => {
         });
     } catch (error) {
         logger.error('Error uploading recording:', error);
-        res.status(500).json({ message: 'Failed to upload recording' });
+        res.status(500).json({
+            message: 'Failed to upload recording',
+            error: error.message
+        });
     }
 };
 
@@ -866,6 +880,156 @@ const getRecordingById = async (req, res) => {
     }
 };
 
+// Create a new call log
+const createCallLog = async (req, res) => {
+    try {
+        console.log('📥 createCallLog called with body:', req.body);
+        console.log('📥 User from request:', req.user);
+
+        const { sessionId, groupSessionId, type, participants } = req.body;
+        const userId = req.user?.userId;
+
+        console.log('📥 Extracted userId:', userId);
+
+        // Validate input
+        if (!sessionId && !groupSessionId) {
+            return res.status(400).json({ message: 'Either sessionId or groupSessionId is required' });
+        }
+
+        if (!type) {
+            return res.status(400).json({ message: 'Call type is required' });
+        }
+
+        // Validate user
+        if (!userId) {
+            console.error('❌ No userId found in request');
+            return res.status(400).json({ message: 'User authentication required' });
+        }
+
+        // Verify session exists and user has access
+        if (sessionId) {
+            const session = await Session.findById(sessionId);
+            if (!session) {
+                return res.status(404).json({ message: 'Session not found' });
+            }
+        } else if (groupSessionId) {
+            const groupSession = await GroupSession.findById(groupSessionId);
+            if (!groupSession) {
+                return res.status(404).json({ message: 'Group session not found' });
+            }
+        }
+
+        // Create call log
+        const callLog = new CallLog({
+            sessionId: sessionId || undefined,
+            groupSessionId: groupSessionId || undefined,
+            type,
+            callStartedAt: new Date(),
+            status: 'active',
+            participants: participants || []
+        });
+
+        await callLog.save();
+        await callLog.populate('participants.userId', 'name email');
+
+        logger.info(`Call log created by user ${userId} for session ${sessionId || groupSessionId}`);
+        res.status(201).json({ callLog });
+    } catch (error) {
+        logger.error('Error creating call log:', error);
+        res.status(500).json({ message: 'Failed to create call log' });
+    }
+};
+
+// Get call log by ID
+const getCallLogById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.userId;
+
+        const callLog = await CallLog.findById(id)
+            .populate('sessionId', 'date time')
+            .populate('groupSessionId', 'title')
+            .populate('participants.userId', 'name email');
+
+        if (!callLog) {
+            return res.status(404).json({ message: 'Call log not found' });
+        }
+
+        // Check if user has access to this call log
+        const isAdmin = req.user.role === 'admin';
+        const isParticipant = callLog.participants.some(p => p.userId.toString() === userId);
+
+        if (!isAdmin && !isParticipant) {
+            return res.status(403).json({ message: 'Access denied' });
+        }
+
+        res.json({ callLog });
+    } catch (error) {
+        logger.error('Error getting call log:', error);
+        res.status(500).json({ message: 'Failed to get call log' });
+    }
+};
+
+// Update call log
+const updateCallLog = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status, callEndedAt, duration } = req.body;
+        const userId = req.user.userId;
+
+        const callLog = await CallLog.findById(id);
+        if (!callLog) {
+            return res.status(404).json({ message: 'Call log not found' });
+        }
+
+        // Check if user has access to update this call log
+        const isAdmin = req.user.role === 'admin';
+        const isParticipant = callLog.participants.some(p => p.userId.toString() === userId);
+
+        if (!isAdmin && !isParticipant) {
+            return res.status(403).json({ message: 'Access denied' });
+        }
+
+        // Update fields
+        if (status) callLog.status = status;
+        if (callEndedAt) callLog.callEndedAt = callEndedAt;
+        if (duration) callLog.duration = duration;
+
+        await callLog.save();
+        await callLog.populate('participants.userId', 'name email');
+
+        logger.info(`Call log ${id} updated by user ${userId}`);
+        res.json({ callLog });
+    } catch (error) {
+        logger.error('Error updating call log:', error);
+        res.status(500).json({ message: 'Failed to update call log' });
+    }
+};
+
+// Delete call log (admin only)
+const deleteCallLog = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.userId;
+
+        // Only admin can delete call logs
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ message: 'Access denied. Admin only.' });
+        }
+
+        const callLog = await CallLog.findByIdAndDelete(id);
+        if (!callLog) {
+            return res.status(404).json({ message: 'Call log not found' });
+        }
+
+        logger.info(`Call log ${id} deleted by admin ${userId}`);
+        res.json({ message: 'Call log deleted successfully' });
+    } catch (error) {
+        logger.error('Error deleting call log:', error);
+        res.status(500).json({ message: 'Failed to delete call log' });
+    }
+};
+
 module.exports = {
     generateCallToken,
     verifyCallToken,
@@ -883,6 +1047,10 @@ module.exports = {
     uploadRecording,
     getUserRecordings,
     getAllRecordings,
-    getRecordingById
+    getRecordingById,
+    createCallLog,
+    getCallLogById,
+    updateCallLog,
+    deleteCallLog
 };
 
