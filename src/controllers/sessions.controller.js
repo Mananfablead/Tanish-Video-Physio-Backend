@@ -148,6 +148,7 @@ const getUserSessions = async (req, res, next) => {
       .populate("therapistId", "name email role");
 
     // Update statuses as needed
+    // console.log("Updating session statuses...", sessions);
     const updatedSessions = await updateSessionStatusesIfNeeded(sessions);
 
     res
@@ -160,6 +161,38 @@ const getUserSessions = async (req, res, next) => {
   }
 };
 
+// Helper function to calculate time until session
+const calculateTimeUntilSession = (session) => {
+  if (!session || !session.startTime) {
+    return { minutes: Infinity, hours: Infinity };
+  }
+  
+  const now = new Date();
+  const sessionStartTime = new Date(session.startTime);
+  const diffMs = sessionStartTime.getTime() - now.getTime();
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMinutes / 60);
+  
+  return { minutes: diffMinutes, hours: diffHours };
+};
+
+// Helper function to determine session status based on timing
+const getSessionTimingStatus = (session) => {
+  if (!session || !session.startTime) {
+    return 'normal';
+  }
+  
+  const { minutes, hours } = calculateTimeUntilSession(session);
+  
+  if (minutes <= 10 && minutes > 0) {
+    return 'join_now'; // Within 10 minutes
+  } else if (minutes <= 60 && minutes > 10) {
+    return 'join_soon'; // Within 1 hour
+  } else {
+    return 'normal'; // More than 1 hour away
+  }
+};
+
 // Function to update session status based on time and status
 const updateSessionStatusIfNeeded = async (session) => {
   if (!session || !session.startTime || !session.status) {
@@ -168,10 +201,16 @@ const updateSessionStatusIfNeeded = async (session) => {
 
   const now = new Date();
   const sessionStartTime = new Date(session.startTime);
-  const oneHourAfterStart = new Date(sessionStartTime.getTime() + 60 * 60000); // Add 1 hour
+  const sessionEndTime = session.endTime ? new Date(session.endTime) : null;
 
-  // If session is Live and current time is past 1 hour after start time
-  if (session.status === "live" && now > oneHourAfterStart) {
+  // If session has endTime, use that for completion. Otherwise, use 1 hour after start
+  let completionTime = sessionEndTime;
+  if (!completionTime) {
+    completionTime = new Date(sessionStartTime.getTime() + 60 * 60000); // 1 hour default
+  }
+
+  // If session is Live and current time is past completion time
+  if (session.status === "live" && now > completionTime) {
     await Session.findByIdAndUpdate(session._id, {
       status: "completed",
       completedAt: now
@@ -179,8 +218,8 @@ const updateSessionStatusIfNeeded = async (session) => {
     return { ...session.toObject(), status: "completed", completedAt: now };
   }
   
-  // If session is Scheduled and current time is past 1 hour after start time
-  if (session.status === "scheduled" && now > oneHourAfterStart) {
+  // If session is Scheduled and current time is past completion time
+  if (session.status === "scheduled" && now > completionTime) {
     await Session.findByIdAndUpdate(session._id, {
       status: "missed",
       missedAt: now
@@ -200,10 +239,16 @@ const updateSessionStatusesIfNeeded = async (sessions) => {
 
     const now = new Date();
     const sessionStartTime = new Date(session.startTime);
-    const oneHourAfterStart = new Date(sessionStartTime.getTime() + 60 * 60000); // Add 1 hour
+    const sessionEndTime = session.endTime ? new Date(session.endTime) : null;
 
-    // If session is Live and current time is past 1 hour after start time
-    if (session.status === "live" && now > oneHourAfterStart) {
+    // If session has endTime, use that for completion. Otherwise, use 1 hour after start
+    let completionTime = sessionEndTime;
+    if (!completionTime) {
+      completionTime = new Date(sessionStartTime.getTime() + 60 * 60000); // 1 hour default
+    }
+
+    // If session is Live and current time is past completion time
+    if (session.status === "live" && now > completionTime) {
       await Session.findByIdAndUpdate(session._id, {
         status: "completed",
         completedAt: now
@@ -211,8 +256,8 @@ const updateSessionStatusesIfNeeded = async (sessions) => {
       return { ...session.toObject(), status: "completed", completedAt: now };
     }
     
-    // If session is Scheduled and current time is past 1 hour after start time
-    if (session.status === "scheduled" && now > oneHourAfterStart) {
+    // If session is Scheduled and current time is past completion time
+    if (session.status === "scheduled" && now > completionTime) {
       await Session.findByIdAndUpdate(session._id, {
         status: "missed",
         missedAt: now
@@ -242,6 +287,7 @@ const getAllSessions = async (req, res, next) => {
       .populate("userId", "name email");
 
     // Update statuses as needed
+    // console.log("Updating session statuses...", sessions)
     const updatedSessions = await updateSessionStatusesIfNeeded(sessions);
 
     res
@@ -258,27 +304,35 @@ const getAllSessions = async (req, res, next) => {
 const getUserUpcomingSessions = async (req, res, next) => {
   try {
     const now = new Date();
-    // Show sessions that start within 30 minutes from now
-    const thirtyMinutesFromNow = new Date(now.getTime() + 30 * 60000);
+    const twentyFourHoursLater = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
 
     const sessions = await Session.find({
       userId: req.user.userId,
-      startTime: { $gte: now, $lte: thirtyMinutesFromNow },
+      startTime: { $gte: now, $lte: twentyFourHoursLater },
       status: { $in: ["scheduled", "live"] },
     })
-      .sort({ createdAt: -1 }) // Descending order by creation time
+      .sort({ startTime: 1 }) // Ascending order by start time
       .populate("bookingId", "serviceName therapistName date time")
       .populate("subscriptionId", "planId planName startDate endDate status")
       .populate("therapistId", "name email role");
 
-    // Update statuses as needed
+    // Update statuses as needed and add timing information
     const updatedSessions = await updateSessionStatusesIfNeeded(sessions);
+    
+    // Add timing status to each session
+    const sessionsWithTiming = updatedSessions.map(session => {
+      const timingStatus = getSessionTimingStatus(session);
+      return {
+        ...session.toObject ? session.toObject() : session,
+        timingStatus
+      };
+    });
 
     res
       .status(200)
       .json(
         ApiResponse.success(
-          { sessions: updatedSessions },
+          { sessions: sessionsWithTiming },
           "Upcoming sessions retrieved successfully"
         )
       );
@@ -297,27 +351,35 @@ const getAllUpcomingSessions = async (req, res, next) => {
     }
 
     const now = new Date();
-    // Show sessions that start within 30 minutes from now
-    const thirtyMinutesFromNow = new Date(now.getTime() + 30 * 60000);
+    const twentyFourHoursLater = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
 
     const sessions = await Session.find({
-      startTime: { $gte: now, $lte: thirtyMinutesFromNow },
+      startTime: { $gte: now, $lte: twentyFourHoursLater },
       status: { $in: ["scheduled", "live"] },
     })
-      .sort({ createdAt: -1 }) // Descending order by creation time
+      .sort({ startTime: 1 }) // Ascending order by start time
       .populate("bookingId", "serviceName therapistName date time")
       .populate("subscriptionId", "planId planName startDate endDate status")
       .populate("therapistId", "name email role")
       .populate("userId", "name email");
 
-    // Update statuses as needed
+    // Update statuses as needed and add timing information
     const updatedSessions = await updateSessionStatusesIfNeeded(sessions);
+    
+    // Add timing status to each session
+    const sessionsWithTiming = updatedSessions.map(session => {
+      const timingStatus = getSessionTimingStatus(session);
+      return {
+        ...session.toObject ? session.toObject() : session,
+        timingStatus
+      };
+    });
 
     res
       .status(200)
       .json(
         ApiResponse.success(
-          { sessions: updatedSessions },
+          { sessions: sessionsWithTiming },
           "All upcoming sessions retrieved successfully"
         )
       );

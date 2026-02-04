@@ -199,10 +199,31 @@ const startServer = async () => {
                 }
 
                 // Attach user info to socket
+                const constructedName = user.name || (user.firstName && user.lastName ? 
+                    `${user.firstName} ${user.lastName}` : null) || 
+                    user.displayName || user.email || `User ${decoded.userId.substring(0, 5)}`;
+                
+                console.log('SOCKET AUTH: User data:', {
+                    userId: decoded.userId,
+                    dbUser: {
+                        name: user.name,
+                        firstName: user.firstName,
+                        lastName: user.lastName,
+                        displayName: user.displayName,
+                        email: user.email
+                    },
+                    constructedName: constructedName
+                });
+                
                 socket.user = {
                     userId: decoded.userId.toString(), // Ensure string format
                     role: decoded.role,
-                    sessionId: decoded.sessionId
+                    sessionId: decoded.sessionId,
+                    name: constructedName,
+                    firstName: user.firstName,
+                    lastName: user.lastName,
+                    displayName: user.displayName,
+                    email: user.email
                 };
 
                 console.log(`✅ Socket ${socket.id} authenticated:`, {
