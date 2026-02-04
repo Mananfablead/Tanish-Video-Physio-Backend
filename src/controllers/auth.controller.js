@@ -349,7 +349,8 @@ const getPublicProfile = async (req, res, next) => {
 // Update user profile
 const updateProfile = async (req, res, next) => {
     try {
-        const { name, phone } = req.body;
+       const { name, phone, location } = req.body;
+
 
         // Handle healthProfile - it may come as a JSON string when using form data
         let healthProfile = req.body.healthProfile;
@@ -411,7 +412,12 @@ const updateProfile = async (req, res, next) => {
             );
         }
 
-        const updateData = { name, phone };
+      const updateData = { name, phone };
+
+if (location) {
+  updateData.location = location;
+}
+    
         if (healthProfile && Object.keys(healthProfile).length > 0) {
             updateData.healthProfile = healthProfile;
         }

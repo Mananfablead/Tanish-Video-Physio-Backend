@@ -31,7 +31,8 @@ const subscriptionPlanSchema = new mongoose.Schema({
     },
     sessions: {
         type: Number,
-        default: 0 // 0 means unlimited sessions
+        default: 0,
+        required: [true, 'Number of sessions is required']
     },
     status: {
         type: String,

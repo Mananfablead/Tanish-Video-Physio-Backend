@@ -3,6 +3,7 @@ const Session = require('../models/Session.model');
 const CallLog = require('../models/CallLog.model');
 const User = require('../models/User.model');
 const logger = require('../utils/logger');
+const config = require('../config/env');
 
 // Generate secure JWT for joining call
 const generateCallToken = async (req, res) => {
@@ -227,7 +228,7 @@ const getCallDetails = async (req, res) => {
 
         // Get call logs for this session
         const callLogs = await CallLog.find({ sessionId })
-            .populate('participants.userId', 'name email')
+            .populate('participants.userId', 'name email role phone avatar status')
             .sort({ callStartedAt: -1 })
             .limit(10);
 
@@ -264,7 +265,7 @@ const getCallHistory = async (req, res) => {
             'participants.userId': userId
         })
             .populate('sessionId', 'date time status')
-            .populate('participants.userId', 'name email')
+            .populate('participants.userId', 'name email role phone avatar status')
             .sort({ callStartedAt: -1 })
             .skip(skip)
             .limit(parseInt(limit));
@@ -344,6 +345,11 @@ const reportCallIssue = async (req, res) => {
 // Admin: Get all call logs with filters
 const getCallLogs = async (req, res) => {
     try {
+        console.log('=== GET CALL LOGS REQUEST ===');
+        console.log('User role:', req.user?.role);
+        console.log('User ID:', req.user?.userId);
+        console.log('Query params:', req.query);
+
         const { dateRange, therapistId, userId, page = 1, limit = 10 } = req.query;
         const skip = (page - 1) * limit;
 
@@ -361,12 +367,15 @@ const getCallLogs = async (req, res) => {
 
         const callLogs = await CallLog.find(filter)
             .populate('sessionId', 'date time status')
-            .populate('participants.userId', 'name email')
+            .populate('participants.userId', 'name email role phone avatar status')
             .sort({ callStartedAt: -1 })
             .skip(skip)
             .limit(parseInt(limit));
 
         const total = await CallLog.countDocuments(filter);
+
+        console.log('✅ Found call logs:', callLogs.length);
+        console.log('✅ Total call logs:', total);
 
         res.status(200).json({
             success: true,
@@ -379,7 +388,8 @@ const getCallLogs = async (req, res) => {
             }
         });
     } catch (error) {
-        logger.error('Error getting call logs:', error);
+        console.error('❌ Error getting call logs:', error);
+        console.error('❌ Error stack:', error.stack);
         res.status(500).json({
             success: false,
             message: 'Failed to get call logs'
@@ -426,7 +436,7 @@ const getActiveCalls = async (req, res) => {
     try {
         const activeCalls = await CallLog.find({ status: 'active' })
             .populate('sessionId', 'date time')
-            .populate('participants.userId', 'name email')
+            .populate('participants.userId', 'name email role phone avatar status')
             .sort({ callStartedAt: -1 });
 
         res.status(200).json({
@@ -618,7 +628,7 @@ const startRecording = async (req, res) => {
         await callLog.save();
 
         // Populate the updated call log
-        await callLog.populate('participants.userId', 'name email');
+        await callLog.populate('participants.userId', 'name email role phone avatar status');
 
         res.json({
             message: 'Recording started successfully',
@@ -665,7 +675,7 @@ const stopRecording = async (req, res) => {
         await callLog.save();
 
         // Populate the updated call log
-        await callLog.populate('participants.userId', 'name email');
+        await callLog.populate('participants.userId', 'name email role phone avatar status');
 
         res.json({
             message: 'Recording stopped successfully',
@@ -717,13 +727,14 @@ const uploadRecording = async (req, res) => {
         }
 
         // Create uploads directory if it doesn't exist
-        const uploadDir = require('path').join(__dirname, '..', '..', 'uploads', 'recordings');
+        const uploadDir = require('path').join(__dirname, '..', '..', 'public', 'uploads', 'recording-videos');
         if (!require('fs').existsSync(uploadDir)) {
             require('fs').mkdirSync(uploadDir, { recursive: true });
         }
 
-        // Generate unique filename
-        const fileName = `recording_${callLogId}_${Date.now()}_${require('uuid').v4()}.webm`;
+        // Generate unique filename including callLogId for better organization
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const fileName = `recording-${callLogId}-${uniqueSuffix}.webm`;
         const filePath = require('path').join(uploadDir, fileName);
 
         // Move uploaded file to our destination
@@ -731,7 +742,7 @@ const uploadRecording = async (req, res) => {
         require('fs').renameSync(tempPath, filePath);
 
         // Update call log with recording info
-        callLog.recordingUrl = `/uploads/recordings/${fileName}`;
+        callLog.recordingUrl = `/uploads/recording-videos/${fileName}`;
         callLog.recordingStatus = 'completed';
         callLog.recordingEndTime = new Date();
 
@@ -748,7 +759,7 @@ const uploadRecording = async (req, res) => {
         await callLog.save();
 
         // Populate the updated call log
-        await callLog.populate('participants.userId', 'name email');
+        await callLog.populate('participants.userId', 'name email role phone avatar status');
 
         res.json({
             message: 'Recording uploaded successfully',
@@ -776,9 +787,9 @@ const getUserRecordings = async (req, res) => {
             recordingUrl: { $exists: true, $ne: null },
             recordingStatus: 'completed'
         })
-            .populate('sessionId', 'date time')
+            .populate('sessionId')
             .populate('groupSessionId', 'title')
-            .populate('participants.userId', 'name email')
+            .populate('participants.userId', 'name email role phone avatar status')
             .sort({ callStartedAt: -1 })
             .skip(skip)
             .limit(parseInt(limit));
@@ -789,8 +800,24 @@ const getUserRecordings = async (req, res) => {
             recordingStatus: 'completed'
         });
 
+        // Convert relative URLs to full URLs
+        const recordingsWithFullUrls = callLogs.map(recording => {
+            const recordingObj = recording.toObject();
+            if (recordingObj.recordingUrl && !recordingObj.recordingUrl.startsWith('http')) {
+                const baseUrl = config.BASE_URL || 'http://localhost:5000';
+                recordingObj.recordingUrl = `${baseUrl}${recordingObj.recordingUrl}`;
+            }
+            // Also convert recording images if they exist
+            if (recordingObj.recordingImages && Array.isArray(recordingObj.recordingImages)) {
+                recordingObj.recordingImages = recordingObj.recordingImages.map(img =>
+                    img.startsWith('http') ? img : `${config.BASE_URL || 'http://localhost:5000'}${img}`
+                );
+            }
+            return recordingObj;
+        });
+
         res.json({
-            recordings: callLogs,
+            recordings: recordingsWithFullUrls,
             pagination: {
                 page: parseInt(page),
                 limit: parseInt(limit),
@@ -807,20 +834,26 @@ const getUserRecordings = async (req, res) => {
 // Get all recordings (admin only)
 const getAllRecordings = async (req, res) => {
     try {
+        console.log('=== GET ALL RECORDINGS REQUEST ===');
+        console.log('User role:', req.user?.role);
+        console.log('User ID:', req.user?.userId);
+        console.log('Query params:', req.query);
+
         const { page = 1, limit = 10 } = req.query;
         const skip = (page - 1) * limit;
 
         // Only admin can access all recordings
         if (req.user.role !== 'admin') {
+            console.log('❌ Access denied - user role:', req.user.role);
             return res.status(403).json({ message: 'Access denied. Admin only.' });
         }
 
         const recordings = await CallLog.find({
             recordingUrl: { $exists: true, $ne: null }
         })
-            .populate('sessionId', 'date time')
+            .populate('sessionId')
             .populate('groupSessionId', 'title')
-            .populate('participants.userId', 'name email')
+            .populate('participants.userId', 'name email role phone avatar status')
             .sort({ callStartedAt: -1 })
             .skip(skip)
             .limit(parseInt(limit));
@@ -829,8 +862,27 @@ const getAllRecordings = async (req, res) => {
             recordingUrl: { $exists: true, $ne: null }
         });
 
+        // Convert relative URLs to full URLs
+        const recordingsWithFullUrls = recordings.map(recording => {
+            const recordingObj = recording.toObject();
+            if (recordingObj.recordingUrl && !recordingObj.recordingUrl.startsWith('http')) {
+                const baseUrl = config.BASE_URL || 'http://localhost:5000';
+                recordingObj.recordingUrl = `${baseUrl}${recordingObj.recordingUrl}`;
+            }
+            // Also convert recording images if they exist
+            if (recordingObj.recordingImages && Array.isArray(recordingObj.recordingImages)) {
+                recordingObj.recordingImages = recordingObj.recordingImages.map(img =>
+                    img.startsWith('http') ? img : `${config.BASE_URL || 'http://localhost:5000'}${img}`
+                );
+            }
+            return recordingObj;
+        });
+
+        console.log('✅ Found recordings:', recordings.length);
+        console.log('✅ Total recordings:', total);
+
         res.json({
-            recordings,
+            recordings: recordingsWithFullUrls,
             pagination: {
                 page: parseInt(page),
                 limit: parseInt(limit),
@@ -839,21 +891,23 @@ const getAllRecordings = async (req, res) => {
             }
         });
     } catch (error) {
-        logger.error('Error getting all recordings:', error);
+        console.error('❌ Error getting all recordings:', error);
+        console.error('❌ Error stack:', error.stack);
         res.status(500).json({ message: 'Failed to get recordings' });
     }
 };
 
 // Get recording by ID
-const getRecordingById = async (req, res) => {
+// Get user details for a specific recording
+const getRecordingUsers = async (req, res) => {
     try {
         const { id } = req.params;
         const userId = req.user.userId;
 
         const callLog = await CallLog.findById(id)
-            .populate('sessionId', 'date time')
+            .populate('sessionId')
             .populate('groupSessionId', 'title')
-            .populate('participants.userId', 'name email');
+            .populate('participants.userId', 'name email role phone avatar createdAt status');
 
         if (!callLog) {
             return res.status(404).json({ message: 'Recording not found' });
@@ -873,7 +927,55 @@ const getRecordingById = async (req, res) => {
             return res.status(404).json({ message: 'Recording not found' });
         }
 
-        res.json({ callLog });
+        res.json({ participants: callLog.participants });
+    } catch (error) {
+        logger.error('Error getting recording users:', error);
+        res.status(500).json({ message: 'Failed to get recording users' });
+    }
+};
+
+const getRecordingById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.userId;
+
+        const callLog = await CallLog.findById(id)
+            .populate('sessionId')
+            .populate('groupSessionId', 'title')
+            .populate('participants.userId', 'name email role phone avatar status');
+
+        if (!callLog) {
+            return res.status(404).json({ message: 'Recording not found' });
+        }
+
+        // Check if user has access to this recording
+        const isAdmin = req.user.role === 'admin';
+        const isTherapist = req.user.role === 'therapist';
+        const isParticipant = callLog.participants.some(p => p.userId.toString() === userId);
+
+        if (!isAdmin && !isTherapist && !isParticipant) {
+            return res.status(403).json({ message: 'Access denied' });
+        }
+
+        // Verify recording exists
+        if (!callLog.recordingUrl) {
+            return res.status(404).json({ message: 'Recording not found' });
+        }
+
+        // Convert to full URL
+        const callLogObj = callLog.toObject();
+        if (callLogObj.recordingUrl && !callLogObj.recordingUrl.startsWith('http')) {
+            const baseUrl = config.BASE_URL || 'http://localhost:5000';
+            callLogObj.recordingUrl = `${baseUrl}${callLogObj.recordingUrl}`;
+        }
+        // Also convert recording images if they exist
+        if (callLogObj.recordingImages && Array.isArray(callLogObj.recordingImages)) {
+            callLogObj.recordingImages = callLogObj.recordingImages.map(img =>
+                img.startsWith('http') ? img : `${config.BASE_URL || 'http://localhost:5000'}${img}`
+            );
+        }
+
+        res.json({ callLog: callLogObj });
     } catch (error) {
         logger.error('Error getting recording:', error);
         res.status(500).json({ message: 'Failed to get recording' });
@@ -930,7 +1032,7 @@ const createCallLog = async (req, res) => {
         });
 
         await callLog.save();
-        await callLog.populate('participants.userId', 'name email');
+        await callLog.populate('participants.userId', 'name email role phone avatar status');
 
         logger.info(`Call log created by user ${userId} for session ${sessionId || groupSessionId}`);
         res.status(201).json({ callLog });
@@ -949,7 +1051,7 @@ const getCallLogById = async (req, res) => {
         const callLog = await CallLog.findById(id)
             .populate('sessionId', 'date time')
             .populate('groupSessionId', 'title')
-            .populate('participants.userId', 'name email');
+            .populate('participants.userId', 'name email role phone avatar status');
 
         if (!callLog) {
             return res.status(404).json({ message: 'Call log not found' });
@@ -996,7 +1098,7 @@ const updateCallLog = async (req, res) => {
         if (duration) callLog.duration = duration;
 
         await callLog.save();
-        await callLog.populate('participants.userId', 'name email');
+        await callLog.populate('participants.userId', 'name email role phone avatar status');
 
         logger.info(`Call log ${id} updated by user ${userId}`);
         res.json({ callLog });
@@ -1030,6 +1132,85 @@ const deleteCallLog = async (req, res) => {
     }
 };
 
+const uploadRecordingImage = async (req, res) => {
+    try {
+        const { callLogId } = req.body;
+
+        if (!req.file) {
+            return res.status(400).json({ message: 'Recording image file is required' });
+        }
+
+        // Validate callLogId
+        if (!callLogId || callLogId === 'null' || callLogId === 'undefined') {
+            return res.status(400).json({
+                message: 'Valid callLogId is required',
+                error: 'callLogId is missing or invalid'
+            });
+        }
+
+        const userId = req.user.userId;
+
+        // Find the call log
+        const callLog = await CallLog.findById(callLogId);
+        if (!callLog) {
+            return res.status(404).json({
+                message: 'Call log not found',
+                error: `No call log found with ID: ${callLogId}`
+            });
+        }
+
+        // Check if user has access to upload recording for this call
+        const isAdmin = req.user.role === 'admin';
+        const isTherapist = req.user.role === 'therapist';
+
+        // Check if user is a participant in the call
+        const isParticipant = callLog.participants.some(p => p.userId.toString() === userId);
+
+        if (!isAdmin && !isTherapist && !isParticipant) {
+            return res.status(403).json({ message: 'Access denied' });
+        }
+
+        // Create uploads directory if it doesn't exist
+        const uploadDir = require('path').join(__dirname, '..', '..', 'public', 'uploads', 'recording-images');
+        if (!require('fs').existsSync(uploadDir)) {
+            require('fs').mkdirSync(uploadDir, { recursive: true });
+        }
+
+        // Generate unique filename including callLogId for better organization
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const fileName = `recording-image-${callLogId}-${uniqueSuffix}${require('path').extname(req.file.originalname)}`;
+        const filePath = require('path').join(uploadDir, fileName);
+
+        // Move uploaded file to our destination
+        const tempPath = req.file.path;
+        require('fs').renameSync(tempPath, filePath);
+
+        // Add recording image info to call log
+        if (!callLog.recordingImages) {
+            callLog.recordingImages = [];
+        }
+
+        const imageUrl = `/uploads/recording-images/${fileName}`;
+        callLog.recordingImages.push(imageUrl);
+
+        await callLog.save();
+
+        // Populate the updated call log
+        await callLog.populate('participants.userId', 'name email role phone avatar status');
+
+        res.json({
+            message: 'Recording image uploaded successfully',
+            callLog
+        });
+    } catch (error) {
+        logger.error('Error uploading recording image:', error);
+        res.status(500).json({
+            message: 'Failed to upload recording image',
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
     generateCallToken,
     verifyCallToken,
@@ -1045,9 +1226,11 @@ module.exports = {
     startRecording,
     stopRecording,
     uploadRecording,
+    uploadRecordingImage,
     getUserRecordings,
     getAllRecordings,
     getRecordingById,
+    getRecordingUsers,
     createCallLog,
     getCallLogById,
     updateCallLog,

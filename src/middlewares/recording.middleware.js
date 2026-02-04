@@ -10,10 +10,10 @@ function createDirIfNotExists(dir) {
     }
 }
 
-// Set up storage for recording-related files (videos only)
-const recordingStorage = multer.diskStorage({
+// Set up storage for recording-related files (videos)
+const recordingVideoStorage = multer.diskStorage({
     destination: function (req, file, cb) {
-        // Store all recording files in the same directory
+        // Store recording videos in the video directory
         const dir = 'public/uploads/recording-videos/';
         createDirIfNotExists(dir);
         cb(null, dir);
@@ -25,22 +25,45 @@ const recordingStorage = multer.diskStorage({
     }
 });
 
-// File filter to allow only video files for recordings
-const fileFilter = (req, file, cb) => {
-    // Allow only video files
-    if (file.mimetype.startsWith('video/')) {
+// Set up storage for recording-related images
+const recordingImageStorage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        // Store recording images in the image directory
+        const dir = 'public/uploads/recording-images/';
+        createDirIfNotExists(dir);
+        cb(null, dir);
+    },
+    filename: function (req, file, cb) {
+        // Create a unique filename using timestamp and original name
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, 'recording-image-' + uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+// Combined file filter for recordings (both videos and images)
+const recordingFileFilter = (req, file, cb) => {
+    // Allow video and image files for recordings
+    if (file.mimetype.startsWith('video/') || file.mimetype.startsWith('image/')) {
         cb(null, true);
     } else {
-        cb(new Error('Only video files are allowed for recordings!'), false);
+        cb(new Error('Only video and image files are allowed for recordings!'), false);
     }
 };
 
-// Multer upload instance for recordings
+// Multer upload instances for recordings
 const recordingUpload = multer({
-    storage: recordingStorage,
-    fileFilter: fileFilter,
+    storage: recordingVideoStorage, // Use video storage as default for recordings
+    fileFilter: recordingFileFilter,
     limits: {
         fileSize: 100 * 1024 * 1024 // 100MB limit for recordings to accommodate videos
+    }
+});
+
+const recordingImageUpload = multer({
+    storage: recordingImageStorage,
+    fileFilter: recordingFileFilter,
+    limits: {
+        fileSize: 10 * 1024 * 1024 // 10MB limit for images
     }
 });
 
@@ -63,19 +86,22 @@ const validateRecordingUpload = [
             });
         }
 
-        // Validate file size (in case limit wasn't caught by multer)
-        if (req.file.size > 100 * 1024 * 1024) { // 100MB
+        // Validate file size based on file type
+        const isVideo = req.file.mimetype.startsWith('video/');
+        const maxSize = isVideo ? 100 * 1024 * 1024 : 10 * 1024 * 1024; // 100MB for videos, 10MB for images
+
+        if (req.file.size > maxSize) {
             return res.status(400).json({
                 success: false,
-                message: 'File size exceeds 100MB limit'
+                message: isVideo ? 'Video file size exceeds 100MB limit' : 'Image file size exceeds 10MB limit'
             });
         }
 
         // Validate file type
-        if (!req.file.mimetype.startsWith('video/')) {
+        if (!req.file.mimetype.startsWith('video/') && !req.file.mimetype.startsWith('image/')) {
             return res.status(400).json({
                 success: false,
-                message: 'Invalid file type. Only video files are allowed for recordings.'
+                message: 'Invalid file type. Only video and image files are allowed for recordings.'
             });
         }
 
@@ -148,6 +174,7 @@ const sanitizeRecordingData = (req, res, next) => {
 
 module.exports = {
     recordingUpload,
+    recordingImageUpload,
     validateRecordingUpload,
     checkRecordingExists,
     validateRecordingMetadata,

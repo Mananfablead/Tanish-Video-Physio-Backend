@@ -6,41 +6,41 @@ const morgan = require('morgan');
 const path = require('path');
 const http = require('http');
 const { Server } = require('socket.io');
-const connectDB = require('./config/db');
-const config = require('./config/env');
-const routes = require('./routes');
-const errorHandler = require('./middlewares/error.middleware');
+const connectDB = require('./src/config/db');
+const config = require('./src/config/env');
+const routes = require('./src/routes');
+const errorHandler = require('./src/middlewares/error.middleware');
 const fs = require('fs');
 
 const app = express();
 // Security middleware
 app.use(
-  helmet({
-    crossOriginResourcePolicy: {
-      policy: "cross-origin",
-    },
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        imgSrc: [
-          "'self'",
-          "data:",
-          "blob:",
-          "http://localhost:5000", // backend
-            "http://localhost:8080",
-          "http://localhost:8081", // frontend
-        ],
-        mediaSrc: [
-          "'self'",
-          "data:",
-          "blob:",
-          "http://localhost:5000",
-            "http://localhost:8080",
-          "http://localhost:8081",
-        ],
-      },
-    },
-  })
+    helmet({
+        crossOriginResourcePolicy: {
+            policy: "cross-origin",
+        },
+        contentSecurityPolicy: {
+            directives: {
+                defaultSrc: ["'self'"],
+                imgSrc: [
+                    "'self'",
+                    "data:",
+                    "blob:",
+                    "http://localhost:5000", // backend
+                    "http://localhost:8080",
+                    "http://localhost:8081", // frontend
+                ],
+                mediaSrc: [
+                    "'self'",
+                    "data:",
+                    "blob:",
+                    "http://localhost:5000",
+                    "http://localhost:8080",
+                    "http://localhost:8081",
+                ],
+            },
+        },
+    })
 );
 
 // CORS configuration
@@ -48,7 +48,7 @@ const corsOptions = {
     origin: function (origin, callback) {
         // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
-        
+
         // In development, allow specific frontend origin
         if (config.NODE_ENV === 'development') {
             const allowedOrigins = config.ALLOWED_ORIGINS;
@@ -92,49 +92,39 @@ app.use(express.urlencoded({ extended: true }));
 
 // // Serve static files
 // Serve static files from uploads directory
-const PUBLIC_UPLOADS_DIR = path.join(__dirname, '..', 'public', 'uploads');
+// const PUBLIC_UPLOADS_DIR = path.join(__dirname, '..', 'public', 'uploads');
 
-if (!fs.existsSync(PUBLIC_UPLOADS_DIR)) {
-    fs.mkdirSync(PUBLIC_UPLOADS_DIR, { recursive: true });
-}
-
-// Serve static files from public uploads directory
-app.use(
-    '/uploads',
-    express.static(PUBLIC_UPLOADS_DIR, {
-        setHeaders: (res) => {
-            res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-        },
-    })
-);
-
-// Create recording directories if they don't exist
-const RECORDING_VIDEOS_DIR = path.join(PUBLIC_UPLOADS_DIR, 'recording-videos');
-
-if (!fs.existsSync(RECORDING_VIDEOS_DIR)) {
-    fs.mkdirSync(RECORDING_VIDEOS_DIR, { recursive: true });
-}
-
-console.log('📂 Serving uploads from:', PUBLIC_UPLOADS_DIR);
-console.log('📂 Serving recording videos from:', RECORDING_VIDEOS_DIR);
-
-// const UPLOADS_DIR = path.resolve('/home/u378554361/domains/apitanishvideo.fableadtech.in/uploads');
-
-// if (!fs.existsSync(UPLOADS_DIR)) {
-//     fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+// if (!fs.existsSync(PUBLIC_UPLOADS_DIR)) {
+//     fs.mkdirSync(PUBLIC_UPLOADS_DIR, { recursive: true });
 // }
 
+// // Serve static files from public uploads directory
 // app.use(
 //     '/uploads',
-//     express.static(UPLOADS_DIR, {
-//     express.static(UPLOADS_DIR, {
+//     express.static(PUBLIC_UPLOADS_DIR, {
 //         setHeaders: (res) => {
 //             res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
 //         },
 //     })
 // );
 
-// console.log('📂 Serving uploads from:', UPLOADS_DIR);
+const UPLOADS_DIR = path.resolve('/home/u378554361/domains/apitanishvideo.fableadtech.in/uploads');
+// const UPLOADS_DIR = path.resolve('/home/u378554361/domains/apitanishvideo.fableadtech.in/public_html');
+
+if (!fs.existsSync(UPLOADS_DIR)) {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
+app.use(
+    '/uploads',
+    express.static(UPLOADS_DIR, {
+        setHeaders: (res) => {
+            res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+        },
+    })
+);
+
+console.log('📂 Serving uploads from:', UPLOADS_DIR);
 
 // Routes
 app.use('/api', routes);
@@ -165,10 +155,10 @@ const startServer = async () => {
         console.log(`Database connected successfully`);
 
         const PORT = config.PORT || 5001;
-        
+
         // Create HTTP server
         const server = http.createServer(app);
-        
+
         // Initialize Socket.IO server
         const io = new Server(server, {
             cors: {
@@ -178,44 +168,36 @@ const startServer = async () => {
             },
             transports: ['websocket', 'polling']
         });
-        
+
         // Middleware to authenticate socket connections
         io.use(async (socket, next) => {
             try {
                 // Extract token from handshake auth
                 const token = socket.handshake.auth.token || socket.handshake.query.token;
-                
+
                 if (!token) {
                     console.error('❌ Socket authentication error: No token provided');
                     return next(new Error('Authentication error: No token provided'));
                 }
-                
+
                 // Verify JWT token
                 const jwt = require('jsonwebtoken');
-                const config = require('./config/env');
-                const User = require('./models/User.model');
-                
+                const config = require('../src/config/env');
+
                 const decoded = jwt.verify(token, config.JWT_SECRET);
-                
+
                 // Validate required fields in token
                 if (!decoded.userId) {
                     console.error('❌ Socket authentication error: Token missing userId');
                     console.error('Token payload:', decoded);
                     return next(new Error('Authentication error: Invalid token payload'));
                 }
-                
+
                 if (!decoded.role) {
                     console.error('❌ Socket authentication error: Token missing role');
                     return next(new Error('Authentication error: Invalid token payload'));
                 }
-                
-                // Get full user information
-                const user = await User.findById(decoded.userId);
-                if (!user) {
-                    console.error('❌ Socket authentication error: User not found');
-                    return next(new Error('Authentication error: User not found'));
-                }
-                
+
                 // Attach user info to socket
                 const constructedName = user.name || (user.firstName && user.lastName ? 
                     `${user.firstName} ${user.lastName}` : null) || 
@@ -243,32 +225,31 @@ const startServer = async () => {
                     displayName: user.displayName,
                     email: user.email
                 };
-                
+
                 console.log(`✅ Socket ${socket.id} authenticated:`, {
                     userId: socket.user.userId,
                     role: socket.user.role
                 });
-                
+
                 next();
             } catch (error) {
                 console.error('❌ Socket authentication error:', error);
                 console.error('Token provided:', socket.handshake.auth.token || socket.handshake.query.token);
-                next(new Error('Authentication error')); 
+                next(new Error('Authentication error'));
             }
         });
-        
+
         // Socket connection handler
         io.on('connection', (socket) => {
             console.log('New client connected:', socket.id);
-            console.log('Socket user info:', socket.user);
-            
+
             // Load chat and video call handlers
-            const setupChatHandlers = require('./sockets/chat.socket');
-            const setupVideoCallHandlers = require('./sockets/videoCall.socket');
-            
+            const setupChatHandlers = require('./src/sockets/chat.socket');
+            const setupVideoCallHandlers = require('./src/sockets/videoCall.socket');
+
             setupChatHandlers(io, socket);
             setupVideoCallHandlers(io, socket);
-            
+
             socket.on('disconnect', () => {
                 console.log('Client disconnected:', socket.id);
             });
