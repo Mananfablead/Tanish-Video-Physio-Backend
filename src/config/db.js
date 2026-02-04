@@ -11,8 +11,8 @@ const connectDB = async (maxRetries = 3, retryDelay = 5000) => {
                 socketTimeoutMS: 45000,          // 45 seconds
                 connectTimeoutMS: 30000,         // 30 seconds
 
-                // Buffering settings (bufferMaxEntries deprecated)
-                bufferCommands: false,           // Disable buffering to prevent timeout issues
+                // Buffering settings - Enable for connection stability
+                bufferCommands: true,            // Enable command buffering
 
                 // Connection pool settings
                 maxPoolSize: 10,                 // Maximum number of connections
@@ -38,6 +38,9 @@ const connectDB = async (maxRetries = 3, retryDelay = 5000) => {
 
             const conn = await mongoose.connect(config.MONGODB_URI, connectionOptions);
 
+            // Small delay to ensure connection is fully established
+            await new Promise(resolve => setTimeout(resolve, 500));
+
             console.log(`✅ MongoDB Connected Successfully!`);
             console.log(`   Host: ${conn.connection.host}`);
             console.log(`   Database: ${conn.connection.name}`);
@@ -45,32 +48,6 @@ const connectDB = async (maxRetries = 3, retryDelay = 5000) => {
 
             // If successful, break out of retry loop
             return conn;
-
-        // Handle connection events
-        mongoose.connection.on('error', (err) => {
-            console.error('❌ MongoDB connection error:', err);
-        });
-
-        mongoose.connection.on('disconnected', () => {
-            console.warn('⚠️ MongoDB disconnected');
-        });
-
-        mongoose.connection.on('reconnected', () => {
-            console.log('✅ MongoDB reconnected successfully');
-        });
-
-            mongoose.connection.on('close', () => {
-                console.log('🔌 MongoDB connection closed');
-            });
-
-            // Graceful shutdown
-            process.on('SIGINT', async () => {
-                console.log('\n🛑 Shutting down MongoDB connection...');
-                await mongoose.connection.close();
-                console.log('✅ MongoDB connection closed');
-                process.exit(0);
-        });
-
         } catch (error) {
             console.error(`
 ❌ Connection attempt ${attempt} failed:`);
@@ -95,4 +72,24 @@ const connectDB = async (maxRetries = 3, retryDelay = 5000) => {
     }
 };
 
+// Export connection checker utility
+const isDbConnected = () => {
+    return mongoose.connection.readyState === 1;
+};
+
+const waitForDbConnection = async (timeout = 30000) => {
+    const startTime = Date.now();
+
+    while (!isDbConnected()) {
+        if (Date.now() - startTime > timeout) {
+            throw new Error('Database connection timeout');
+        }
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    return true;
+};
+
 module.exports = connectDB;
+module.exports.isDbConnected = isDbConnected;
+module.exports.waitForDbConnection = waitForDbConnection;
