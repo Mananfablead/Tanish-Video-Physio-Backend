@@ -6,41 +6,41 @@ const morgan = require('morgan');
 const path = require('path');
 const http = require('http');
 const { Server } = require('socket.io');
-const connectDB = require('./config/db');
-const config = require('./config/env');
-const routes = require('./routes');
-const errorHandler = require('./middlewares/error.middleware');
+const connectDB = require('./src/config/db');
+const config = require('./src/config/env');
+const routes = require('./src/routes');
+const errorHandler = require('./src/middlewares/error.middleware');
 const fs = require('fs');
 
 const app = express();
 // Security middleware
 app.use(
-  helmet({
-    crossOriginResourcePolicy: {
-      policy: "cross-origin",
-    },
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        imgSrc: [
-          "'self'",
-          "data:",
-          "blob:",
-          "http://localhost:5000", // backend
-            "http://localhost:8080",
-          "http://localhost:8081", // frontend
-        ],
-        mediaSrc: [
-          "'self'",
-          "data:",
-          "blob:",
-          "http://localhost:5000",
-            "http://localhost:8080",
-          "http://localhost:8081",
-        ],
-      },
-    },
-  })
+    helmet({
+        crossOriginResourcePolicy: {
+            policy: "cross-origin",
+        },
+        contentSecurityPolicy: {
+            directives: {
+                defaultSrc: ["'self'"],
+                imgSrc: [
+                    "'self'",
+                    "data:",
+                    "blob:",
+                    "http://localhost:5000", // backend
+                    "http://localhost:8080",
+                    "http://localhost:8081", // frontend
+                ],
+                mediaSrc: [
+                    "'self'",
+                    "data:",
+                    "blob:",
+                    "http://localhost:5000",
+                    "http://localhost:8080",
+                    "http://localhost:8081",
+                ],
+            },
+        },
+    })
 );
 
 // CORS configuration
@@ -48,7 +48,7 @@ const corsOptions = {
     origin: function (origin, callback) {
         // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
-        
+
         // In development, allow specific frontend origin
         if (config.NODE_ENV === 'development') {
             const allowedOrigins = config.ALLOWED_ORIGINS;
@@ -155,10 +155,10 @@ const startServer = async () => {
         console.log(`Database connected successfully`);
 
         const PORT = config.PORT || 5001;
-        
+
         // Create HTTP server
         const server = http.createServer(app);
-        
+
         // Initialize Socket.IO server
         const io = new Server(server, {
             cors: {
@@ -168,67 +168,67 @@ const startServer = async () => {
             },
             transports: ['websocket', 'polling']
         });
-        
+
         // Middleware to authenticate socket connections
         io.use(async (socket, next) => {
             try {
                 // Extract token from handshake auth
                 const token = socket.handshake.auth.token || socket.handshake.query.token;
-                
+
                 if (!token) {
                     console.error('❌ Socket authentication error: No token provided');
                     return next(new Error('Authentication error: No token provided'));
                 }
-                
+
                 // Verify JWT token
                 const jwt = require('jsonwebtoken');
-                const config = require('./config/env');
-                
+                const config = require('../src/config/env');
+
                 const decoded = jwt.verify(token, config.JWT_SECRET);
-                
+
                 // Validate required fields in token
                 if (!decoded.userId) {
                     console.error('❌ Socket authentication error: Token missing userId');
                     console.error('Token payload:', decoded);
                     return next(new Error('Authentication error: Invalid token payload'));
                 }
-                
+
                 if (!decoded.role) {
                     console.error('❌ Socket authentication error: Token missing role');
                     return next(new Error('Authentication error: Invalid token payload'));
                 }
-                
+
                 // Attach user info to socket
                 socket.user = {
                     userId: decoded.userId.toString(), // Ensure string format
                     role: decoded.role,
                     sessionId: decoded.sessionId
                 };
-                
+
                 console.log(`✅ Socket ${socket.id} authenticated:`, {
                     userId: socket.user.userId,
                     role: socket.user.role
                 });
-                
+
                 next();
             } catch (error) {
                 console.error('❌ Socket authentication error:', error);
                 console.error('Token provided:', socket.handshake.auth.token || socket.handshake.query.token);
-                next(new Error('Authentication error')); 
+                next(new Error('Authentication error'));
             }
         });
-        
+
         // Socket connection handler
         io.on('connection', (socket) => {
             console.log('New client connected:', socket.id);
-            
+
             // Load chat and video call handlers
-            const setupChatHandlers = require('./sockets/chat.socket');
-            const setupVideoCallHandlers = require('./sockets/videoCall.socket');
-            
+            const setupChatHandlers = require('./src/sockets/chat.socket');
+            const setupVideoCallHandlers = require('./src/sockets/videoCall.socket');
+
             setupChatHandlers(io, socket);
             setupVideoCallHandlers(io, socket);
-            
+
             socket.on('disconnect', () => {
                 console.log('Client disconnected:', socket.id);
             });
