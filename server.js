@@ -10,6 +10,7 @@ const connectDB = require('./src/config/db');
 const config = require('./src/config/env');
 const routes = require('./src/routes');
 const errorHandler = require('./src/middlewares/error.middleware');
+const DatabaseHealthChecker = require('./src/utils/dbHealthCheck');
 const fs = require('fs');
 
 const app = express();
@@ -161,8 +162,23 @@ app.use('*', (req, res) => {
 
 const startServer = async () => {
     try {
+        console.log('🚀 Starting server initialization...');
+        console.log(`🔧 Environment: ${config.NODE_ENV}`);
+        console.log(`📍 Port: ${config.PORT}`);
+        console.log(`🔗 Backend URL: ${config.BASE_URL}`);
+
+        // Connect to database
+        console.log('\n🔄 Connecting to database...');
         await connectDB();
-        console.log(`Database connected successfully`);
+
+        // Run health check
+        console.log('\n🏥 Performing database health check...');
+        const healthCheck = await DatabaseHealthChecker.checkConnection();
+        if (!healthCheck.healthy) {
+            console.error('❌ Database health check failed:', healthCheck.message);
+            throw new Error(`Database health check failed: ${healthCheck.message}`);
+        }
+        console.log('✅ Database health check passed\n');
 
         const PORT = config.PORT || 5001;
 
@@ -271,7 +287,21 @@ const startServer = async () => {
             console.log(`WebSocket server running on port ${PORT}`);
         });
     } catch (error) {
-        console.error('Failed to start server:', error);
+        console.error('💥 Failed to start server!');
+        console.error('Error type:', error.constructor.name);
+        console.error('Error message:', error.message);
+        console.error('Stack trace:', error.stack);
+
+        // Additional debugging for common issues
+        if (error.message.includes('buffering timed out')) {
+            console.error('\n🔍 This is a MongoDB connection timeout issue. Possible causes:');
+            console.error('   • Network connectivity issues');
+            console.error('   • MongoDB Atlas cluster paused or unavailable');
+            console.error('   • IP address not whitelisted in MongoDB Atlas');
+            console.error('   • Incorrect connection string');
+            console.error('   • Firewall blocking connection');
+        }
+
         process.exit(1);
     }
 };
