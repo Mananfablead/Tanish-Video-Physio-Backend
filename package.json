@@ -2,7 +2,7 @@
   "name": "tanish-physio-backend",
   "version": "1.0.0",
   "description": "Backend API for Tanish Physio application",
-  "main": "/src/server.js",
+  "main": "./src/server.js",
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
