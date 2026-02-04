@@ -10,7 +10,7 @@ const config = {
     NODE_ENV: process.env.NODE_ENV || 'development',
     PORT: process.env.PORT || 5000,
     BASE_URL: process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 5000}`,
-    mongodb_uri: process.env.MONGODB_URI || 'mongodb://localhost:27017/tanish-physio',
+    mongodb_uri: process.env.MONGODB_URI || 'mongodb+srv://mananfablead_db_user:sgwePKwn0j1gt4eY@cluster0.pmssk5e.mongodb.net/tanish_physio_live',
     JWT_SECRET: process.env.JWT_SECRET || 'your_jwt_secret_here',
     JWT_EXPIRE: process.env.JWT_EXPIRE || '24h',
     RAZORPAY_KEY_ID: process.env.RAZORPAY_KEY_ID || 'your_razorpay_key_id_here',
