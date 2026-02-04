@@ -29,6 +29,9 @@ app.use(
                     "http://localhost:5000", // backend
                     "http://localhost:8080",
                     "http://localhost:8081", // frontend
+                    "https://tanishvideo.fableadtech.in",
+                    "https://tanishvideo.fableadtech.in/admin",
+                    "https://apitanishvideo.fableadtech.in"
                 ],
                 mediaSrc: [
                     "'self'",
@@ -37,6 +40,9 @@ app.use(
                     "http://localhost:5000",
                     "http://localhost:8080",
                     "http://localhost:8081",
+                    "https://tanishvideo.fableadtech.in",
+                    "https://tanishvideo.fableadtech.in/admin",
+                    "https://apitanishvideo.fableadtech.in"
                 ],
             },
         },
@@ -58,7 +64,10 @@ const corsOptions = {
                 callback(null, true);
             } else {
                 // Check if origin matches localhost:8080 specifically for development
-                if (origin === 'http://localhost:8080' || origin === 'http://localhost:8081') {
+                if (origin === 'http://localhost:8080' ||
+                    origin === 'http://localhost:8081' ||
+                    origin === 'https://tanishvideo.fableadtech.in' ||
+                    origin === 'https://tanishvideo.fableadtech.in/admin') {
                     callback(null, true);
                 } else {
                     callback(null, Error('Not allowed by CORS'));
@@ -199,10 +208,10 @@ const startServer = async () => {
                 }
 
                 // Attach user info to socket
-                const constructedName = user.name || (user.firstName && user.lastName ? 
-                    `${user.firstName} ${user.lastName}` : null) || 
+                const constructedName = user.name || (user.firstName && user.lastName ?
+                    `${user.firstName} ${user.lastName}` : null) ||
                     user.displayName || user.email || `User ${decoded.userId.substring(0, 5)}`;
-                
+
                 console.log('SOCKET AUTH: User data:', {
                     userId: decoded.userId,
                     dbUser: {
@@ -214,7 +223,7 @@ const startServer = async () => {
                     },
                     constructedName: constructedName
                 });
-                
+
                 socket.user = {
                     userId: decoded.userId.toString(), // Ensure string format
                     role: decoded.role,
