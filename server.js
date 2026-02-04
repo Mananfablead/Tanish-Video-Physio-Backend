@@ -26,9 +26,9 @@ app.use(
                     "'self'",
                     "data:",
                     "blob:",
-                    "http://localhost:5000", // backend
-                    "http://localhost:8080",
-                    "http://localhost:8081", // frontend
+                    // "http://localhost:5000",
+                    // "http://localhost:8080",
+                    // "http://localhost:8081",
                     "https://tanishvideo.fableadtech.in",
                     "https://tanishvideo.fableadtech.in/admin",
                     "https://apitanishvideo.fableadtech.in"
@@ -37,9 +37,9 @@ app.use(
                     "'self'",
                     "data:",
                     "blob:",
-                    "http://localhost:5000",
-                    "http://localhost:8080",
-                    "http://localhost:8081",
+                    // "http://localhost:5000",
+                    // "http://localhost:8080",
+                    // "http://localhost:8081",
                     "https://tanishvideo.fableadtech.in",
                     "https://tanishvideo.fableadtech.in/admin",
                     "https://apitanishvideo.fableadtech.in"
@@ -64,8 +64,9 @@ const corsOptions = {
                 callback(null, true);
             } else {
                 // Check if origin matches localhost:8080 specifically for development
-                if (origin === 'http://localhost:8080' ||
-                    origin === 'http://localhost:8081' ||
+                if (
+                // origin === 'http://localhost:8080' ||
+                // origin === 'http://localhost:8081' ||
                     origin === 'https://tanishvideo.fableadtech.in' ||
                     origin === 'https://tanishvideo.fableadtech.in/admin') {
                     callback(null, true);
