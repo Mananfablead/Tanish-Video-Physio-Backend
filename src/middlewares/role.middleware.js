@@ -34,5 +34,7 @@ module.exports = {
     checkRole,
     isAdmin,
     isPatient,
-    isTherapist
+    isTherapist,
+    requirePatientRole: isPatient,
+    requireAdminRole: isAdmin
 };
