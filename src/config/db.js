@@ -1,22 +1,3 @@
-// const mongoose = require('mongoose');
-// const config = require('./env');
-
-// const connectDB = async () => {
-//     try {
-//         const conn = await mongoose.connect(config.MONGODB_URI, {
-//             useNewUrlParser: true,
-//             useUnifiedTopology: true
-//         });
-
-//         console.log(`MongoDB Connected: ${conn.connection.host}`);
-//     } catch (error) {
-//         console.error('Database connection error:', error);
-//         process.exit(1);
-//     }
-// };
-
-// module.exports = connectDB;
-
 const mongoose = require('mongoose');
 const config = require('./env');
 
@@ -24,15 +5,12 @@ const connectDB = async () => {
     try {
         const conn = await mongoose.connect(config.MONGODB_URI, {
             useNewUrlParser: true,
-            useUnifiedTopology: true,
-            dbName: 'tanish_physio_live' // 🔥 IMPORTANT FIX
+            useUnifiedTopology: true
         });
 
-        console.log(`✅ MongoDB Connected`);
-        console.log(`📦 Database Name: ${conn.connection.name}`);
-        console.log(`🌍 Host: ${conn.connection.host}`);
+        console.log(`MongoDB Connected: ${conn.connection.host}`);
     } catch (error) {
-        console.error('❌ Database connection error:', error);
+        console.error('Database connection error:', error);
         process.exit(1);
     }
 };
