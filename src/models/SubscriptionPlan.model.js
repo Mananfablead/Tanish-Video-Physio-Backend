@@ -27,7 +27,7 @@ const subscriptionPlanSchema = new mongoose.Schema({
     duration: {
         type: String,
         required: [true, 'Duration is required'],
-       enum: ["daily", "weekly", "monthly", "quarterly", "yearly"]
+        enum: ["monthly", "quarterly", "yearly"]
     },
     sessions: {
         type: Number,
