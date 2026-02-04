@@ -192,7 +192,6 @@ const startServer = async () => {
 
                 // Verify JWT token
                 const jwt = require('jsonwebtoken');
-                const config = require('../src/config/env');
 
                 const decoded = jwt.verify(token, config.JWT_SECRET);
 
@@ -209,31 +208,18 @@ const startServer = async () => {
                 }
 
                 // Attach user info to socket
-                const constructedName = user.name || (user.firstName && user.lastName ?
-                    `${user.firstName} ${user.lastName}` : null) ||
-                    user.displayName || user.email || `User ${decoded.userId.substring(0, 5)}`;
-
-                console.log('SOCKET AUTH: User data:', {
-                    userId: decoded.userId,
-                    dbUser: {
-                        name: user.name,
-                        firstName: user.firstName,
-                        lastName: user.lastName,
-                        displayName: user.displayName,
-                        email: user.email
-                    },
-                    constructedName: constructedName
-                });
-
+                // For now, we'll just use the info from the token since we don't have DB lookup here
+                const constructedName = `User ${decoded.userId.substring(0, 5)}`;
+                
                 socket.user = {
                     userId: decoded.userId.toString(), // Ensure string format
                     role: decoded.role,
                     sessionId: decoded.sessionId,
                     name: constructedName,
-                    firstName: user.firstName,
-                    lastName: user.lastName,
-                    displayName: user.displayName,
-                    email: user.email
+                    firstName: null,
+                    lastName: null,
+                    displayName: null,
+                    email: null
                 };
 
                 console.log(`✅ Socket ${socket.id} authenticated:`, {

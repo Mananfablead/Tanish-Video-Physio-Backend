@@ -28,8 +28,6 @@ const generateCallToken = async (req, res) => {
             .populate('userId')
             .populate('therapistId');
 
-        logger.info(`Session found - ID: ${session._id}, Status: ${session.status}, Date: ${session.date}, Time: ${session.time}`);
-
         if (!session) {
             logger.warn(`Session not found - sessionId: ${sessionId}`);
             return res.status(404).json({
@@ -37,6 +35,8 @@ const generateCallToken = async (req, res) => {
                 message: 'Session not found'
             });
         }
+
+        logger.info(`Session found - ID: ${session._id}, Status: ${session.status}, Date: ${session.date}, Time: ${session.time}`);
 
         // Check if requester is authorized to generate token
         const isTherapist = session.therapistId && session.therapistId._id.toString() === requesterId;
