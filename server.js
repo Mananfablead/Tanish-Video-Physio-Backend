@@ -136,7 +136,7 @@ app.use(
 console.log('📂 Serving uploads from:', UPLOADS_DIR);
 
 // Routes
-app.use('/', routes);
+app.use('/api', routes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
