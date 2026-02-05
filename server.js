@@ -68,7 +68,10 @@ const corsOptions = {
                     origin === 'http://localhost:8080' ||
                     origin === 'http://localhost:8081' ||
                     origin === 'https://tanishvideo.fableadtech.in' ||
-                    origin === 'https://tanishvideo.fableadtech.in/admin') {
+                    origin === 'https://tanishvideo.fableadtech.in/admin' ||
+                    origin === 'https://tanishphysiofitness.in' ||
+                    origin === 'https://tanishphysiofitness.in/admin'
+                ) {
                     callback(null, true);
                 } else {
                     callback(null, Error('Not allowed by CORS'));
@@ -89,7 +92,7 @@ const corsOptions = {
     allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
 };
 
-app.use(cors());
+app.use(cors(corsOptions));
 
 // Logging
 if (config.NODE_ENV === 'development') {
