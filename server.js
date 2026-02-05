@@ -122,7 +122,7 @@ app.use(express.urlencoded({ extended: true }));
 // );
 
 // const UPLOADS_DIR = path.resolve('/home/u378554361/domains/apitanishvideo.fableadtech.in/uploads');
-const UPLOADS_DIR = path.resolve('/var/www/backend/uploads');
+const UPLOADS_DIR = config.UPLOAD_PATH || path.join(__dirname, 'public', 'uploads');
 
 if (!fs.existsSync(UPLOADS_DIR)) {
     fs.mkdirSync(UPLOADS_DIR, { recursive: true });

@@ -12,7 +12,7 @@ function createDirIfNotExists(dir) {
 // Configure storage
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const dir = 'uploads/';
+    const dir = 'public/uploads/';
     createDirIfNotExists(dir);
     cb(null, dir);
   },
