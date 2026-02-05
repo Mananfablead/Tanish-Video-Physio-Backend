@@ -11,6 +11,7 @@ const config = require('./src/config/env');
 const routes = require('./src/routes');
 const errorHandler = require('./src/middlewares/error.middleware');
 const fs = require('fs');
+const logger = require('./src/utils/logger');
 
 const app = express();
 // Security middleware

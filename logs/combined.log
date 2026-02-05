@@ -330,3 +330,6 @@
 {"level":"info","message":"Socket 0_Tz0yo-YMWvY0VOAAAF disconnected from video call","service":"tanish-physio-backend","timestamp":"2026-02-04T10:31:11.816Z"}
 {"level":"info","message":"User 6978711f57ff2f4727b1f0a7 disconnected from chat","service":"tanish-physio-backend","timestamp":"2026-02-04T10:39:58.316Z"}
 {"level":"info","message":"Socket VSayTjnyO3EaKRNyAAAH disconnected from video call","service":"tanish-physio-backend","timestamp":"2026-02-04T10:39:58.318Z"}
+{"level":"info","message":"Upload directory sarver js: /var/www/backend/public/uploads","service":"tanish-physio-backend","timestamp":"2026-02-05T11:15:40.655Z"}
+{"level":"info","message":"Upload directory sarver js: /var/www/backend/public/uploads","service":"tanish-physio-backend","timestamp":"2026-02-05T11:17:51.221Z"}
+{"level":"info","message":"Upload directory sarver js: /var/www/backend/public/uploads","service":"tanish-physio-backend","timestamp":"2026-02-05T11:18:00.967Z"}

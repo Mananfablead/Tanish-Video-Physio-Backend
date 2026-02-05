@@ -1,6 +1,7 @@
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const logger = require('./logger');
 
 // Create directory if it doesn't exist
 function createDirIfNotExists(dir) {
