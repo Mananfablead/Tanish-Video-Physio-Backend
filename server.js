@@ -89,7 +89,7 @@ const corsOptions = {
     allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
 };
 
-app.use(cors());
+app.use(cors(corsOptions));
 
 // Logging
 if (config.NODE_ENV === 'development') {
@@ -118,7 +118,9 @@ app.use(express.urlencoded({ extended: true }));
 //     })
 // );
 
-const UPLOADS_DIR = path.resolve('/home/u378554361/domains/apitanishvideo.fableadtech.in/uploads');
+// const UPLOADS_DIR = path.resolve('/home/u378554361/domains/apitanishvideo.fableadtech.in/uploads');
+const UPLOADS_DIR = path.resolve('/var/www/backend/');
+
 
 if (!fs.existsSync(UPLOADS_DIR)) {
     fs.mkdirSync(UPLOADS_DIR, { recursive: true });
@@ -139,7 +141,7 @@ console.log('📂 Serving uploads from:', UPLOADS_DIR);
 app.use('/api', routes);
 
 // Health check endpoint
-app.get('/health', (req, res) => {
+app.get('/api/health', (req, res) => {
     res.status(200).json({
         status: 'success',
         message: 'Server is running',
