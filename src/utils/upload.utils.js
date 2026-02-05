@@ -12,7 +12,8 @@ function createDirIfNotExists(dir) {
 // Configure storage
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const dir = 'public/uploads/';
+    const dir = process.env.UPLOAD_PATH || 'uploads/';
+    logger.log('info', `Upload directory: ${dir}`);
     createDirIfNotExists(dir);
     cb(null, dir);
   },
