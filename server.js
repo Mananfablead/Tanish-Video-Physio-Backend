@@ -92,7 +92,7 @@ const corsOptions = {
     allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
 };
 
-app.use(cors());
+app.use(cors(corsOptions));
 
 // Logging
 if (config.NODE_ENV === 'development') {
