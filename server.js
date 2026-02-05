@@ -26,9 +26,9 @@ app.use(
                     "'self'",
                     "data:",
                     "blob:",
-                    "http://localhost:5000", // backend
+                    "http://localhost:5000", 
                     "http://localhost:8080",
-                    "http://localhost:8081", // frontend
+                    "http://localhost:8081", 
                 ],
                 mediaSrc: [
                     "'self'",
@@ -108,7 +108,7 @@ app.use(express.urlencoded({ extended: true }));
 //     })
 // );
 
-const UPLOADS_DIR = path.resolve('/home/u378554361/domains/apitanishvideo.fableadtech.in/uploads');
+const UPLOADS_DIR = path.resolve(__dirname, 'uploads');
 // const UPLOADS_DIR = path.resolve('/home/u378554361/domains/apitanishvideo.fableadtech.in/public_html');
 
 if (!fs.existsSync(UPLOADS_DIR)) {
