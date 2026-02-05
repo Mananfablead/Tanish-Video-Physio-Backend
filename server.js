@@ -123,7 +123,7 @@ app.use(express.urlencoded({ extended: true }));
 // );
 
 // const UPLOADS_DIR = path.resolve('/home/u378554361/domains/apitanishvideo.fableadtech.in/uploads');
-const UPLOADS_DIR = config.UPLOAD_PATH || path.join(__dirname, 'public', 'uploads');
+const UPLOADS_DIR = config.UPLOAD_PATH || path.join(__dirname, 'public/uploads');
 logger.log('info', `Upload directory sarver js: ${UPLOADS_DIR}`);
 
 if (!fs.existsSync(UPLOADS_DIR)) {
