@@ -105,7 +105,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Static file serving (must be before 404 handler)
-const UPLOADS_DIR = config.UPLOAD_PATH || path.join(__dirname, 'public', 'uploads');
+const UPLOADS_DIR = config.UPLOAD_PATH || path.join(__dirname, '..', 'public', 'uploads');
+// const UPLOADS_DIR = config.UPLOAD_PATH || path.join(__dirname, 'public', 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) {
     fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 }
@@ -136,6 +137,7 @@ app.use(errorHandler);
 
 // 404 handler (must be last)
 app.use('*', (req, res) => {
+    console.log('404 Handler hit for path:', req.originalUrl);
     res.status(404).json({
         success: false,
         message: 'Route not found'
