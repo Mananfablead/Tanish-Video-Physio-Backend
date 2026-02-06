@@ -43,7 +43,7 @@ router.use(authenticateToken);
 // Recording routes (must be before /:id route)
 router.post('/recording/start', startRecording);
 router.post('/recording/stop', stopRecording);
-router.post('/recording/upload', recordingUpload.single('recording-videos'), validateRecordingUpload, uploadRecording);
+router.post('/recording/upload', recordingUpload.single('recording'), validateRecordingUpload, uploadRecording);
 router.post('/recording/image', recordingImageUpload.single('recordingImage'), validateRecordingUpload, uploadRecordingImage);
 router.get('/recordings/user', getUserRecordings);
 router.get('/recordings', getAllRecordings);

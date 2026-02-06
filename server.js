@@ -104,25 +104,7 @@ if (config.NODE_ENV === 'development') {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// // Serve static files
-// Serve static files from uploads directory
-// const PUBLIC_UPLOADS_DIR = path.join(__dirname, '..', 'public', 'uploads');
-
-// if (!fs.existsSync(PUBLIC_UPLOADS_DIR)) {
-//     fs.mkdirSync(PUBLIC_UPLOADS_DIR, { recursive: true });
-// }
-
-// // Serve static files from public uploads directory
-// app.use(
-//     '/uploads',
-//     express.static(PUBLIC_UPLOADS_DIR, {
-//         setHeaders: (res) => {
-//             res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-//         },
-//     })
-// );
-
-// const UPLOADS_DIR = path.resolve('/home/u378554361/domains/apitanishvideo.fableadtech.in/uploads');
+// Static file serving (must be before 404 handler)
 const UPLOADS_DIR = config.UPLOAD_PATH || path.join(__dirname, 'public', 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) {
     fs.mkdirSync(UPLOADS_DIR, { recursive: true });
@@ -136,8 +118,6 @@ app.use(
         },
     })
 );
-
-console.log('📂 Serving uploads from:', UPLOADS_DIR);
 
 // Routes
 app.use('/api', routes);
@@ -154,7 +134,7 @@ app.get('/api/health', (req, res) => {
 // Error handling middleware
 app.use(errorHandler);
 
-// 404 handler
+// 404 handler (must be last)
 app.use('*', (req, res) => {
     res.status(404).json({
         success: false,

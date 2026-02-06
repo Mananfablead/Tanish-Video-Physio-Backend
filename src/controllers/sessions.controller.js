@@ -538,7 +538,7 @@ const createSession = async (req, res, next) => {
           .status(400)
           .json(
             ApiResponse.error(
-              "therapistId is required for subscription session booking"
+              "therapistId is required for subscription and session booking"
             )
           );
       }
