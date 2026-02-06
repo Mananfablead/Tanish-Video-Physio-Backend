@@ -8,25 +8,32 @@ const User = require('../models/User.model');
 const ApiResponse = require('../utils/apiResponse');
 const { hashPassword } = require('../utils/auth.utils');
 
-// Utility function to calculate end date based on plan ID
-function calculateEndDate(planId, startDate = new Date()) {
+// Utility function to calculate end date based on plan validity
+async function calculateEndDate(planId, startDate = new Date()) {
     const endDate = new Date(startDate);
-
-    switch (planId.toLowerCase()) {
-        case 'daily':
-            endDate.setDate(endDate.getDate() + 1);
-            break;
-        case 'weekly':
-            endDate.setDate(endDate.getDate() + 7);
-            break;
-        case 'monthly':
-            endDate.setMonth(endDate.getMonth() + 1);
-            break;
-        default:
-            // Default to monthly if planId is not recognized
-            endDate.setMonth(endDate.getMonth() + 1);
+    
+    // Find the subscription plan to get validity days
+    const plan = await SubscriptionPlan.findOne({ planId });
+    
+    if (!plan) {
+        // Fallback to default monthly if plan not found
+        endDate.setMonth(endDate.getMonth() + 1);
+        return endDate;
     }
-
+    
+    // Use the plan's validityDays or calculate based on duration
+    const validityDays = plan.validityDays || 
+        (function() {
+            switch(plan.duration) {
+                case 'monthly': return 30;
+                case 'quarterly': return 90;
+                case 'half-yearly': return 180;
+                case 'yearly': return 365;
+                default: return 30;
+            }
+        })();
+    
+    endDate.setDate(endDate.getDate() + validityDays);
     return endDate;
 }
 
@@ -37,8 +44,8 @@ async function activateSubscription(subscriptionId) {
         throw new Error('Subscription not found');
     }
 
-    // Calculate end date based on plan
-    const endDate = calculateEndDate(subscription.planId, new Date());
+    // Calculate end date based on plan validity
+    const endDate = await calculateEndDate(subscription.planId, new Date());
 
     // Calculate next billing date (same as end date for now)
     const nextBillingDate = new Date(endDate);

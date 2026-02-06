@@ -19,12 +19,24 @@ const getSubscriptionPlans = async (req, res, next) => {
 // Create a new subscription plan (admin only)
 const createSubscriptionPlan = async (req, res, next) => {
     try {
-        const { planId, name, price, description, features, duration, sessions } = req.body;
+        const { planId, name, price, description, features, duration, sessions, validityDays } = req.body;
 
         // Check if plan already exists
         const existingPlan = await SubscriptionPlan.findOne({ planId });
         if (existingPlan) {
             return res.status(400).json(ApiResponse.error('Plan with this ID already exists'));
+        }
+
+        // Calculate validityDays based on duration if not provided
+        let calculatedValidityDays = validityDays;
+        if (!calculatedValidityDays) {
+            switch(duration) {
+                case 'monthly': calculatedValidityDays = 30; break;
+                case 'quarterly': calculatedValidityDays = 90; break;
+                case 'half-yearly': calculatedValidityDays = 180; break;
+                case 'yearly': calculatedValidityDays = 365; break;
+                default: calculatedValidityDays = 30;
+            }
         }
 
         const plan = new SubscriptionPlan({
@@ -34,7 +46,8 @@ const createSubscriptionPlan = async (req, res, next) => {
             description,
             features,
             duration,
-            sessions
+            sessions,
+            validityDays: calculatedValidityDays
         });
 
         await plan.save();
@@ -87,11 +100,27 @@ const getSubscriptionPlan = async (req, res, next) => {
 // Update a subscription plan (admin only)
 const updateSubscriptionPlan = async (req, res, next) => {
     try {
-        const { name, price, description, features, duration, sessions, status, sortOrder } = req.body;
+        const { name, price, description, features, duration, sessions, status, sortOrder, validityDays } = req.body;
+
+        // Calculate validityDays based on duration if not provided
+        let updateData = { name, price, description, features, duration, sessions, status, sortOrder };
+        
+        if (validityDays !== undefined) {
+            updateData.validityDays = validityDays;
+        } else if (duration) {
+            // Recalculate validityDays based on new duration
+            switch(duration) {
+                case 'monthly': updateData.validityDays = 30; break;
+                case 'quarterly': updateData.validityDays = 90; break;
+                case 'half-yearly': updateData.validityDays = 180; break;
+                case 'yearly': updateData.validityDays = 365; break;
+                default: updateData.validityDays = 30;
+            }
+        }
 
         const plan = await SubscriptionPlan.findByIdAndUpdate(
             req.params.id,
-            { name, price, description, features, duration, sessions, status, sortOrder },
+            updateData,
             { new: true, runValidators: true }
         );
 

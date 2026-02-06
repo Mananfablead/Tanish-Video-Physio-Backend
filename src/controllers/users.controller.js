@@ -82,7 +82,9 @@ const getAllUsers = async (req, res, next) => {
                 status: subscription.status,
                 startDate: subscription.startDate,
                 endDate: subscription.endDate,
-                amount: subscription.amount
+                amount: subscription.amount,
+                isExpired: subscription.checkExpirationStatus ? subscription.checkExpirationStatus().isExpired : (subscription.endDate ? new Date(subscription.endDate) < new Date() : false),
+                daysUntilExpiry: subscription.checkExpirationStatus ? subscription.checkExpirationStatus().daysRemaining : null
             } : null;
             
             // Convert profile picture paths to full URLs
@@ -158,7 +160,9 @@ const getUserById = async (req, res, next) => {
             status: subscription.status,
             startDate: subscription.startDate,
             endDate: subscription.endDate,
-            amount: subscription.amount
+            amount: subscription.amount,
+            isExpired: subscription.checkExpirationStatus ? subscription.checkExpirationStatus().isExpired : (subscription.endDate ? new Date(subscription.endDate) < new Date() : false),
+            daysUntilExpiry: subscription.checkExpirationStatus ? subscription.checkExpirationStatus().daysRemaining : null
         } : null;
 
         // If user has a profile picture, convert to full URL
@@ -222,6 +226,19 @@ const getUserProfile = async (req, res, next) => {
             return res.status(404).json(ApiResponse.error('User not found'));
         }
 
+        // Get user's subscription information
+        const subscription = await Subscription.findOne({ userId: req.user.userId }).sort({ createdAt: -1 });
+        user._doc.subscriptionInfo = subscription ? {
+            planName: subscription.planName,
+            planId: subscription.planId,
+            status: subscription.status,
+            startDate: subscription.startDate,
+            endDate: subscription.endDate,
+            amount: subscription.amount,
+            isExpired: subscription.checkExpirationStatus ? subscription.checkExpirationStatus().isExpired : (subscription.endDate ? new Date(subscription.endDate) < new Date() : false),
+            daysUntilExpiry: subscription.checkExpirationStatus ? subscription.checkExpirationStatus().daysRemaining : null
+        } : null;
+
         res.status(200).json(ApiResponse.success(user, 'Profile retrieved successfully'));
     } catch (error) {
         next(error);
@@ -242,6 +259,19 @@ const updateUserProfile = async (req, res, next) => {
         if (!user) {
             return res.status(404).json(ApiResponse.error('User not found'));
         }
+
+        // Get user's subscription information
+        const subscription = await Subscription.findOne({ userId: req.user.userId }).sort({ createdAt: -1 });
+        user._doc.subscriptionInfo = subscription ? {
+            planName: subscription.planName,
+            planId: subscription.planId,
+            status: subscription.status,
+            startDate: subscription.startDate,
+            endDate: subscription.endDate,
+            amount: subscription.amount,
+            isExpired: subscription.checkExpirationStatus ? subscription.checkExpirationStatus().isExpired : (subscription.endDate ? new Date(subscription.endDate) < new Date() : false),
+            daysUntilExpiry: subscription.checkExpirationStatus ? subscription.checkExpirationStatus().daysRemaining : null
+        } : null;
 
         res.status(200).json(ApiResponse.success(user, 'Profile updated successfully'));
     } catch (error) {

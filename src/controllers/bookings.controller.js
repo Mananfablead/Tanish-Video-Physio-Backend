@@ -8,8 +8,8 @@ const getAllBookings = async (req, res, next) => {
     try {
         const bookings = await Booking.find({ userId: req.user.userId })
             .sort({ createdAt: -1 }) // Sort by createdAt descending
-            .populate('serviceId', 'name price duration validity')
-            .populate('therapistId', 'name email role');
+            .populate('serviceId', 'name price duration validity images')
+            .populate('therapistId', 'name email role profilePicture');
 
         res.status(200).json(ApiResponse.success({ bookings }, 'Bookings retrieved successfully'));
     } catch (error) {
@@ -31,8 +31,8 @@ const getBookingById = async (req, res, next) => {
         }
         
         const booking = await Booking.findOne(query)
-            .populate('serviceId', 'name price duration validity')
-            .populate('therapistId', 'name email role');
+            .populate('serviceId', 'name price duration validity images')
+            .populate('therapistId', 'name email role profilePicture');
 
         if (!booking) {
             return res.status(404).json(ApiResponse.error('Booking not found or unauthorized'));
@@ -54,7 +54,7 @@ const getBookingDetails = async (req, res, next) => {
         
         // Find the booking by ID
         const booking = await Booking.findById(bookingId)
-            .populate('serviceId', 'name price duration description validity')
+            .populate('serviceId', 'name price duration description validity images')
             .populate('therapistId', 'name email role profilePicture');
             
         if (!booking) {
@@ -125,8 +125,8 @@ const createBooking = async (req, res, next) => {
         await booking.save();
 
         // Populate the response
-        await booking.populate('serviceId', 'name price duration validity');
-        await booking.populate('therapistId', 'name email role');
+        await booking.populate('serviceId', 'name price duration validity images');
+        await booking.populate('therapistId', 'name email role profilePicture');
 
         res.status(201).json(ApiResponse.success({ booking }, 'Booking created successfully'));
     } catch (error) {
@@ -165,8 +165,8 @@ const updateBooking = async (req, res, next) => {
             updateData,
             { new: true, runValidators: true }
         )
-            .populate('serviceId', 'name price duration validity')
-            .populate('therapistId', 'name email role');
+            .populate('serviceId', 'name price duration validity images')
+            .populate('therapistId', 'name email role profilePicture');
 
         if (!booking) {
             return res.status(404).json(ApiResponse.error('Booking not found or unauthorized'));
@@ -204,8 +204,8 @@ const updateBookingStatus = async (req, res, next) => {
             { status },
             { new: true, runValidators: true }
         )
-            .populate('serviceId', 'name price duration validity')
-            .populate('therapistId', 'name email role');
+            .populate('serviceId', 'name price duration validity images')
+            .populate('therapistId', 'name email role profilePicture');
 
         if (!booking) {
             return res.status(404).json(ApiResponse.error('Booking not found or unauthorized'));
@@ -235,8 +235,8 @@ const deleteBooking = async (req, res, next) => {
             { status: 'cancelled' },
             { new: true }
         )
-            .populate('serviceId', 'name price duration validity')
-            .populate('therapistId', 'name email role');
+            .populate('serviceId', 'name price duration validity images')
+            .populate('therapistId', 'name email role profilePicture');
 
         if (!booking) {
             return res.status(404).json(ApiResponse.error('Booking not found or unauthorized'));
@@ -291,8 +291,8 @@ const updateGuestBookingStatus = async (req, res, next) => {
             }
 
             // Populate the booking before sending response
-            await updatedBooking.populate('serviceId', 'name price duration');
-            await updatedBooking.populate('therapistId', 'name email role');
+            await updatedBooking.populate('serviceId', 'name price duration images');
+            await updatedBooking.populate('therapistId', 'name email role profilePicture');
 
             res.status(200).json(ApiResponse.success({ booking: updatedBooking }, `Booking status updated to ${status} successfully`));
         } else {
@@ -342,9 +342,9 @@ const getAllBookingsForAdmin = async (req, res, next) => {
 
         const bookings = await Booking.find()
             .sort({ createdAt: -1 }) // Sort by createdAt descending
-            .populate('serviceId', 'name price duration validity')
-            .populate('therapistId', 'name email role')
-            .populate('userId', 'name email phone');
+            .populate('serviceId', 'name price duration validity images')
+            .populate('therapistId', 'name email role profilePicture')
+            .populate('userId', 'name email phone profilePicture');
 
         res.status(200).json(ApiResponse.success({ bookings }, 'All bookings retrieved successfully')); 
     } catch (error) {
@@ -369,8 +369,8 @@ const getBookingsByStatus = async (req, res, next) => {
         
         const bookings = await Booking.find(query)
             .sort({ createdAt: -1 }) // Sort by createdAt descending
-            .populate('serviceId', 'name price duration validity')
-            .populate('therapistId', 'name email role');
+            .populate('serviceId', 'name price duration validity images')
+            .populate('therapistId', 'name email role profilePicture');
 
         res.status(200).json(ApiResponse.success({ bookings }, `Bookings with status '${status}' retrieved successfully`));
     } catch (error) {
@@ -465,8 +465,8 @@ const createGuestBooking = async (req, res, next) => {
         await booking.save();
 
         // Populate the response
-        await booking.populate('serviceId', 'name price duration validity');
-        await booking.populate('therapistId', 'name email role');
+        await booking.populate('serviceId', 'name price duration validity images');
+        await booking.populate('therapistId', 'name email role profilePicture');
 
         res.status(201).json(ApiResponse.success({
             booking,

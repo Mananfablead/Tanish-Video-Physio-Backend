@@ -27,7 +27,7 @@ const subscriptionPlanSchema = new mongoose.Schema({
     duration: {
         type: String,
         required: [true, 'Duration is required'],
-        enum: ["monthly", "quarterly", "yearly"]
+        enum: ["monthly", "quarterly", "half-yearly", "yearly"]
     },
     sessions: {
         type: Number,
@@ -42,6 +42,19 @@ const subscriptionPlanSchema = new mongoose.Schema({
     sortOrder: {
         type: Number,
         default: 0
+    },
+    validityDays: {
+        type: Number,
+        default: function() {
+            // Set default validity based on duration
+            switch(this.duration) {
+                case 'monthly': return 30;
+                case 'quarterly': return 90;
+                case 'half-yearly': return 180;
+                case 'yearly': return 365;
+                default: return 30;
+            }
+        }
     }
 }, {
     timestamps: true
