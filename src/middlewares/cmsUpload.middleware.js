@@ -70,7 +70,7 @@ const cmsUpload = multer({
     storage: storage,
     fileFilter: fileFilter,
     limits: {
-        fileSize: 10 * 1024 * 1024 // Limit file size to 10MB
+        fileSize: 100 * 1024 * 1024 // 100MB
     }
 });
 

@@ -55,7 +55,7 @@ const recordingUpload = multer({
     storage: recordingVideoStorage, // Use video storage as default for recordings
     fileFilter: recordingFileFilter,
     limits: {
-        fileSize: 100 * 1024 * 1024 // 100MB limit for recordings to accommodate videos
+        fileSize: 100 * 1024 * 1024 // 100MB
     }
 });
 
@@ -63,7 +63,7 @@ const recordingImageUpload = multer({
     storage: recordingImageStorage,
     fileFilter: recordingFileFilter,
     limits: {
-        fileSize: 10 * 1024 * 1024 // 10MB limit for images
+        fileSize: 100 * 1024 * 1024 // 100MB
     }
 });
 
