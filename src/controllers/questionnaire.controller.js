@@ -11,6 +11,7 @@ const getAllQuestionnaires = async (req, res, next) => {
     } catch (error) {
         next(error);
     }
+    
 };
 
 // Get active questionnaire (for client use)
