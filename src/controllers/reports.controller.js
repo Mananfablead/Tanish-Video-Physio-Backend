@@ -239,11 +239,22 @@ const getAdminDashboard = async (req, res, next) => {
         
         // Get subscription statistics
         const Subscription = require('../models/Subscription.model');
+        const SubscriptionPlan = require('../models/SubscriptionPlan.model');
         const activeSubscriptions = await Subscription.countDocuments({ status: 'active' });
+        
+        // Get subscription plan statistics
+        const totalSubscriptionPlans = await SubscriptionPlan.countDocuments({ status: 'active' });
+        const subscriptionPlans = await SubscriptionPlan.find({ status: 'active' });
 
         // Get revenue statistics
         const payments = await Payment.find({ status: 'paid' });
         const totalRevenue = payments.reduce((sum, payment) => sum + payment.amount, 0);
+        
+        // Get subscription revenue by plan
+        const subscriptionPayments = await Payment.find({ 
+            status: 'paid', 
+            paymentType: 'subscription' 
+        }).populate('subscriptionId', 'planId');
 
         // Get upcoming sessions
         const nowForCount = new Date();
@@ -473,6 +484,54 @@ const getAdminDashboard = async (req, res, next) => {
     // Limit to last 10 activities
     const recentActivityData = recentActivity.slice(0, 10);
 
+    // Calculate subscription plan statistics
+    const activeSubscriptionsByPlan = {};
+    const planRevenueStats = {};
+    
+    // Get subscription distribution by plan
+    const subscriptionsWithPlans = await Subscription.find({ status: 'active' }).populate('planId', 'name duration validityDays');
+    
+    subscriptionsWithPlans.forEach(subscription => {
+        if (subscription.planId) {
+            const planKey = `${subscription.planId.name} (${subscription.planId.duration})`;
+            if (!activeSubscriptionsByPlan[planKey]) {
+                activeSubscriptionsByPlan[planKey] = {
+                    count: 0,
+                    planName: subscription.planId.name,
+                    duration: subscription.planId.duration,
+                    validityDays: subscription.planId.validityDays
+                };
+            }
+            activeSubscriptionsByPlan[planKey].count += 1;
+        }
+    });
+    
+    // Calculate revenue by plan
+    for (const payment of subscriptionPayments) {
+        if (payment.subscriptionId?.planId) {
+            const planId = payment.subscriptionId.planId;
+            if (!planRevenueStats[planId]) {
+                planRevenueStats[planId] = { 
+                    totalRevenue: 0, 
+                    subscriptionCount: 0,
+                    planName: ''
+                };
+            }
+            planRevenueStats[planId].totalRevenue += payment.amount;
+            planRevenueStats[planId].subscriptionCount += 1;
+        }
+    }
+    
+    // Get plan details for better display
+    for (const planId in planRevenueStats) {
+        const plan = await SubscriptionPlan.findOne({ planId: planId });
+        if (plan) {
+            planRevenueStats[planId].planName = plan.name;
+            planRevenueStats[planId].duration = plan.duration;
+            planRevenueStats[planId].validityDays = plan.validityDays;
+        }
+    }
+
     // Fetch upcoming sessions dynamically
     const upcomingSessionsData = [];
     
@@ -514,7 +573,13 @@ const getAdminDashboard = async (req, res, next) => {
                     totalServices,
                     pendingBookings,
                     monthlyGrowthRate,
-                    customerSatisfactionScore
+                    customerSatisfactionScore,
+                    totalSubscriptionPlans
+                },
+                subscriptionPlans,
+                subscriptionStats: {
+                    activeSubscriptionsByPlan,
+                    planRevenueStats
                 },
                 revenueChart,
                 sessionsChart,
