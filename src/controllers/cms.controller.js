@@ -284,10 +284,14 @@ exports.updateConditions = async (req, res) => {
         // Handle conditions data - works with indexed fields, JSON string, or array
         let conditionsArray = [];
 
-        // Check if we have indexed condition fields
+        // Check if we have indexed condition fields (both bracket and dot notation)
         const conditionFields = {};
         Object.keys(req.body).forEach(key => {
-            const match = key.match(/^conditions\[(\d+)\]\.(title|content|image)$/);
+            // Match both conditions[0][title] and conditions[0].title formats
+            let match = key.match(/^conditions\[(\d+)\]\[(title|content|image)\]$/); // conditions[0][title] format
+            if (!match) {
+                match = key.match(/^conditions\[(\d+)\]\.(title|content|image)$/); // conditions[0].title format
+            }
             if (match) {
                 const index = parseInt(match[1]);
                 const field = match[2];
@@ -353,12 +357,13 @@ exports.updateConditions = async (req, res) => {
                         // Enhanced pattern matching for condition images
                         // Try multiple patterns to catch different field name formats
                         const patterns = [
-                            /^conditions\[(\d+)\]\.image$/,  // conditions[0].image
+                            /^conditions\[(\d+)\]\[image\]$/,  // conditions[0][image] - bracket notation
+                            /^conditions\[(\d+)\]\.image$/,  // conditions[0].image - dot notation
                             /^conditions\.(\d+)\.image$/,    // conditions.0.image  
                             /^(\d+)$/,                       // Just the index number
                             /^conditions\[(\d+)\]$/          // conditions[0] (if image is separate)
                         ];
-
+                        
                         for (const pattern of patterns) {
                             const match = fieldKey.match(pattern);
                             if (match) {
@@ -367,12 +372,23 @@ exports.updateConditions = async (req, res) => {
                                 break;
                             }
                         }
-                        
+                                                
+                        // Alternative pattern matching for bracket notation
+                        if (conditionIndex === null) {
+                            // Try matching conditions[0] or conditions[0][any_field] formats
+                            const bracketPattern = /^conditions\[(\d+)\](?:\[.+\])?$/;
+                            const bracketMatch = fieldKey.match(bracketPattern);
+                            if (bracketMatch) {
+                                conditionIndex = parseInt(bracketMatch[1]);
+                                console.log(`Matched bracket pattern ${bracketPattern} with index: ${conditionIndex}`);
+                            }
+                        }
+                                                
                         if (conditionIndex !== null && conditionIndex < conditionsArray.length) {
                             const imageUrl = `${config.BASE_URL}/uploads/cms-condition-images/${uploadedFile.filename}`;
                             console.log(`Setting image for condition ${conditionIndex}: ${imageUrl}`);
                             conditionsArray[conditionIndex].image = imageUrl;
-                            
+                                                    
                             // Also update the conditionsData to ensure it's preserved
                             if (conditionsData.conditions && conditionsData.conditions[conditionIndex]) {
                                 conditionsData.conditions[conditionIndex].image = imageUrl;
@@ -397,10 +413,10 @@ exports.updateConditions = async (req, res) => {
             // Create a copy of conditionsArray with image URLs preserved
             const processedConditions = conditionsArray.map((condition, index) => {
                 // Check if this condition already has an image URL from file upload
-                const hasUploadedImage = condition.image && condition.image.startsWith('http');
+                const hasUploadedImage = condition.image && typeof condition.image === 'string' && condition.image.startsWith('http');
                 
                 if (hasUploadedImage) {
-                // Keep the uploaded image URL
+                    // Keep the uploaded image URL
                     return condition;
                 } else {
                     // No new image uploaded, preserve existing image URL from database
