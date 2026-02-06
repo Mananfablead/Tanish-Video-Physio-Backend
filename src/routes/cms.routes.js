@@ -31,6 +31,15 @@ router.delete('/admin/steps/:id', cmsController.deleteStep);
 
 // Conditions Section
 router.get('/admin/conditions', cmsController.getConditionsAdmin);
+router.post('/admin/conditions', cmsUpload.any(), cmsController.createConditions);
+router.put('/admin/conditions/:id', cmsUpload.any(), cmsController.updateConditionsById);
+// Endpoint to add a single condition to the existing conditions array
+router.post('/admin/conditions/single', cmsUpload.any(), cmsController.addSingleCondition);
+// Endpoint to update a single condition in the existing conditions array
+router.put('/admin/conditions/single/:index', cmsUpload.any(), cmsController.updateSingleCondition);
+// Endpoint to delete a single condition from the existing conditions array
+router.delete('/admin/conditions/single/:index', cmsController.deleteSingleCondition);
+// Backward compatibility - keep the old route for update
 router.put('/admin/conditions', cmsUpload.any(), cmsController.updateConditions);
 
 // Why Us Section
