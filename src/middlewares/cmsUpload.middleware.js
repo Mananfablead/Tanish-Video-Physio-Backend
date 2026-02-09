@@ -19,11 +19,11 @@ const storage = multer.diskStorage({
         if (fieldname === 'image') {
             // For general image fields like hero, about, etc.
             dir = 'public/uploads/cms-images/';
-        } else if (fieldname.includes('conditions[') && fieldname.includes('].image')) {
-            // For condition images
+        } else if (fieldname.includes('conditions[') && fieldname.includes('[image]')) {
+            // For condition images with bracket notation
             dir = 'public/uploads/cms-condition-images/';
-        } else if (fieldname === 'conditions.image') {
-            // For condition images in some formats
+        } else if (fieldname.includes('conditions[') && fieldname.includes('].image')) {
+            // For condition images with dot notation
             dir = 'public/uploads/cms-condition-images/';
         } else if (fieldname.includes('condition') && fieldname.includes('.image')) {
             // For various condition image field formats
