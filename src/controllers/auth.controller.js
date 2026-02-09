@@ -154,15 +154,30 @@ const getProfile = async (req, res, next) => {
 
         // Find the most relevant subscription (active/paid or most recent)
         let activeSubscription = null;
+        let expiredSubscriptions = [];
+
+        // Check expiration status for all subscriptions
+        const subscriptionsWithExpiry = await Promise.all(subscriptions.map(async (subscription) => {
+            const expiryStatus = subscription.checkExpirationStatus();
+            return {
+                ...subscription.toObject(),
+                ...expiryStatus
+            };
+        }));
+
+        // Separate active and expired subscriptions
+        const activeSubscriptions = subscriptionsWithExpiry.filter(sub => 
+            !sub.isExpired && (sub.status === 'active' || sub.status === 'paid')
+        );
+        
+        expiredSubscriptions = subscriptionsWithExpiry.filter(sub => sub.isExpired);
 
         // First check for active subscriptions
-        activeSubscription = subscriptions.find(sub =>
-            sub.status === 'active' || sub.status === 'paid'
-        ) || null;
+        activeSubscription = activeSubscriptions[0] || null;
 
         // If no active subscription found, get the most recent one
         if (!activeSubscription && subscriptions.length > 0) {
-            activeSubscription = subscriptions[0];
+            activeSubscription = subscriptionsWithExpiry[0];
         }
 
         // Get user's bookings with service information
@@ -220,7 +235,7 @@ const getProfile = async (req, res, next) => {
                 };
             });
 
-        // Add subscription data and purchased services to the response
+        // Add subscription data, expiration info, and purchased services to the response
         const responseData = {
             ...user.toObject(),
             subscriptionData: activeSubscription ? {
@@ -232,10 +247,39 @@ const getProfile = async (req, res, next) => {
                 status: activeSubscription.status,
                 startDate: activeSubscription.startDate,
                 endDate: activeSubscription.endDate,
+                isExpired: activeSubscription.isExpired,
+                daysRemaining: activeSubscription.daysRemaining,
+                expiryStatus: activeSubscription.status, // active, expiring_soon, expired
                 createdAt: activeSubscription.createdAt
             } : null,
+            expiredSubscriptions: expiredSubscriptions.map(sub => ({
+                id: sub._id,
+                planId: sub.planId,
+                planName: sub.planName,
+                amount: sub.amount,
+                status: sub.status,
+                startDate: sub.startDate,
+                endDate: sub.endDate,
+                expiredDays: Math.abs(sub.daysRemaining),
+                expiryDate: sub.expiryDate
+            })),
             purchasedServices: purchasedServices
         };
+
+        // Add subscription warning message if there are expired subscriptions
+        if (expiredSubscriptions.length > 0) {
+            responseData.subscriptionWarning = {
+                type: 'expired',
+                message: `You have ${expiredSubscriptions.length} expired subscription(s).`,
+                count: expiredSubscriptions.length
+            };
+        } else if (activeSubscription && activeSubscription.status === 'expiring_soon') {
+            responseData.subscriptionWarning = {
+                type: 'expiring_soon',
+                message: `Your subscription expires in ${activeSubscription.daysRemaining} day(s).`,
+                daysRemaining: activeSubscription.daysRemaining
+            };
+        }
 
         res.status(200).json(ApiResponse.success(responseData, 'Profile retrieved successfully'));
     } catch (error) {
