@@ -240,7 +240,11 @@ const getCallDetails = async (req, res) => {
                 time: session.time,
                 status: session.status,
                 user: session.userId,
-                therapist: session.therapistId
+                therapist: session.therapistId,
+                googleMeetLink: session.googleMeetLink,
+                googleMeetCode: session.googleMeetCode,
+                googleMeetExpiresAt: session.googleMeetExpiresAt,
+                googleMeetEventId: session.googleMeetEventId
             },
             callLogs
         });
