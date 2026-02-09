@@ -18,7 +18,14 @@ const storage = multer.diskStorage({
         
         if (fieldname === 'image') {
             // For general image fields like hero, about, etc.
-            dir = 'public/uploads/cms-images/';
+            // Check if this is coming from conditions update by checking the request path
+            const url = req.url;
+            if (url.includes('/conditions')) {
+                // Special handling for conditions section main image
+                dir = 'public/uploads/cms-condition-images/';
+            } else {
+                dir = 'public/uploads/cms-images/';
+            }
         } else if (fieldname.includes('conditions[') && fieldname.includes('[image]')) {
             // For condition images with bracket notation
             dir = 'public/uploads/cms-condition-images/';
