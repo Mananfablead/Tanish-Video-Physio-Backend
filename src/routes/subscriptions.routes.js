@@ -1,5 +1,5 @@
 const express = require('express');
-const { getSubscriptionPlans, createSubscriptionPlan, getAllSubscriptionPlans, getSubscriptionPlan, updateSubscriptionPlan, deleteSubscriptionPlan, getUserSubscriptions, getAllSubscriptions, getExpiredSubscriptions, getExpiredServices } = require('../controllers/subscriptions.controller');
+const { getSubscriptionPlans, createSubscriptionPlan, getAllSubscriptionPlans, getSubscriptionPlan, updateSubscriptionPlan, deleteSubscriptionPlan, archiveSubscriptionPlan, getUserSubscriptions, getAllSubscriptions, getExpiredSubscriptions, getExpiredServices } = require('../controllers/subscriptions.controller');
 const { authenticateToken, authorizeRoles } = require('../middlewares/auth.middleware');
 
 const router = express.Router();
