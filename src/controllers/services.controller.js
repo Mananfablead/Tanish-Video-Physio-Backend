@@ -179,9 +179,73 @@ const getServiceByIdAdmin = async (req, res, next) => {
             return res.status(404).json(ApiResponse.error('Service not found'));
         }
 
+        // Count total purchases for this service
+        const Booking = require('../models/Booking.model');
+        const purchaseCount = await Booking.countDocuments({
+            serviceId: req.params.id,
+            paymentStatus: 'paid'
+        });
+        
+        // Get recent purchasers with details
+        const recentPurchases = await Booking.find({
+            serviceId: req.params.id,
+            paymentStatus: 'paid'
+        })
+        .populate('userId', 'name email phone')
+        .sort({ createdAt: -1 })
+        .limit(10); // Get last 10 purchases
+        
+        // Calculate additional stats
+        const activeBookings = await Booking.countDocuments({
+            serviceId: req.params.id,
+            paymentStatus: 'paid',
+            status: { $in: ['confirmed', 'ongoing'] }
+        });
+        
+        const completedBookings = await Booking.countDocuments({
+            serviceId: req.params.id,
+            paymentStatus: 'paid',
+            status: 'completed'
+        });
+        
         // Convert relative paths to absolute URLs
         const serviceWithAbsoluteUrls = convertToAbsoluteUrls(service.toObject());
-        res.status(200).json(ApiResponse.success({ service: serviceWithAbsoluteUrls }, 'Service retrieved successfully'));
+        
+        // Get detailed purchasers list
+        const purchasers = await Booking.find({
+            serviceId: req.params.id,
+            paymentStatus: 'paid'
+        })
+        .populate('userId', 'name email phone')
+        .select('userId amount status createdAt updatedAt')
+        .sort({ createdAt: -1 });
+        
+        res.status(200).json(ApiResponse.success({ 
+            service: {
+                ...serviceWithAbsoluteUrls,
+                purchaseStats: {
+                    totalPurchases: purchaseCount,
+                    activeBookings,
+                    completedBookings,
+                    recentPurchases: recentPurchases.map(purchase => ({
+                        id: purchase._id,
+                        userId: purchase.userId,
+                        bookingDate: purchase.createdAt,
+                        amount: purchase.amount,
+                        status: purchase.status,
+                        paymentStatus: purchase.paymentStatus
+                    })),
+                    purchasers: purchasers.map(purchaser => ({
+                        id: purchaser._id,
+                        userId: purchaser.userId,
+                        amount: purchaser.amount,
+                        status: purchaser.status,
+                        bookingDate: purchaser.createdAt,
+                        updatedDate: purchaser.updatedAt
+                    }))
+                }
+            }
+        }, 'Service with purchase details retrieved successfully'));
     } catch (error) {
         next(error);
     }

@@ -1,5 +1,5 @@
 const express = require('express');
-const { createOrder, createGuestOrder, verifyPayment, verifyGuestPayment, handleWebhook, createSubscriptionOrder, createGuestSubscriptionOrder, verifySubscriptionPayment, verifyGuestSubscriptionPayment, getUserPayments, getAllPayments } = require('../controllers/payments.controller');
+const { createOrder, createGuestOrder, verifyPayment, verifyGuestPayment, handleWebhook, createSubscriptionOrder, createGuestSubscriptionOrder, verifySubscriptionPayment, verifyGuestSubscriptionPayment, getUserPayments, getAllPayments, getPaymentById } = require('../controllers/payments.controller');
 const { authenticateToken, authorizeRoles } = require('../middlewares/auth.middleware');
 
 const router = express.Router();
@@ -25,7 +25,11 @@ router.post('/webhook', handleWebhook); // This endpoint should be accessible wi
 
 // Route to get user's payments
 router.get('/user', authenticateToken, getUserPayments);
+
 // Admin route to get all payments
 router.get('/admin/all', authenticateToken, authorizeRoles('admin'), getAllPayments);
+
+// Admin route to get payment by ID
+router.get('/admin/:paymentId', authenticateToken, authorizeRoles('admin'), getPaymentById);
 
 module.exports = router;

@@ -82,7 +82,7 @@ const getAllSubscriptionPlans = async (req, res, next) => {
     }
 };
 
-// Get a specific subscription plan
+// Get a specific subscription plan id with subscriber  
 const getSubscriptionPlan = async (req, res, next) => {
     try {
         const plan = await SubscriptionPlan.findById(req.params.id);
@@ -90,8 +90,79 @@ const getSubscriptionPlan = async (req, res, next) => {
         if (!plan) {
             return res.status(404).json(ApiResponse.error('Subscription plan not found'));
         }
-
-        res.status(200).json(ApiResponse.success({ plan }, 'Subscription plan retrieved successfully'));
+        
+        // Use the planId string value to match with subscriptions
+        const planIdValue = plan.planId;
+        let queryCondition = { planId: planIdValue };
+        
+        // Count total subscribers for this plan (including guest subscriptions)
+        const subscriberCount = await Subscription.countDocuments({
+            ...queryCondition,
+            status: { $in: ['active', 'expired'] }
+        });
+        
+        // Get detailed subscriber information
+        const subscriptions = await Subscription.find(queryCondition)
+        .populate('userId', 'name email phone joinDate')
+        .sort({ createdAt: -1 });
+        
+        // Process subscribers to handle both registered users and guest users
+        const subscribers = await Promise.all(subscriptions.map(async (sub) => {
+            if (sub.userId) {
+                // Registered user
+                return {
+                    id: sub._id,
+                    userId: sub.userId,
+                    status: sub.status,
+                    startDate: sub.startDate,
+                    endDate: sub.endDate,
+                    createdAt: sub.createdAt,
+                    updatedAt: sub.updatedAt,
+                    amount: sub.amount,
+                    currency: sub.currency
+                };
+            } else {
+                // Guest user - include guest information if available
+                return {
+                    id: sub._id,
+                    userId: {
+                        _id: sub.userId || 'guest',
+                        name: sub.guestName || 'Guest User',
+                        email: sub.guestEmail || 'N/A',
+                        phone: sub.guestPhone || 'N/A',
+                        joinDate: sub.createdAt
+                    },
+                    status: sub.status,
+                    startDate: sub.startDate,
+                    endDate: sub.endDate,
+                    createdAt: sub.createdAt,
+                    updatedAt: sub.updatedAt,
+                    amount: sub.amount,
+                    currency: sub.currency
+                };
+            }
+        }));
+        
+        // Add additional stats
+        const activeSubscribers = await Subscription.countDocuments({
+            ...queryCondition,
+            status: 'active'
+        });
+        
+        const expiredSubscribers = await Subscription.countDocuments({
+            ...queryCondition,
+            status: 'expired'
+        });
+        
+        res.status(200).json(ApiResponse.success({ 
+            plan: {
+                ...plan.toObject(),
+                subscriberCount,
+                activeSubscribers,
+                expiredSubscribers,
+                subscribers // Already mapped in the processing step above
+            } 
+        }, 'Subscription plan with subscriber details retrieved successfully'));
     } catch (error) {
         next(error);
     }

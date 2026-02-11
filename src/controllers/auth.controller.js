@@ -233,7 +233,8 @@ const getProfile = async (req, res, next) => {
                         remaining: service.sessions
                     }
                 };
-            });
+            })
+            .filter(service => !service.isExpired); // Filter out expired services
 
         // Add subscription data, expiration info, and purchased services to the response
         const responseData = {
