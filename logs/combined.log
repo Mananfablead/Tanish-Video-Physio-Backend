@@ -1108,3 +1108,8 @@
 {"level":"info","message":"User 6979dea1511c8daa0d0923a6 disconnected from chat","service":"tanish-physio-backend","timestamp":"2026-02-11T10:55:09.776Z"}
 {"level":"info","message":"Socket oV6YvjhiOCFQHgS-AAAF disconnected","service":"tanish-physio-backend","timestamp":"2026-02-11T10:55:09.860Z"}
 {"level":"info","message":"Admin 6979dea1511c8daa0d0923a6 joined admin notification room","service":"tanish-physio-backend","timestamp":"2026-02-11T10:55:39.206Z"}
+{"level":"info","message":"Initializing external services...","service":"tanish-physio-backend","timestamp":"2026-02-11T10:56:49.457Z"}
+{"level":"info","message":"Google Calendar API initialized successfully","service":"tanish-physio-backend","timestamp":"2026-02-11T10:56:49.610Z"}
+{"level":"info","message":"✓ Google Calendar API initialized successfully","service":"tanish-physio-backend","timestamp":"2026-02-11T10:56:49.627Z"}
+{"level":"info","message":"External services initialization completed","service":"tanish-physio-backend","timestamp":"2026-02-11T10:56:49.634Z"}
+{"level":"info","message":"Admin 6979dea1511c8daa0d0923a6 joined admin notification room","service":"tanish-physio-backend","timestamp":"2026-02-11T10:56:51.395Z"}
