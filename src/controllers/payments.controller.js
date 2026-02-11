@@ -982,6 +982,26 @@ const getUserPayments = async (req, res, next) => {
     }
 };
 
+// Get payment details by ID (Admin only)
+const getPaymentById = async (req, res, next) => {
+    try {
+        const { paymentId } = req.params;
+        
+        const payment = await Payment.findById(paymentId)
+            .populate('userId', 'name email phone role status createdAt')
+            .populate('bookingId', 'serviceName therapistName date time status paymentStatus clientName purchaseDate serviceExpiryDate serviceValidityDays')
+            .populate('subscriptionId', 'planName status startDate endDate nextBillingDate');
+
+        if (!payment) {
+            return res.status(404).json(ApiResponse.error('Payment not found'));
+        }
+
+        res.status(200).json(ApiResponse.success({ payment }, 'Payment details retrieved successfully'));
+    } catch (error) {
+        next(error);
+    }
+};
+
 // Get all payments (Admin only)
 const getAllPayments = async (req, res, next) => {
     try {
@@ -1007,5 +1027,6 @@ module.exports = {
     verifySubscriptionPayment,
     verifyGuestSubscriptionPayment,
     getUserPayments,
-    getAllPayments
+    getAllPayments,
+    getPaymentById
 };
