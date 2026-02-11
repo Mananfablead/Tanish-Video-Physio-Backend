@@ -61,6 +61,18 @@ const sessionSchema = new mongoose.Schema({
         type: Number, // Duration in minutes
         default: 0
     },
+    googleMeetLink: {
+        type: String
+    },
+    googleMeetCode: {
+        type: String
+    },
+    googleMeetExpiresAt: {
+        type: Date
+    },
+    googleMeetEventId: {
+        type: String
+    },
     notes: {
         type: String,
         maxlength: [1000, 'Notes cannot exceed 1000 characters']

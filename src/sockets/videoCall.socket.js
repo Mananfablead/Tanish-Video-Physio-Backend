@@ -4,6 +4,7 @@ const GroupSession = require('../models/GroupSession.model');
 const CallLog = require('../models/CallLog.model');
 const logger = require('../utils/logger');
 const mongoose = require('mongoose');
+const { createGoogleMeetEvent } = require('../utils/googleMeet.utils');
 
 // Room-based participant registry
 // Map<roomId, Map<socketId, Participant>>
@@ -962,6 +963,62 @@ const setupVideoCallHandlers = (io, socket) => {
             callLog.recordingStatus = 'recording';
             callLog.recordingStartTime = new Date();
             await callLog.save();
+
+            // If this is a 1-on-1 session, generate Google Meet link when session goes live
+            if (roomType === 'session') {
+                try {
+                    const session = await Session.findById(roomId).populate('userId').populate('therapistId');
+                    if (session) {
+                        // ONLY use Google Calendar API - no fallback
+                        try {
+                            // Create Google Meet event through Google Calendar API
+                            const googleMeetData = await createGoogleMeetEvent({
+                                sessionId: roomId,
+                                startTime: new Date().toISOString(),
+                                endTime: new Date(Date.now() + (session.duration || 60) * 60 * 1000).toISOString(),
+                                userName: session.userId?.name || 'Patient',
+                                userEmail: session.userId?.email || '',
+                                therapistName: session.therapistId?.name || 'Therapist',
+                                therapistEmail: session.therapistId?.email || '',
+                                summary: `Physiotherapy Session - ${session.therapistId?.name || 'Therapist'}`
+                            });
+
+                            // Update session with Google Meet details from Calendar API
+                            await Session.findByIdAndUpdate(
+                                roomId,
+                                {
+                                    status: 'live',
+                                    startTime: new Date(),
+                                    googleMeetLink: googleMeetData.googleMeetLink,
+                                    googleMeetCode: googleMeetData.googleMeetCode,
+                                    googleMeetExpiresAt: googleMeetData.googleMeetExpiresAt,
+                                    googleMeetEventId: googleMeetData.googleMeetEventId
+                                },
+                                { new: true, runValidators: true }
+                            );
+
+                            logger.info(`Session ${roomId} status updated to live with Google Calendar Meet link: ${googleMeetData.googleMeetLink}`);
+                        } catch (calendarError) {
+                            // ONLY Google Calendar API - no fallback
+                            logger.error('Google Calendar API failed - cannot generate Google Meet link:', calendarError);
+
+                            // Update session status but without Google Meet link
+                            await Session.findByIdAndUpdate(
+                                roomId,
+                                {
+                                    status: 'live',
+                                    startTime: new Date()
+                                },
+                                { new: true, runValidators: true }
+                            );
+
+                            logger.warn(`Session ${roomId} status updated to live but Google Meet link generation failed`);
+                        }
+                    }
+                } catch (sessionUpdateError) {
+                    logger.error('Error updating session status:', sessionUpdateError);
+                }
+            }
 
             io.to(roomId).emit('call-started', {
                 roomId: roomId,

@@ -12,6 +12,7 @@ const routes = require('./src/routes');
 const errorHandler = require('./src/middlewares/error.middleware');
 const fs = require('fs');
 const logger = require('./src/utils/logger');
+const { initializeServices } = require('./src/utils/serviceInitializer.utils');
 
 const app = express();
 // Security middleware
@@ -148,6 +149,9 @@ const startServer = async () => {
     try {
         await connectDB();
         console.log(`Database connected successfully`);
+
+        // Initialize external services
+        await initializeServices();
 
         const PORT = config.PORT || 5001;
 
