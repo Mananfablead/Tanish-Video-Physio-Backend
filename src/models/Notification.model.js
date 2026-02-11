@@ -14,13 +14,26 @@ const notificationSchema = new mongoose.Schema({
     },
     type: {
         type: String,
-        enum: ['booking', 'payment', 'session', 'system'],
+        enum: ['booking', 'payment', 'session', 'system', 'connection_failure'],
         required: [true, 'Type is required']
     },
     userId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         default: null // If null, it's a global notification
+    },
+    sessionId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Session',
+        default: null // For session-specific notifications
+    },
+    channels: {
+        type: {
+            email: { type: Boolean, default: false },
+            whatsapp: { type: Boolean, default: false },
+            inApp: { type: Boolean, default: true }
+        },
+        default: { email: false, whatsapp: false, inApp: true }
     },
     read: {
         type: Boolean,

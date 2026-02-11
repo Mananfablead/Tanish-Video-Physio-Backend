@@ -21,7 +21,7 @@ const userSchema = new mongoose.Schema(
     phone: {
       type: String,
       required: false,
-      match: [/^[0-9]{10}$/, "Please enter a valid 10-digit phone number"],
+      match: [/^[0-9]{10,15}$/, "Please enter a valid phone number (10-15 digits)"],
     },
     location: {
       type: String,

@@ -4,8 +4,14 @@ const { authenticateToken, authorizeRoles } = require('../middlewares/auth.middl
 
 const router = express.Router();
 
+// Payment routes for service bookings
 router.post('/create-order', authenticateToken, createOrder);
 router.post('/verify', authenticateToken, verifyPayment);
+
+// Subscription payment routes
+router.post('/create-subscription-order', authenticateToken, createSubscriptionOrder);
+router.post('/verify-subscription', authenticateToken, verifySubscriptionPayment);
+
 // Public route for guest payment verification
 router.post('/create-guest-order', createGuestOrder);
 router.post('/verify-guest', verifyGuestPayment);
@@ -13,10 +19,6 @@ router.post('/verify-guest', verifyGuestPayment);
 // Public route for guest subscription payment verification
 router.post('/create-guest-subscription-order', createGuestSubscriptionOrder);
 router.post('/verify-guest-subscription', verifyGuestSubscriptionPayment);
-
-// Subscription payment routes
-router.post('/create-subscription-order', authenticateToken, createSubscriptionOrder);
-router.post('/verify-subscription', authenticateToken, verifySubscriptionPayment);
 
 // Webhook endpoint for Razorpay payments and subscriptions
 router.post('/webhook', handleWebhook); // This endpoint should be accessible without authentication for Razorpay webhooks

@@ -228,12 +228,14 @@ const startServer = async () => {
         io.on('connection', (socket) => {
             console.log('New client connected:', socket.id);
 
-            // Load chat and video call handlers
+            // Load chat, video call, and notification handlers
             const setupChatHandlers = require('./src/sockets/chat.socket');
             const setupVideoCallHandlers = require('./src/sockets/videoCall.socket');
+            const { setupNotificationHandlers } = require('./src/sockets/notification.socket');
 
             setupChatHandlers(io, socket);
             setupVideoCallHandlers(io, socket);
+            setupNotificationHandlers(io, socket);
 
             socket.on('disconnect', () => {
                 console.log('Client disconnected:', socket.id);
@@ -245,6 +247,9 @@ const startServer = async () => {
             console.log(`Environment: ${config.NODE_ENV}`);
             console.log(`WebSocket server running on port ${PORT}`);
         });
+
+        // Export io instance for use in controllers
+        module.exports = { ...app, io };
     } catch (error) {
         console.error('Failed to start server:', error);
         process.exit(1);

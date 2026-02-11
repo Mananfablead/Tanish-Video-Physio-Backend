@@ -61,6 +61,117 @@ async function activateSubscription(subscriptionId) {
 
     return await Subscription.findById(subscriptionId);
 }
+// Helper function to send welcome email with login credentials
+async function sendWelcomeEmailWithCredentials(email, name, username, password) {
+    const nodemailer = require('nodemailer');
+    const { createTransport } = nodemailer;
+
+    const transporter = createTransport({
+        service: 'gmail',
+        host: process.env.EMAIL_HOST,
+        port: process.env.EMAIL_PORT,
+        auth: {
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASS
+        }
+    });
+
+    const message = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Welcome to Tanish Physio</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+
+<body style="margin:0; padding:0; background-color:#f4f6f8; font-family:Arial, Helvetica, sans-serif;">
+
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f6f8; padding:30px 0;">
+    <tr>
+      <td align="center">
+
+        <!-- Main Container -->
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff; border-radius:8px; overflow:hidden; box-shadow:0 6px 18px rgba(0,0,0,0.08);">
+
+          <!-- Header -->
+          <tr>
+            <td style="background:linear-gradient(135deg,#667eea,#764ba2); padding:30px; text-align:center; color:#ffffff;">
+              <h1 style="margin:0; font-size:26px;">Tanish Physio</h1>
+              <p style="margin:8px 0 0; font-size:14px; opacity:0.9;">
+                Physical Therapy & Rehabilitation Center
+              </p>
+            </td>
+          </tr>
+
+          <!-- Content -->
+          <tr>
+            <td style="padding:35px; color:#333333;">
+              <h2 style="margin-top:0; font-size:22px; color:#222;">
+                Welcome to Tanish Physio
+              </h2>
+
+              <p style="font-size:15px; line-height:1.6;">
+                Hello <strong>${name}</strong>,
+              </p>
+
+              <p style="font-size:15px; line-height:1.6;">
+                Thank you for booking a session with us and completing the payment! Your account has been created successfully and your booking is confirmed.
+              </p>
+
+              <p style="font-size:15px; line-height:1.6;">
+                <strong>Login Credentials:</strong><br>
+                Email: ${username}<br>
+                Temporary Password: ${password}
+              </p>
+              
+              <p style="font-size:15px; line-height:1.6; color: #ff6b6b; font-weight: bold;">
+                IMPORTANT: Please change your password after first login for security.
+              </p>
+
+              <p style="font-size:15px; line-height:1.6;">
+                You can now log in to your account and manage your bookings.
+              </p>
+
+              <p style="font-size:15px; margin-top:30px;">
+                Regards,<br>
+                <strong>Tanish Physio Team</strong>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background:#f1f3f6; padding:20px; text-align:center; font-size:12px; color:#777;">
+              <p style="margin:0;">
+                © 2024 Tanish Physio. All rights reserved.
+              </p>
+              <p style="margin:6px 0 0;">
+                This is an automated email. Please do not reply.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>
+`;
+
+    const mailOptions = {
+        to: email,
+        from: process.env.EMAIL_USER,
+        subject: 'Welcome to Tanish Physio - Account Created & Payment Verified',
+        html: message
+    };
+
+    // Send email
+    await transporter.sendMail(mailOptions);
+}
 
 // Create a payment order for Razorpay
 const createOrder = async (req, res, next) => {
@@ -103,6 +214,92 @@ const createOrder = async (req, res, next) => {
                 currency: order.currency
             }, 'Payment order created successfully')
         );
+    } catch (error) {
+        next(error);
+    }
+};
+// Verify payment after successful transaction
+const verifyPayment = async (req, res, next) => {
+    try {
+        const { paymentId, orderId, signature } = req.body;
+        const userId = req.user.userId;
+
+        // Fetch payment details from our database
+        const payment = await Payment.findOne({ orderId, userId });
+        if (!payment) {
+            return res.status(404).json(ApiResponse.error('Payment not found'));
+        }
+
+        // Verify the payment with Razorpay
+        const crypto = require('crypto');
+
+        // Check if the required environment variable is available
+        const config = require('../config/env');
+        const secret = config.RAZORPAY_KEY_SECRET || process.env.RAZORPAY_KEY_SECRET || 'uvPkIj6Wi9gO3WYHqje57gh7';
+
+        if (!secret) {
+            return res.status(500).json(ApiResponse.error('Server configuration error: Razorpay secret is not set'));
+        }
+
+        // Create the expected signature
+        const expectedSignature = crypto
+            .createHmac('sha256', secret)
+            .update(orderId + '|' + paymentId)
+            .digest('hex');
+
+        // Compare signatures
+        if (expectedSignature === signature) {
+            // Payment verified successfully
+            await Payment.findOneAndUpdate(
+                { orderId },
+                {
+                    paymentId,
+                    status: 'paid',
+                    verifiedAt: new Date()
+                }
+            );
+
+            // Update booking payment status and calculate service expiry
+            const booking = await Booking.findById(payment.bookingId);
+            if (booking) {
+                // Set payment status to paid
+                booking.paymentStatus = 'paid';
+
+                // Calculate service expiry based on the service's validity
+                const service = await Service.findById(booking.serviceId);
+                if (service && service.validity > 0) {
+                    // Calculate expiry date based on service validity
+                    const purchaseDate = booking.purchaseDate || booking.createdAt;
+                    const expiryDate = new Date(purchaseDate);
+                    expiryDate.setDate(purchaseDate.getDate() + service.validity);
+
+                    booking.serviceExpiryDate = expiryDate;
+                    booking.serviceValidityDays = service.validity;
+                }
+
+                await booking.save();
+            }
+
+            res.status(200).json(
+                ApiResponse.success({
+                    paymentId,
+                    orderId,
+                    status: 'paid'
+                }, 'Payment verified successfully')
+            );
+        } else {
+            // Invalid signature
+            await Payment.findOneAndUpdate(
+                { orderId },
+                {
+                    paymentId,
+                    status: 'failed',
+                    failureReason: 'Invalid signature'
+                }
+            );
+
+            return res.status(400).json(ApiResponse.error('Payment verification failed'));
+        }
     } catch (error) {
         next(error);
     }
@@ -179,114 +376,11 @@ const createGuestOrder = async (req, res, next) => {
     }
 };
 
-// Verify payment after successful transaction
-const verifyPayment = async (req, res, next) => {
-    try {
-        const { paymentId, orderId, signature } = req.body;
-        const userId = req.user.userId;
-
-        // Fetch payment details from our database
-        const payment = await Payment.findOne({ orderId, userId });
-        if (!payment) {
-            return res.status(404).json(ApiResponse.error('Payment not found'));
-        }
-
-        // Verify the payment with Razorpay
-        const crypto = require('crypto');
-
-        // Check if the required environment variable is available
-        const config = require('../config/env');
-        const secret = config.RAZORPAY_KEY_SECRET || process.env.RAZORPAY_KEY_SECRET || 'uvPkIj6Wi9gO3WYHqje57gh7';
-
-        if (!secret) {
-            return res.status(500).json(ApiResponse.error('Server configuration error: Razorpay secret is not set'));
-        }
-
-        // Create the expected signature
-        const expectedSignature = crypto
-            .createHmac('sha256', secret)
-            .update(orderId + '|' + paymentId)
-            .digest('hex');
-
-        // Compare signatures
-        if (expectedSignature === signature) {
-            // Payment verified successfully
-            await Payment.findOneAndUpdate(
-                { orderId },
-                {
-                    paymentId,
-                    status: 'paid',
-                    verifiedAt: new Date()
-                }
-            );
-
-            // Update booking payment status and calculate service expiry
-            const booking = await Booking.findById(payment.bookingId);
-            if (booking) {
-                // Set payment status to paid
-                booking.paymentStatus = 'paid';
-
-                // Calculate service expiry based on the service's validity
-                const service = await Service.findById(booking.serviceId);
-                if (service && service.validity > 0) {
-                    // Calculate expiry date based on service validity
-                    const purchaseDate = booking.purchaseDate || booking.createdAt;
-                    const expiryDate = new Date(purchaseDate);
-                    expiryDate.setDate(purchaseDate.getDate() + service.validity);
-
-                    booking.serviceExpiryDate = expiryDate;
-                    booking.serviceValidityDays = service.validity;
-                }
-
-                await booking.save();
-
-                // Send confirmation email to the user about their service purchase
-                if (booking.userId) {
-                    const user = await User.findById(booking.userId);
-                    if (user) {
-                        try {
-                            // Send service purchase confirmation email
-                            await sendServicePurchaseConfirmation(user.email, user.name, booking.serviceId, booking);
-                            console.log('Service purchase confirmation email sent to:', user.email);
-                        } catch (emailError) {
-                            console.error('Failed to send service purchase confirmation email:', emailError);
-                            // Don't fail the payment if email fails, just log the error
-                        }
-                    }
-                }
-            }
-
-            res.status(200).json(
-                ApiResponse.success({
-                    paymentId,
-                    orderId,
-                    status: 'paid'
-                }, 'Payment verified successfully')
-            );
-        } else {
-            // Invalid signature
-            await Payment.findOneAndUpdate(
-                { orderId },
-                {
-                    paymentId,
-                    status: 'failed',
-                    failureReason: 'Invalid signature'
-                }
-            );
-
-            return res.status(400).json(ApiResponse.error('Payment verification failed'));
-        }
-    } catch (error) {
-        next(error);
-    }
-};
-
-// Handle payment verification for guest users (without authentication)
+// Handle payment verification for guest users
 const verifyGuestPayment = async (req, res, next) => {
     try {
         const { paymentId, orderId, signature } = req.body;
-        // Note: No userId required as this is for guest users
-
+  
         // Fetch payment details from our database
         const payment = await Payment.findOne({ orderId });
         if (!payment) {
@@ -304,7 +398,7 @@ const verifyGuestPayment = async (req, res, next) => {
             return res.status(500).json(ApiResponse.error('Server configuration error: Razorpay secret is not set'));
         }
 
-        // Create the expected signature
+            // Create the expected signature
         const expectedSignature = crypto
             .createHmac('sha256', secret)
             .update(orderId + '|' + paymentId)
@@ -320,8 +414,7 @@ const verifyGuestPayment = async (req, res, next) => {
             if (payment.guestName && payment.guestEmail && payment.guestPhone) {
                 // Check if user already exists (shouldn't happen, but just in case)
                 const existingUser = await User.findOne({ email: payment.guestEmail });
-
-                if (!existingUser) {
+                 if (!existingUser) {
                     // Create the user account with temporary password
                     tempPassword = Math.random().toString(36).slice(-8) + 'Temp1!';
 
@@ -334,13 +427,16 @@ const verifyGuestPayment = async (req, res, next) => {
                         status: 'active'
                     });
 
-                    await newUser.save();
+                     await newUser.save();
 
                     // Update the payment record with the new user ID
                     await Payment.findByIdAndUpdate(payment._id, { userId: newUser._id });
 
                     // Update the booking to assign the new user
                     await Booking.findByIdAndUpdate(payment.bookingId, { userId: newUser._id });
+               
+                    await sendWelcomeEmailWithCredentials(payment.guestEmail, payment.guestName, payment.guestEmail, tempPassword);
+
                 }
             }
 
@@ -353,6 +449,7 @@ const verifyGuestPayment = async (req, res, next) => {
                 }
             );
 
+          
             // Update the booking status as well
             // Update booking payment status and calculate service expiry
             const booking = await Booking.findById(payment.bookingId);
@@ -375,18 +472,8 @@ const verifyGuestPayment = async (req, res, next) => {
                 await booking.save();
             }
 
-            // If this was a guest booking, send login credentials to the user's email
-            // Since we know the temporary password, we pass it instead of the hashed one
-            if (payment.guestEmail && tempPassword) {
-                try {
-                    // Send welcome email with login credentials to the user
-                    await sendWelcomeEmailWithCredentials(payment.guestEmail, payment.guestName, payment.guestEmail, tempPassword);
-                    console.log('Welcome email sent successfully to:', payment.guestEmail);
-                } catch (emailError) {
-                    console.error('Failed to send welcome email:', emailError);
-                    // Don't fail the payment if email fails, just log the error
-                }
-            }
+       
+
 
             res.status(200).json(
                 ApiResponse.success({
@@ -412,245 +499,6 @@ const verifyGuestPayment = async (req, res, next) => {
         next(error);
     }
 };
-
-// Helper function to send welcome email with login credentials
-async function sendWelcomeEmailWithCredentials(email, name, username, password) {
-    console.log('Attempting to send welcome email to:', email);
-    console.log('Email details - Name:', name, 'Username:', username);
-    
-    const nodemailer = require('nodemailer');
-    const { createTransport } = nodemailer;
-
-    const transporter = createTransport({
-        service: 'gmail',
-        host: process.env.EMAIL_HOST,
-        port: process.env.EMAIL_PORT,
-        auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS
-        }
-    });
-
-    const message = `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Welcome to Tanish Physio</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-
-<body style="margin:0; padding:0; background-color:#f4f6f8; font-family:Arial, Helvetica, sans-serif;">
-
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f6f8; padding:30px 0;">
-    <tr>
-      <td align="center">
-
-        <!-- Main Container -->
-        <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff; border-radius:8px; overflow:hidden; box-shadow:0 6px 18px rgba(0,0,0,0.08);">
-
-          <!-- Header -->
-          <tr>
-            <td style="background:linear-gradient(135deg,#667eea,#764ba2); padding:30px; text-align:center; color:#ffffff;">
-              <h1 style="margin:0; font-size:26px;">Tanish Physio</h1>
-              <p style="margin:8px 0 0; font-size:14px; opacity:0.9;">
-                Physical Therapy & Rehabilitation Center
-              </p>
-            </td>
-          </tr>
-
-          <!-- Content -->
-          <tr>
-            <td style="padding:35px; color:#333333;">
-              <h2 style="margin-top:0; font-size:22px; color:#222;">
-                Welcome to Tanish Physio
-              </h2>
-
-              <p style="font-size:15px; line-height:1.6;">
-                Hello <strong>${name}</strong>,
-              </p>
-
-              <p style="font-size:15px; line-height:1.6;">
-                Thank you for booking a session with us and completing the payment! Your account has been created successfully and your booking is confirmed.
-              </p>
-              
-              <p style="font-size:15px; line-height:1.6;">
-                <strong>Login Credentials:</strong><br>
-                Email: ${username}<br>
-                Temporary Password: ${password}
-              </p>
-              
-              <p style="font-size:15px; line-height:1.6; color: #ff6b6b; font-weight: bold;">
-                IMPORTANT: Please change your password after first login for security.
-              </p>
-
-              <p style="font-size:15px; line-height:1.6;">
-                You can now log in to your account and manage your bookings.
-              </p>
-
-              <p style="font-size:15px; margin-top:30px;">
-                Regards,<br>
-                <strong>Tanish Physio Team</strong>
-              </p>
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td style="background:#f1f3f6; padding:20px; text-align:center; font-size:12px; color:#777;">
-              <p style="margin:0;">
-                © 2024 Tanish Physio. All rights reserved.
-              </p>
-              <p style="margin:6px 0 0;">
-                This is an automated email. Please do not reply.
-              </p>
-            </td>
-          </tr>
-
-        </table>
-
-      </td>
-    </tr>
-  </table>
-
-</body>
-</html>
-`;
-
-    const mailOptions = {
-        to: email,
-        from: process.env.EMAIL_USER,
-        subject: 'Welcome to Tanish Physio - Account Created & Payment Verified',
-        html: message
-    };
-    
-    console.log('Email options prepared, sending...');
-    
-    // Send email
-    const result = await transporter.sendMail(mailOptions);
-    console.log('Email sent successfully! Message ID:', result.messageId);
-    return result;
-}
-
-// Helper function to send service purchase confirmation email
-async function sendServicePurchaseConfirmation(email, name, serviceId, booking) {
-    console.log('Attempting to send service purchase confirmation email to:', email);
-    
-    const nodemailer = require('nodemailer');
-    const { createTransport } = nodemailer;
-
-    const transporter = createTransport({
-        service: 'gmail',
-        host: process.env.EMAIL_HOST,
-        port: process.env.EMAIL_PORT,
-        auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS
-        }
-    });
-
-    // Get service details
-    const service = await Service.findById(serviceId);
-    
-    const message = `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Service Purchase Confirmation - Tanish Physio</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-
-<body style="margin:0; padding:0; background-color:#f4f6f8; font-family:Arial, Helvetica, sans-serif;">
-
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f6f8; padding:30px 0;">
-    <tr>
-      <td align="center">
-
-        <!-- Main Container -->
-        <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff; border-radius:8px; overflow:hidden; box-shadow:0 6px 18px rgba(0,0,0,0.08);">
-
-          <!-- Header -->
-          <tr>
-            <td style="background:linear-gradient(135deg,#667eea,#764ba2); padding:30px; text-align:center; color:#ffffff;">
-              <h1 style="margin:0; font-size:26px;">Tanish Physio</h1>
-              <p style="margin:8px 0 0; font-size:14px; opacity:0.9;">
-                Physical Therapy & Rehabilitation Center
-              </p>
-            </td>
-          </tr>
-
-          <!-- Content -->
-          <tr>
-            <td style="padding:35px; color:#333333;">
-              <h2 style="margin-top:0; font-size:22px; color:#222;">
-                Service Purchase Confirmation
-              </h2>
-
-              <p style="font-size:15px; line-height:1.6;">
-                Hello <strong>${name}</strong>,
-              </p>
-
-              <p style="font-size:15px; line-height:1.6;">
-                Thank you for purchasing our service! Your payment has been processed successfully.
-              </p>
-              
-              <div style="border-left: 4px solid #667eea; padding: 15px; margin: 20px 0; background-color: #f8f9ff;">
-                <h3 style="margin: 0 0 10px 0; color: #667eea;">Service Details:</h3>
-                <p style="margin: 5px 0;"><strong>Service:</strong> ${service ? service.name : 'Unknown Service'}</p>
-                <p style="margin: 5px 0;"><strong>Amount Paid:</strong> ₹${booking.amount || 'N/A'}</p>
-                <p style="margin: 5px 0;"><strong>Purchase Date:</strong> ${new Date(booking.createdAt).toLocaleDateString()}</p>
-                <p style="margin: 5px 0;"><strong>Service Validity:</strong> ${booking.serviceValidityDays || 'N/A'} days</p>
-                <p style="margin: 5px 0;"><strong>Service Expiry:</strong> ${(booking.serviceExpiryDate ? new Date(booking.serviceExpiryDate).toLocaleDateString() : 'N/A')}</p>
-              </div>
-
-              <p style="font-size:15px; line-height:1.6;">
-                Your service is now active and ready to use. You can access your booked sessions and services through your account.
-              </p>
-
-              <p style="font-size:15px; margin-top:30px;">
-                Regards,<br>
-                <strong>Tanish Physio Team</strong>
-              </p>
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td style="background:#f1f3f6; padding:20px; text-align:center; font-size:12px; color:#777;">
-              <p style="margin:0;">
-                © 2024 Tanish Physio. All rights reserved.
-              </p>
-              <p style="margin:6px 0 0;">
-                This is an automated email. Please do not reply.
-              </p>
-            </td>
-          </tr>
-
-        </table>
-
-      </td>
-    </tr>
-  </table>
-
-</body>
-</html>
-`;
-
-    const mailOptions = {
-        to: email,
-        from: process.env.EMAIL_USER,
-        subject: 'Service Purchase Confirmation - Tanish Physio',
-        html: message
-    };
-    
-    console.log('Service confirmation email options prepared, sending...');
-    
-    // Send email
-    const result = await transporter.sendMail(mailOptions);
-    console.log('Service confirmation email sent successfully! Message ID:', result.messageId);
-    return result;
-}
 
 // Handle Razorpay webhook
 const handleWebhook = async (req, res) => {
@@ -724,34 +572,13 @@ const handleWebhook = async (req, res) => {
                     }
 
                     await booking.save();
-
-                    // Send confirmation email to the user about their service purchase
-                    if (booking.userId) {
-                        const user = await User.findById(booking.userId);
-                        if (user) {
-                            try {
-                                // Send service purchase confirmation email
-                                await sendServicePurchaseConfirmation(user.email, user.name, booking.serviceId, booking);
-                                console.log('Service purchase confirmation email sent via webhook to:', user.email);
-                            } catch (emailError) {
-                                console.error('Failed to send service purchase confirmation email via webhook:', emailError);
-                                // Don't fail the payment if email fails, just log the error
-                            }
-                        }
-                    }
                 }
 
                 // If this was a guest booking, send login credentials to the user's email
                 // Since we know the temporary password, we pass it instead of the hashed one
                 if (payment.guestEmail && tempPassword) {
-                    try {
-                        // Send welcome email with login credentials to the user
-                        await sendWelcomeEmailWithCredentials(payment.guestEmail, payment.guestName, payment.guestEmail, tempPassword);
-                        console.log('Welcome email sent successfully via webhook to:', payment.guestEmail);
-                    } catch (emailError) {
-                        console.error('Failed to send welcome email via webhook:', emailError);
-                        // Don't fail the payment if email fails, just log the error
-                    }
+                    // Send welcome email with login credentials to the user
+                    await sendWelcomeEmailWithCredentials(payment.guestEmail, payment.guestName, payment.guestEmail, tempPassword);
                 }
             }
 
@@ -801,14 +628,8 @@ const handleWebhook = async (req, res) => {
 
                 // If this was a guest subscription and we created a new user, send login credentials
                 if (subscription.guestEmail && tempPassword) {
-                    try {
-                        // Send welcome email with login credentials to the user
-                        await sendWelcomeEmailWithCredentials(subscription.guestEmail, subscription.guestName, subscription.guestEmail, tempPassword);
-                        console.log('Welcome email sent successfully for subscription to:', subscription.guestEmail);
-                    } catch (emailError) {
-                        console.error('Failed to send welcome email for subscription:', emailError);
-                        // Don't fail the subscription if email fails, just log the error
-                    }
+                    // Send welcome email with login credentials to the user
+                    await sendWelcomeEmailWithCredentials(subscription.guestEmail, subscription.guestName, subscription.guestEmail, tempPassword);
                 }
             }
         } else if (event === 'payment.failed') {
@@ -1109,14 +930,8 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
             // If this was a guest subscription and we created a new user, send login credentials
             // This would typically be for cases where account was created during subscription purchase
             if (subscription.guestEmail && tempPassword) {
-                try {
-                    // Send welcome email with login credentials to the user
-                    await sendWelcomeEmailWithCredentials(subscription.guestEmail, subscription.guestName, subscription.guestEmail, tempPassword);
-                    console.log('Welcome email sent successfully for guest subscription to:', subscription.guestEmail);
-                } catch (emailError) {
-                    console.error('Failed to send welcome email for guest subscription:', emailError);
-                    // Don't fail the subscription if email fails, just log the error
-                }
+                // Send welcome email with login credentials to the user
+                await sendWelcomeEmailWithCredentials(subscription.guestEmail, subscription.guestName, subscription.guestEmail, tempPassword);
             }
 
             res.status(200).json(

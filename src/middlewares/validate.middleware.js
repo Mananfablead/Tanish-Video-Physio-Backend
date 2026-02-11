@@ -27,8 +27,8 @@ const validateRegister = [
         .withMessage('Password must be at least 6 characters long'),
     body('phone')
         .optional()
-        .isMobilePhone(['en-IN'])
-        .withMessage('Please provide a valid Indian phone number'),
+        .matches(/^[0-9]{10,15}$/)
+        .withMessage('Please provide a valid phone number (10-15 digits)'),
     validate
 ];
 
@@ -73,8 +73,8 @@ const validateUpdateProfile = [
         .withMessage('Name must be between 2 and 50 characters'),
     body('phone')
         .optional()
-        .isMobilePhone(['en-IN'])
-        .withMessage('Please provide a valid Indian phone number'),
+        .matches(/^[0-9]{10,15}$/)
+        .withMessage('Please provide a valid phone number (10-15 digits)'),
     validate
 ];
 

@@ -70,6 +70,15 @@ const bookingSchema = new mongoose.Schema({
     },
     serviceValidityDays: {
         type: Number
+    },
+    lastPaymentReminderSent: {
+        type: Date
+    },
+    lastSessionReminderSent: {
+        type: Date
+    },
+    googleMeetLink: {
+        type: String
     }
 }, {
     timestamps: true

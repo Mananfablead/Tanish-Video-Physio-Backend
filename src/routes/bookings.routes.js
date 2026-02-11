@@ -12,11 +12,11 @@ router.get('/:id', authenticateToken, getBookingById);
 router.post('/', authenticateToken, requirePatientRole, createBooking);
 // Public route for guest bookings
 router.post('/guest', createGuestBooking);
-router.put('/:id', authenticateToken, requirePatientRole, updateBooking);
-router.put('/:id/status', authenticateToken, requirePatientRole, updateBookingStatus);
+router.put('/:id', authenticateToken, updateBooking);
+router.put('/:id/status', authenticateToken, updateBookingStatus);
 // Public route for guest users to update booking status
 router.put('/guest-status/:id', updateGuestBookingStatus);
-router.delete('/:id', authenticateToken, requirePatientRole, deleteBooking);
+router.delete('/:id', authenticateToken, deleteBooking);
 // Unified route for booking details (works for both guest and authenticated users)
 router.post('/details/:id', getBookingDetails);
 

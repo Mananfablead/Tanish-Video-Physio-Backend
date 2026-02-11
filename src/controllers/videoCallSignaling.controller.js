@@ -4,6 +4,7 @@ const CallLog = require('../models/CallLog.model');
 const User = require('../models/User.model');
 const logger = require('../utils/logger');
 const config = require('../config/env');
+const { createGoogleMeetEvent } = require('../utils/googleMeet.utils');
 
 // Generate secure JWT for joining call
 const generateCallToken = async (req, res) => {
@@ -1215,6 +1216,148 @@ const uploadRecordingImage = async (req, res) => {
     }
 };
 
+// Generate Google Meet link for session
+const generateGoogleMeetLink = async (req, res) => {
+    try {
+        const { sessionId } = req.body;
+        const userId = req.user.userId;
+
+        logger.info(`Google Meet link generation request - sessionId: ${sessionId}, userId: ${userId}`);
+
+        if (!sessionId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Session ID is required'
+            });
+        }
+
+        // Verify session exists and user has access
+        const session = await Session.findById(sessionId)
+            .populate('userId')
+            .populate('therapistId');
+
+        if (!session) {
+            return res.status(404).json({
+                success: false,
+                message: 'Session not found'
+            });
+        }
+
+        // Check if user has permission to access this session
+        const isTherapist = session.therapistId && session.therapistId._id.toString() === userId;
+        const isUser = session.userId && session.userId._id.toString() === userId;
+        const isAdmin = req.user.role === 'admin';
+
+        if (!isTherapist && !isUser && !isAdmin) {
+            return res.status(403).json({
+                success: false,
+                message: 'Unauthorized to access this session'
+            });
+        }
+
+        // Check if Google Meet link already exists
+        if (session.googleMeetLink) {
+            return res.json({
+                success: true,
+                message: 'Google Meet link already exists',
+                data: {
+                    googleMeetLink: session.googleMeetLink,
+                    googleMeetCode: session.googleMeetCode,
+                    googleMeetExpiresAt: session.googleMeetExpiresAt
+                }
+            });
+        }
+
+        // Generate Google Meet event through Google Calendar API
+        try {
+            const googleMeetData = await createGoogleMeetEvent({
+                sessionId: sessionId,
+                startTime: new Date().toISOString(),
+                endTime: new Date(Date.now() + (session.duration || 60) * 60 * 1000).toISOString(),
+                userName: session.userId?.name || 'Patient',
+                userEmail: session.userId?.email || '',
+                therapistName: session.therapistId?.name || 'Therapist',
+                therapistEmail: session.therapistId?.email || '',
+                summary: `Physiotherapy Session - ${session.therapistId?.name || 'Therapist'}`
+            });
+
+            // Update session with Google Meet details
+            await Session.findByIdAndUpdate(
+                sessionId,
+                {
+                    googleMeetLink: googleMeetData.googleMeetLink,
+                    googleMeetCode: googleMeetData.googleMeetCode,
+                    googleMeetExpiresAt: googleMeetData.googleMeetExpiresAt,
+                    googleMeetEventId: googleMeetData.googleMeetEventId
+                },
+                { new: true, runValidators: true }
+            );
+
+            // Send real-time notification to client about the Google Meet link
+            if (session.userId) {
+                // Try to notify via socket if available
+                try {
+                    // Get the global io instance (this would need to be passed to the controller)
+                    const io = require('../../server').io; // Adjust path as needed
+
+                    if (io) {
+                        const userNotificationRoom = `user_notifications_${session.userId._id}`;
+                        io.to(userNotificationRoom).emit('client-notification', {
+                            type: 'google_meet_ready',
+                            title: 'Alternative Meeting Ready',
+                            message: 'Your therapist has prepared a Google Meet link as an alternative. Please check your session details.',
+                            sessionId: sessionId,
+                            googleMeetLink: googleMeetData.googleMeetLink,
+                            googleMeetCode: googleMeetData.googleMeetCode,
+                            timestamp: new Date().toISOString(),
+                            priority: 'medium'
+                        });
+
+                        logger.info(`Google Meet notification sent via socket to user ${session.userId._id}`);
+                    }
+                } catch (socketError) {
+                    logger.warn('Socket notification failed, falling back to database notification:', socketError);
+
+                    // Fallback to database notification
+                    const Notification = require('../models/Notification.model');
+                    const notification = new Notification({
+                        title: 'Alternative Meeting Available',
+                        message: `Your therapist has arranged a Google Meet session as an alternative to the video call. You can join using the Google Meet link provided.`,
+                        type: 'connection_failure',
+                        userId: session.userId._id,
+                        sessionId: sessionId
+                    });
+                    await notification.save();
+                }
+            }
+
+            logger.info(`Google Meet link generated successfully for session ${sessionId}`);
+
+            return res.json({
+                success: true,
+                message: 'Google Meet link generated successfully',
+                data: googleMeetData
+            });
+
+        } catch (calendarError) {
+            logger.error('Google Calendar API failed:', calendarError);
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to generate Google Meet link. Please try again later.',
+                error: calendarError.message
+            });
+        }
+
+    } catch (error) {
+        logger.error('Error generating Google Meet link:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
     generateCallToken,
     verifyCallToken,
@@ -1238,6 +1381,7 @@ module.exports = {
     createCallLog,
     getCallLogById,
     updateCallLog,
-    deleteCallLog
+    deleteCallLog,
+    generateGoogleMeetLink
 };
 

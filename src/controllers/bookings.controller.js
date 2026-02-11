@@ -1,7 +1,10 @@
 const Booking = require('../models/Booking.model');
 const Service = require('../models/Service.model');
 const User = require('../models/User.model');
+const Payment = require('../models/Payment.model');
 const ApiResponse = require('../utils/apiResponse');
+const BookingStatusHandler = require('../services/bookingStatusHandler');
+const NotificationService = require('../services/notificationService');
 
 // Get all bookings for authenticated user
 const getAllBookings = async (req, res, next) => {
@@ -17,7 +20,7 @@ const getAllBookings = async (req, res, next) => {
     }
 };
 
-// Get booking by ID
+// Get booking by ID with status evaluation
 const getBookingById = async (req, res, next) => {
     try {
         // Build query based on user role
@@ -29,16 +32,32 @@ const getBookingById = async (req, res, next) => {
             // Regular user can only access their own bookings
             query = { _id: req.params.id, userId: req.user.userId };
         }
-        
+
         const booking = await Booking.findOne(query)
             .populate('serviceId', 'name price duration validity images')
-            .populate('therapistId', 'name email role profilePicture');
+            .populate('therapistId', 'name email role profilePicture')
+            .populate('userId', 'name email phone');
 
         if (!booking) {
             return res.status(404).json(ApiResponse.error('Booking not found or unauthorized'));
         }
 
-        res.status(200).json(ApiResponse.success({ booking }, 'Booking retrieved successfully'));
+        // Add status evaluation
+        const statusEvaluation = BookingStatusHandler.evaluateBookingStatus(booking);
+
+        // Get associated payment if exists
+        const payment = await Payment.findOne({ bookingId: booking._id });
+        const paymentEvaluation = payment
+            ? BookingStatusHandler.evaluatePaymentStatus(booking, payment)
+            : null;
+
+        res.status(200).json(ApiResponse.success({
+            booking: {
+                ...booking.toObject(),
+                statusEvaluation,
+                paymentEvaluation
+            }
+        }, 'Booking retrieved successfully'));
     } catch (error) {
         next(error);
     }
@@ -48,22 +67,22 @@ const getBookingById = async (req, res, next) => {
 const getBookingDetails = async (req, res, next) => {
     try {
         const { id: bookingId } = req.params;
-        
+
         // For guest users, we'll accept email in the request body to verify access
         const { clientEmail } = req.body;
-        
+
         // Find the booking by ID
         const booking = await Booking.findById(bookingId)
             .populate('serviceId', 'name price duration description validity images')
             .populate('therapistId', 'name email role profilePicture');
-            
+
         if (!booking) {
             return res.status(404).json(ApiResponse.error('Booking not found'));
         }
-        
+
         // Check access permissions
         let hasAccess = false;
-        
+
         if (req.user) {
             // Authenticated user - check if booking belongs to them or they're admin
             if (req.user.role === 'admin' || booking.userId.equals(req.user.userId)) {
@@ -76,18 +95,18 @@ const getBookingDetails = async (req, res, next) => {
                 hasAccess = true;
             }
         }
-        
+
         if (!hasAccess) {
             return res.status(403).json(ApiResponse.error('Unauthorized to access this booking'));
         }
-        
+
         res.status(200).json(ApiResponse.success({ booking }, 'Booking details retrieved successfully'));
     } catch (error) {
         next(error);
     }
 };
 
-// Create a new booking
+// Create a new booking with notification triggers
 const createBooking = async (req, res, next) => {
     try {
         const { serviceId, date, time, notes, clientName } = req.body;
@@ -109,24 +128,55 @@ const createBooking = async (req, res, next) => {
             return res.status(404).json(ApiResponse.error('No active therapists available'));
         }
 
+        // Create booking with default status values
         const booking = new Booking({
             serviceId,
-            serviceName: service.name, // Get from service model
+            serviceName: service.name,
             therapistId: therapist._id,
-            therapistName: therapist.name, // Get from therapist model
-            userId: req.user.userId, // Assign current user from auth middleware
-            clientName: clientName || req.user.name, // Use provided clientName or fall back to authenticated user's name
+            therapistName: therapist.name,
+            userId: req.user.userId,
+            clientName: clientName || req.user.name,
             date,
+            time,
             notes,
             amount: service.price,
-            purchaseDate: new Date() // Set purchase date when booking is created
+            paymentStatus: 'pending', // Default from existing enum
+            status: 'pending', // Default from existing enum
+            serviceValidityDays: service.validity,
+            purchaseDate: new Date()
         });
 
         await booking.save();
 
-        // Populate the response
+        // Populate for response
         await booking.populate('serviceId', 'name price duration validity images');
         await booking.populate('therapistId', 'name email role profilePicture');
+
+        // Send notifications
+        const notificationData = {
+            clientName: req.user.name,
+            serviceName: service.name,
+            bookingId: booking._id,
+            date: date,
+            time: time
+        };
+
+        // Notify user (using the booking creator's contact info)
+        await NotificationService.sendNotification(
+            { email: req.user.email, phone: req.user.phone },
+            'booking_created',
+            notificationData
+        );
+
+        // Notify admin
+        const admins = await User.find({ role: 'admin' }).select('email phone name');
+        for (const admin of admins) {
+            await NotificationService.sendNotification(
+                { email: admin.email, phone: admin.phone },
+                'new_booking',
+                { ...notificationData, clientName: req.user.name }
+            );
+        }
 
         res.status(201).json(ApiResponse.success({ booking }, 'Booking created successfully'));
     } catch (error) {
@@ -134,32 +184,71 @@ const createBooking = async (req, res, next) => {
     }
 };
 
-// Update booking by ID
+// Update booking by ID with status-based logic
 const updateBooking = async (req, res, next) => {
     try {
-        const { date, time, notes, status } = req.body;
+        const { date, time, notes, status, cancellationReason } = req.body;
+        const bookingId = req.params.id;
 
         // Build query based on user role
         let query;
         if (req.user.role === 'admin') {
             // Admin can update any booking
-            query = { _id: req.params.id };
+            query = { _id: bookingId };
         } else {
             // Regular user can only update their own bookings
-            query = { _id: req.params.id, userId: req.user.userId };
+            query = { _id: bookingId, userId: req.user.userId };
+        }
+
+        // Get current booking for status evaluation
+        const currentBooking = await Booking.findOne(query);
+        if (!currentBooking) {
+            return res.status(404).json(ApiResponse.error('Booking not found or unauthorized'));
+        }
+
+        // Validate status transition for admins
+        if (status && status !== currentBooking.status) {
+            if (req.user.role !== 'admin') {
+                return res.status(403).json(ApiResponse.error('Only admins can change booking status'));
+            }
+
+            const isValidTransition = BookingStatusHandler.isValidStatusTransition(
+                currentBooking.status,
+                status,
+                req.user.role
+            );
+
+            if (!isValidTransition) {
+                return res.status(400).json(ApiResponse.error(
+                    `Invalid status transition from ${currentBooking.status} to ${status}`
+                ));
+            }
         }
 
         // Prepare update data
         const updateData = { date, time, notes };
-        if (status !== undefined) {
-            // Validate status if provided
-            const validStatuses = ['pending', 'confirmed', 'completed', 'cancelled'];
-            if (!validStatuses.includes(status)) {
-                return res.status(400).json(ApiResponse.error('Invalid status. Valid statuses: pending, confirmed, completed, cancelled'));
-            }
+
+        if (status) {
             updateData.status = status;
+
+            // Handle cancellation
+            if (status === 'cancelled' && cancellationReason) {
+                updateData.cancellationReason = cancellationReason;
+            }
+
+            // Handle confirmation - calculate expiry date
+            if (status === 'confirmed') {
+                const service = await Service.findById(currentBooking.serviceId);
+                if (service && service.validity) {
+                    const purchaseDate = currentBooking.purchaseDate || currentBooking.createdAt;
+                    const expiryDate = new Date(purchaseDate);
+                    expiryDate.setDate(purchaseDate.getDate() + service.validity);
+                    updateData.serviceExpiryDate = expiryDate;
+                }
+            }
         }
 
+        // Update booking
         const booking = await Booking.findOneAndUpdate(
             query,
             updateData,
@@ -168,8 +257,36 @@ const updateBooking = async (req, res, next) => {
             .populate('serviceId', 'name price duration validity images')
             .populate('therapistId', 'name email role profilePicture');
 
-        if (!booking) {
-            return res.status(404).json(ApiResponse.error('Booking not found or unauthorized'));
+        // Handle status change notifications
+        if (status && status !== currentBooking.status) {
+            // Get booking owner's contact information
+            const bookingOwner = await User.findById(booking.userId).select('email phone name');
+
+            const triggers = BookingStatusHandler.getNotificationTriggers(
+                booking,
+                null,
+                { from: currentBooking.status, to: status }
+            );
+
+            // Send notifications
+            for (const trigger of triggers) {
+                if (trigger.type === 'user') {
+                    await NotificationService.sendNotification(
+                        { email: bookingOwner.email, phone: bookingOwner.phone },
+                        trigger.template,
+                        { ...trigger.data, clientName: bookingOwner.name }
+                    );
+                } else if (trigger.type === 'admin') {
+                    const admins = await User.find({ role: 'admin' }).select('email phone name');
+                    for (const admin of admins) {
+                        await NotificationService.sendNotification(
+                            { email: admin.email, phone: admin.phone },
+                            trigger.template,
+                            trigger.data
+                        );
+                    }
+                }
+            }
         }
 
         res.status(200).json(ApiResponse.success({ booking }, 'Booking updated successfully'));
@@ -198,7 +315,7 @@ const updateBookingStatus = async (req, res, next) => {
             // Regular user can only update status of their own bookings
             query = { _id: req.params.id, userId: req.user.userId };
         }
-        
+
         const booking = await Booking.findOneAndUpdate(
             query,
             { status },
@@ -229,7 +346,7 @@ const deleteBooking = async (req, res, next) => {
             // Regular user can only delete/cancel their own bookings
             query = { _id: req.params.id, userId: req.user.userId };
         }
-        
+
         const booking = await Booking.findOneAndUpdate(
             query,
             { status: 'cancelled' },
@@ -332,7 +449,7 @@ const updateGuestBookingStatus = async (req, res, next) => {
     }
 };
 
-// Get all bookings for admin
+// Get all bookings for admin with status-based filtering
 const getAllBookingsForAdmin = async (req, res, next) => {
     try {
         // Only allow admin users to access all bookings
@@ -340,39 +457,90 @@ const getAllBookingsForAdmin = async (req, res, next) => {
             return res.status(403).json(ApiResponse.error('Access denied. Admin access only.'));
         }
 
-        const bookings = await Booking.find()
-            .sort({ createdAt: -1 }) // Sort by createdAt descending
+        const { status, paymentStatus, dateFrom, dateTo } = req.query;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+
+        // Build query
+        let query = {};
+
+        if (status) query.status = status;
+        if (paymentStatus) query.paymentStatus = paymentStatus;
+
+        if (dateFrom || dateTo) {
+            query.date = {};
+            if (dateFrom) query.date.$gte = dateFrom;
+            if (dateTo) query.date.$lte = dateTo;
+        }
+
+        const skip = (page - 1) * limit;
+
+        const bookings = await Booking.find(query)
             .populate('serviceId', 'name price duration validity images')
             .populate('therapistId', 'name email role profilePicture')
-            .populate('userId', 'name email phone profilePicture');
+            .populate('userId', 'name email phone profilePicture')
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit);
 
-        res.status(200).json(ApiResponse.success({ bookings }, 'All bookings retrieved successfully')); 
+        const total = await Booking.countDocuments(query);
+
+        // Add status evaluation to each booking
+        const bookingsWithStatus = bookings.map(booking => ({
+            ...booking.toObject(),
+            statusEvaluation: BookingStatusHandler.evaluateBookingStatus(booking)
+        }));
+
+        res.status(200).json(ApiResponse.success({
+            bookings: bookingsWithStatus,
+            pagination: {
+                current: page,
+                pages: Math.ceil(total / limit),
+                total
+            }
+        }, 'All bookings retrieved successfully'));
     } catch (error) {
         next(error);
     }
 };
 
-// Get bookings by status
+// Get bookings by status with enhanced filtering
 const getBookingsByStatus = async (req, res, next) => {
     try {
         const { status } = req.params;
+        const { paymentStatus, dateFrom, dateTo } = req.query;
 
         // Build query based on user role
-        let query;
-        if (req.user.role === 'admin') {
-            // Admin can see all bookings with the specified status
-            query = { status: status };
-        } else {
-            // Regular user can only see their own bookings with the specified status
-            query = { userId: req.user.userId, status: status };
-        }
-        
-        const bookings = await Booking.find(query)
-            .sort({ createdAt: -1 }) // Sort by createdAt descending
-            .populate('serviceId', 'name price duration validity images')
-            .populate('therapistId', 'name email role profilePicture');
+        let query = { status: status };
 
-        res.status(200).json(ApiResponse.success({ bookings }, `Bookings with status '${status}' retrieved successfully`));
+        if (req.user.role !== 'admin') {
+            // Regular user can only see their own bookings
+            query.userId = req.user.userId;
+        }
+
+        if (paymentStatus) query.paymentStatus = paymentStatus;
+
+        if (dateFrom || dateTo) {
+            query.date = {};
+            if (dateFrom) query.date.$gte = dateFrom;
+            if (dateTo) query.date.$lte = dateTo;
+        }
+
+        const bookings = await Booking.find(query)
+            .sort({ createdAt: -1 })
+            .populate('serviceId', 'name price duration validity images')
+            .populate('therapistId', 'name email role profilePicture')
+            .populate('userId', 'name email phone');
+
+        // Add status evaluation
+        const bookingsWithStatus = bookings.map(booking => ({
+            ...booking.toObject(),
+            statusEvaluation: BookingStatusHandler.evaluateBookingStatus(booking)
+        }));
+
+        res.status(200).json(ApiResponse.success({
+            bookings: bookingsWithStatus
+        }, `Bookings with status '${status}' retrieved successfully`));
     } catch (error) {
         next(error);
     }
@@ -468,6 +636,32 @@ const createGuestBooking = async (req, res, next) => {
         await booking.populate('serviceId', 'name price duration validity images');
         await booking.populate('therapistId', 'name email role profilePicture');
 
+        // Send notifications to guest user
+        const notificationData = {
+            clientName: clientName,
+            serviceName: service.name,
+            bookingId: booking._id,
+            date: date,
+            time: time
+        };
+
+        // Notify guest user
+        await NotificationService.sendNotification(
+            { email: clientEmail, phone: clientPhone },
+            'booking_created',
+            notificationData
+        );
+
+        // Notify admins
+        const admins = await User.find({ role: 'admin' }).select('email phone name');
+        for (const admin of admins) {
+            await NotificationService.sendNotification(
+                { email: admin.email, phone: admin.phone },
+                'new_booking',
+                { ...notificationData, clientName: clientName }
+            );
+        }
+
         res.status(201).json(ApiResponse.success({
             booking,
             message: 'Account created and booking made successfully. Login credentials will be sent after payment verification.'
@@ -481,7 +675,7 @@ const createGuestBooking = async (req, res, next) => {
 async function calculateServiceExpiryForBooking(bookingId) {
     const Booking = require('../models/Booking.model');
     const Service = require('../models/Service.model');
-    
+
     const booking = await Booking.findById(bookingId);
     if (booking && booking.paymentStatus === 'paid') {
         // Calculate service expiry based on the service's validity
@@ -491,10 +685,10 @@ async function calculateServiceExpiryForBooking(bookingId) {
             const purchaseDate = booking.purchaseDate || booking.createdAt;
             const expiryDate = new Date(purchaseDate);
             expiryDate.setDate(purchaseDate.getDate() + service.validity);
-            
+
             booking.serviceExpiryDate = expiryDate;
             booking.serviceValidityDays = service.validity;
-            
+
             await booking.save();
         }
     }
@@ -612,16 +806,116 @@ async function sendWelcomeEmail(email, name, username, password) {
     await transporter.sendMail(mailOptions);
 }
 
+// Admin-only: Bulk status update
+const bulkUpdateStatus = async (req, res, next) => {
+    try {
+        if (req.user.role !== 'admin') {
+            return res.status(403).json(ApiResponse.error('Admin access required'));
+        }
+
+        const { bookingIds, status, cancellationReason } = req.body;
+
+        if (!Array.isArray(bookingIds) || bookingIds.length === 0) {
+            return res.status(400).json(ApiResponse.error('Booking IDs are required'));
+        }
+
+        if (!status) {
+            return res.status(400).json(ApiResponse.error('Status is required'));
+        }
+
+        // Validate all booking IDs exist
+        const existingBookings = await Booking.find({
+            _id: { $in: bookingIds }
+        });
+
+        if (existingBookings.length !== bookingIds.length) {
+            return res.status(404).json(ApiResponse.error('Some bookings not found'));
+        }
+
+        // Update all bookings
+        const updateData = { status };
+        if (status === 'cancelled' && cancellationReason) {
+            updateData.cancellationReason = cancellationReason;
+        }
+
+        const result = await Booking.updateMany(
+            { _id: { $in: bookingIds } },
+            updateData,
+            { runValidators: true }
+        );
+
+        res.status(200).json(ApiResponse.success({
+            modifiedCount: result.modifiedCount,
+            matchedCount: result.matchedCount
+        }, `${result.modifiedCount} bookings updated successfully`));
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Get booking statistics
+const getBookingStats = async (req, res, next) => {
+    try {
+        if (req.user.role !== 'admin') {
+            return res.status(403).json(ApiResponse.error('Admin access required'));
+        }
+
+        const stats = await Booking.aggregate([
+            {
+                $group: {
+                    _id: '$status',
+                    count: { $sum: 1 },
+                    totalAmount: { $sum: '$amount' }
+                }
+            },
+            {
+                $project: {
+                    status: '$_id',
+                    count: 1,
+                    totalAmount: 1,
+                    _id: 0
+                }
+            }
+        ]);
+
+        const paymentStats = await Booking.aggregate([
+            {
+                $group: {
+                    _id: '$paymentStatus',
+                    count: { $sum: 1 }
+                }
+            },
+            {
+                $project: {
+                    paymentStatus: '$_id',
+                    count: 1,
+                    _id: 0
+                }
+            }
+        ]);
+
+        res.status(200).json(ApiResponse.success({
+            bookingStats: stats,
+            paymentStats: paymentStats
+        }, 'Booking statistics retrieved successfully'));
+    } catch (error) {
+        next(error);
+    }
+};
 module.exports = {
     getAllBookings,
     getBookingById,
     createBooking,
-    createGuestBooking, // Add the new function
+    createGuestBooking,
     updateBooking,
     updateBookingStatus,
     updateGuestBookingStatus,
     deleteBooking,
     getBookingsByStatus,
     getAllBookingsForAdmin,
-    getBookingDetails // Single unified function
+    getBookingDetails, // Single unified function
+
+    // Enhanced functions
+    bulkUpdateStatus,
+    getBookingStats
 };

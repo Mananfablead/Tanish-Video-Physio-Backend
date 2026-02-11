@@ -27,7 +27,8 @@ const {
     createCallLog,
     getCallLogById,
     updateCallLog,
-    deleteCallLog
+    deleteCallLog,
+    generateGoogleMeetLink
 } = require('../controllers/videoCallSignaling.controller');
 
 const router = express.Router();
@@ -55,6 +56,9 @@ router.post('/generate-join-link', generateCallToken);
 router.get('/info/:sessionId', getCallDetails);
 router.get('/history', getCallHistory);
 router.post('/report-issue', reportCallIssue);
+
+// Generate Google Meet link for session
+router.post('/generate-google-meet', generateGoogleMeetLink);
 
 // Get participants for a session
 router.get('/session/:sessionId/participants', getSessionParticipants);
