@@ -3,10 +3,79 @@ const User = require('../models/User.model');
 const GroupSession = require('../models/GroupSession.model');
 const CallLog = require('../models/CallLog.model');
 const logger = require('../utils/logger');
+const mongoose = require('mongoose');
 
 // Room-based participant registry
 // Map<roomId, Map<socketId, Participant>>
 const roomParticipants = new Map();
+
+// Production-grade waiting room storage
+// Structure: Map<sessionId, Array<{ userId, socketId, name, role, requestedAt }>>
+// Designed to be easily replaceable with Redis
+const waitingRooms = new Map();
+
+// Helper function to get waiting room
+const getWaitingRoom = (sessionId) => {
+    if (!waitingRooms.has(sessionId)) {
+        waitingRooms.set(sessionId, []);
+    }
+    return waitingRooms.get(sessionId);
+};
+
+// Helper function to add patient to waiting room
+const addPatientToWaitingRoom = (sessionId, patient) => {
+    const waitingRoom = getWaitingRoom(sessionId);
+    const existingIndex = waitingRoom.findIndex(p => p.userId === patient.userId);
+    
+    if (existingIndex === -1) {
+        waitingRoom.push(patient);
+        logger.info(`Added patient ${patient.userId} to waiting room for session ${sessionId}`);
+    } else {
+        // Update existing patient info
+        waitingRoom[existingIndex] = patient;
+        logger.info(`Updated patient ${patient.userId} in waiting room for session ${sessionId}`);
+    }
+    
+    return patient;
+};
+
+// Helper function to remove patient from waiting room
+const removePatientFromWaitingRoom = (sessionId, userId) => {
+    const waitingRoom = getWaitingRoom(sessionId);
+    const patientIndex = waitingRoom.findIndex(p => p.userId === userId);
+    
+    if (patientIndex !== -1) {
+        const [removedPatient] = waitingRoom.splice(patientIndex, 1);
+        logger.info(`Removed patient ${userId} from waiting room for session ${sessionId}`);
+        
+        // Clean up empty waiting rooms
+        if (waitingRoom.length === 0) {
+            waitingRooms.delete(sessionId);
+        }
+        
+        return removedPatient;
+    }
+    return null;
+};
+
+// Helper function to get all waiting patients
+const getWaitingPatients = (sessionId) => {
+    return getWaitingRoom(sessionId);
+};
+
+// Helper function to check if patient is in waiting room
+const isPatientInWaitingRoom = (sessionId, userId) => {
+    const waitingRoom = getWaitingRoom(sessionId);
+    return waitingRoom.some(p => p.userId === userId);
+};
+
+// Helper function to check if patient has been approved (in video room registry)
+const isPatientApproved = (sessionId, userId) => {
+    const videoRoomParticipants = getAllParticipantsInRoom(sessionId);
+    return videoRoomParticipants.some(p => p.userId === userId);
+};
+
+
 
 // Helper function to get room participants
 const getRoomParticipants = (roomId) => {
@@ -44,6 +113,488 @@ const getAllParticipantsInRoom = (roomId) => {
 
 // Function to setup video call socket handlers
 const setupVideoCallHandlers = (io, socket) => {
+    // Handle patient request to join waiting room
+    socket.on('request-to-join', async (data) => {
+        try {
+            const { sessionId } = data;
+            const userId = socket.user.userId;
+            
+            if (!sessionId) {
+                socket.emit('error', { message: 'Session ID is required' });
+                return;
+            }
+
+            // Verify session exists and user has access
+            const session = await Session.findById(sessionId)
+                .populate('userId')
+                .populate('therapistId');
+
+            if (!session) {
+                socket.emit('error', { message: 'Session not found' });
+                return;
+            }
+
+            // Check if user is authorized to join this session
+            const isUser = session.userId && session.userId._id.toString() === userId;
+            const isTherapist = session.therapistId && session.therapistId._id.toString() === userId;
+            const isAdmin = socket.user.role === 'admin';
+
+            if (!isUser && !isTherapist && !isAdmin) {
+                socket.emit('error', { message: 'Unauthorized to join this session' });
+                return;
+            }
+
+            // Check session status
+            if (session.status !== 'pending' && session.status !== 'scheduled' && session.status !== 'live') {
+                socket.emit('error', { message: 'Session is not active at this time' });
+                return;
+            }
+
+            // Create standardized waiting room patient object
+            const waitingPatient = {
+                userId: userId,
+                socketId: socket.id,
+                name: socket.user.name && socket.user.name !== 'Clinician' && socket.user.name !== 'User Unknown' 
+                    ? socket.user.name 
+                    : (socket.user.firstName && socket.user.lastName ? 
+                        `${socket.user.firstName} ${socket.user.lastName}` : null) ||
+                    socket.user.displayName || socket.user.email || `User ${userId.substring(0, 5)}`,
+                role: socket.user.role,
+                email: socket.user.email,
+                sessionId: sessionId,
+                requestedAt: new Date().toISOString()
+            };
+
+            // Add patient to waiting room
+            addPatientToWaitingRoom(sessionId, waitingPatient);
+
+            // Join the waiting room socket room for real-time notifications
+            const waitingRoomId = `waiting-room-${sessionId}`;
+            socket.join(waitingRoomId);
+
+            // Update session status to 'pending' if it's currently 'scheduled'
+            if (session.status === 'scheduled') {
+                await Session.findByIdAndUpdate(sessionId, { status: 'pending' });
+                logger.info(`Updated session ${sessionId} status from scheduled to pending`);
+            }
+
+            // Get all waiting patients to send to newly joined admins/therapists
+            const allWaitingPatients = getWaitingPatients(sessionId);
+            
+            // Notify therapist and all admins in the waiting room
+            const therapistId = session.therapistId._id.toString();
+            let notificationCount = 0;
+            
+            for (let [socketId, clientSocket] of io.sockets.sockets) {
+                if (clientSocket.user && 
+                    (clientSocket.user.userId === therapistId || clientSocket.user.role === 'admin')) {
+                    
+                    // Join them to the waiting room if they're not already in it
+                    if (!clientSocket.rooms.has(waitingRoomId)) {
+                        clientSocket.join(waitingRoomId);
+                        logger.info(`📧 Auto-joined ${clientSocket.user.role} ${clientSocket.user.userId} to waiting room ${waitingRoomId}`);
+                    }
+                    
+                    // Send the complete waiting list to ensure no missed patients
+                    clientSocket.emit('waiting-list', {
+                        sessionId: sessionId,
+                        patients: allWaitingPatients
+                    });
+                    
+                    // Also send individual notification for the new patient
+                    clientSocket.emit('patient-waiting', {
+                        patient: waitingPatient,
+                        sessionId: sessionId
+                    });
+                    
+                    notificationCount++;
+                    logger.info(`📧 Notified ${clientSocket.user.role} ${clientSocket.user.userId} about waiting patient`);
+                }
+            }
+            
+            logger.info(`✅ Notified ${notificationCount} therapist/admin(s) about waiting patient ${waitingPatient.userId}`);
+
+            // Send confirmation to patient
+            socket.emit('waiting-room-joined', {
+                success: true,
+                message: 'You have been added to the waiting room. Please wait for the therapist to admit you.',
+                sessionId: sessionId
+            });
+
+            logger.info(`Patient ${userId} joined waiting room for session ${sessionId}`);
+        } catch (error) {
+            logger.error('Error handling request-to-join:', error);
+            socket.emit('error', { message: 'Failed to join waiting room' });
+        }
+    });
+
+    // Handle admin approval of patient
+    socket.on('approve-patient', async (data) => {
+        try {
+            const { sessionId, patientSocketId } = data;
+            const adminId = socket.user.userId;
+
+            if (!sessionId || !patientSocketId) {
+                socket.emit('error', { message: 'Session ID and patient socket ID are required' });
+                return;
+            }
+
+            // Verify admin role
+            if (socket.user.role !== 'admin' && socket.user.role !== 'therapist') {
+                socket.emit('error', { message: 'Only admins or therapists can approve patients' });
+                return;
+            }
+
+            // Verify session exists
+            const session = await Session.findById(sessionId);
+            if (!session) {
+                socket.emit('error', { message: 'Session not found' });
+                return;
+            }
+
+            // Get the patient's socket to verify they're still connected
+            const targetPatientSocket = io.sockets.sockets.get(patientSocketId);
+            if (!targetPatientSocket) {
+                socket.emit('error', { message: 'Patient is no longer connected' });
+                return;
+            }
+
+            // Verify patient is in waiting room
+            const waitingPatient = removePatientFromWaitingRoom(sessionId, targetPatientSocket.user.userId);
+            if (!waitingPatient) {
+                socket.emit('error', { message: 'Patient not found in waiting room' });
+                return;
+            }
+
+            // Add participant to video room registry FIRST
+            const participant = {
+                socketId: patientSocketId,
+                userId: waitingPatient.userId,
+                name: waitingPatient.name,
+                role: waitingPatient.role,
+                email: waitingPatient.email,
+                isTherapist: false,
+                isUser: true,
+                joinedAt: new Date().toISOString()
+            };
+
+            console.log(`✅ Adding participant ${participant.userId} to video room registry for session ${sessionId}`);
+            console.log(`📋 Current video room participants before add:`, getAllParticipantsInRoom(sessionId));
+            addParticipantToRoom(sessionId, patientSocketId, participant);
+            console.log(`📋 Video room participants after add:`, getAllParticipantsInRoom(sessionId));
+
+            // Move patient from waiting room to video room
+            const approvalWaitingRoomId = `waiting-room-${sessionId}`;
+            const videoRoomId = `video-room-${sessionId}`;
+            
+            targetPatientSocket.leave(approvalWaitingRoomId);
+            targetPatientSocket.join(videoRoomId);
+
+            // Longer delay to ensure registry update is fully processed
+            setTimeout(() => {
+                console.log(`🕒 Sending approval notification after delay for user ${waitingPatient.userId}`);
+                // Notify the approved patient
+                targetPatientSocket.emit('join-approved', {
+                    sessionId: sessionId,
+                    approvedBy: adminId,
+                    message: 'Your request to join has been approved. Redirecting to video call...'
+                });
+            }, 500);
+
+            // Notify admin of successful approval
+            socket.emit('patient-approved-success', {
+                patient: waitingPatient,
+                sessionId: sessionId
+            });
+
+            logger.info(`Admin ${adminId} approved patient ${waitingPatient.userId} for session ${sessionId}`);
+        } catch (error) {
+            logger.error('Error handling approve-patient:', error);
+            socket.emit('error', { message: 'Failed to approve patient' });
+        }
+    });
+
+    // Handle admin rejection of patient
+    socket.on('reject-patient', async (data) => {
+        try {
+            const { sessionId, patientSocketId, reason = 'Request rejected by therapist' } = data;
+            const adminId = socket.user.userId;
+
+            if (!sessionId || !patientSocketId) {
+                socket.emit('error', { message: 'Session ID and patient socket ID are required' });
+                return;
+            }
+
+            // Verify admin role
+            if (socket.user.role !== 'admin' && socket.user.role !== 'therapist') {
+                socket.emit('error', { message: 'Only admins or therapists can reject patients' });
+                return;
+            }
+
+            // Remove patient from waiting room
+            const waitingPatient = removePatientFromWaitingRoom(sessionId, patientSocketId);
+            if (!waitingPatient) {
+                socket.emit('error', { message: 'Patient not found in waiting room' });
+                return;
+            }
+
+            // Get the patient's socket
+            const targetPatientSocket = io.sockets.sockets.get(patientSocketId);
+            if (targetPatientSocket) {
+                // Notify the rejected patient
+                targetPatientSocket.emit('join-rejected', {
+                    sessionId: sessionId,
+                    rejectedBy: adminId,
+                    reason: reason
+                });
+
+                // Remove from waiting room
+                const rejectionWaitingRoomId = `waiting-room-${sessionId}`;
+                targetPatientSocket.leave(rejectionWaitingRoomId);
+            }
+
+            // Notify admin of successful rejection
+            socket.emit('patient-rejected-success', {
+                patient: waitingPatient,
+                sessionId: sessionId,
+                reason: reason
+            });
+
+            logger.info(`Admin ${adminId} rejected patient ${waitingPatient.userId} for session ${sessionId}`);
+        } catch (error) {
+            logger.error('Error handling reject-patient:', error);
+            socket.emit('error', { message: 'Failed to reject patient' });
+        }
+    });
+
+    // Handle approved patient joining video room
+    socket.on('join-video-room', async (data) => {
+        try {
+            console.log(`📥 join-video-room event received from ${socket.id}:`, data);
+            console.log(`📥 Socket user:`, socket.user);
+            const { sessionId } = data;
+            const userId = socket.user.userId;
+            console.log(`📥 User ID from socket: ${userId}`);
+
+            if (!sessionId) {
+                socket.emit('error', { message: 'Session ID is required' });
+                return;
+            }
+
+            // Verify session exists
+            const session = await Session.findById(sessionId)
+                .populate('userId')
+                .populate('therapistId');
+
+            if (!session) {
+                socket.emit('error', { message: 'Session not found' });
+                return;
+            }
+
+            // Check if user has permission to join the call
+            const isUser = session.userId && session.userId._id.toString() === userId;
+            const isTherapist = session.therapistId && session.therapistId._id.toString() === userId;
+            const isAdmin = socket.user.role === 'admin';
+
+            if (!isUser && !isTherapist && !isAdmin) {
+                socket.emit('error', { message: 'Unauthorized to join this session' });
+                return;
+            }
+
+            // Check if patient was approved (should be in video room registry)
+            const videoRoomParticipants = getAllParticipantsInRoom(sessionId);
+            console.log(`🔍 Checking approval for user ${userId} in session ${sessionId}`);
+            console.log(`📋 Video room participants:`, JSON.stringify(videoRoomParticipants, null, 2));
+            console.log(`🎯 Looking for userId: ${userId}`);
+            
+            let isApproved = false;
+            let existingParticipant = null;
+            
+            // Look for the user in the registry by userId (not socketId, since it might change after redirect)
+            for (const participant of videoRoomParticipants) {
+                const match = participant.userId === userId;
+                console.log(`🔄 Checking participant: ${JSON.stringify(participant)} - Match: ${match}`);
+                if (match) {
+                    isApproved = true;
+                    existingParticipant = participant;
+                    break;
+                }
+            }
+            
+            // If user was approved but socket ID has changed (after redirect), update the registry
+            if (isApproved && existingParticipant && existingParticipant.socketId !== socket.id) {
+                console.log(`🔄 Updating socket ID for approved user ${userId} from ${existingParticipant.socketId} to ${socket.id}`);
+                
+                // Remove the old entry and add the new one with updated socket ID
+                removeParticipantFromRoom(sessionId, existingParticipant.socketId);
+                
+                // Create updated participant with new socket ID
+                const updatedParticipant = {
+                    ...existingParticipant,
+                    socketId: socket.id
+                };
+                
+                addParticipantToRoom(sessionId, socket.id, updatedParticipant);
+                console.log(`✅ Updated participant registry with new socket ID`);
+            }
+            
+            console.log(`✅ User ${userId} approved status: ${isApproved}`);
+            console.log(`📊 Debug - isUser: ${isUser}, isTherapist: ${isTherapist}, isAdmin: ${isAdmin}`);
+
+            if (!isApproved && !isTherapist && !isAdmin) {
+                const errorMsg = `You must be approved by the therapist to join the video call. User ${userId} not found in video room registry for session ${sessionId}`;
+                console.log(`❌ Approval error: ${errorMsg}`);
+                console.log(`📊 Debug info - isUser: ${isUser}, isTherapist: ${isTherapist}, isAdmin: ${isAdmin}`);
+                console.log(`🕒 Current timestamp: ${new Date().toISOString()}`);
+                
+                // Give approved patients a brief grace period
+                if (socket.__APPROVAL_ATTEMPT__) {
+                    console.log(`🔄 Retrying approval check for approved patient`);
+                    socket.emit('error', { 
+                        message: 'Still processing approval. Please wait...',
+                        retry: true
+                    });
+                    return;
+                }
+                
+                socket.__APPROVAL_ATTEMPT__ = true;
+                socket.emit('error', { 
+                    message: errorMsg,
+                    redirect: `/waiting-room?sessionId=${sessionId}`
+                });
+                return;
+            }
+
+            // Join the video room
+            const videoRoomId = `video-room-${sessionId}`;
+            socket.join(videoRoomId);
+
+            // Create standardized participant object
+            const participant = {
+                socketId: socket.id,
+                userId: userId,
+                name: socket.user.name && socket.user.name !== 'Clinician' && socket.user.name !== 'User Unknown' 
+                    ? socket.user.name 
+                    : (socket.user.firstName && socket.user.lastName ? 
+                        `${socket.user.firstName} ${socket.user.lastName}` : null) ||
+                    socket.user.displayName || socket.user.email || `User ${userId.substring(0, 5)}`,
+                role: socket.user.role,
+                email: socket.user.email,
+                isTherapist: isTherapist || (session.therapistId && session.therapistId._id.toString() === userId),
+                isUser: isUser,
+                joinedAt: new Date().toISOString()
+            };
+
+            // Add participant to room registry if not already there
+            if (!isApproved) {
+                addParticipantToRoom(sessionId, socket.id, participant);
+            }
+
+            // Get all current participants in the video room
+            const currentParticipants = getAllParticipantsInRoom(sessionId);
+
+            // Send full participant list to joining client
+            socket.emit('room-participants', {
+                participants: currentParticipants,
+                roomId: sessionId,
+                roomType: 'session'
+            });
+
+            // Notify others in the room about new participant
+            socket.to(videoRoomId).emit('participant-joined', participant);
+
+            // Emit success event
+            socket.emit('joined-video-room', {
+                success: true,
+                roomId: sessionId,
+                message: 'Successfully joined video room'
+            });
+
+            logger.info(`User ${userId} joined video room ${sessionId}`);
+        } catch (error) {
+            logger.error('Error joining video room:', error);
+            socket.emit('error', { message: 'Failed to join video room' });
+        }
+    });
+
+    // Admin ready event - when admin opens the video page
+    socket.on('admin-ready', ({ sessionId }) => {
+        try {
+            if (!sessionId) {
+                socket.emit('error', { message: 'Session ID is required' });
+                return;
+            }
+
+            // Join the waiting room
+            const adminWaitingRoomId = `waiting-room-${sessionId}`;
+            socket.join(adminWaitingRoomId);
+            
+            logger.info(`📧 Admin ${socket.user.userId} joined waiting room ${adminWaitingRoomId}`);
+
+            // Send current waiting patients list
+            const waitingPatients = getWaitingPatients(sessionId);
+            
+            socket.emit('waiting-list', {
+                sessionId: sessionId,
+                patients: waitingPatients
+            });
+
+            logger.info(`📧 Sent waiting list with ${waitingPatients.length} patients to admin ${socket.user.userId}`);
+        } catch (error) {
+            logger.error('Error handling admin-ready:', error);
+            socket.emit('error', { message: 'Failed to initialize admin waiting room' });
+        }
+    });
+
+    // Debug: Get connected users
+    socket.on('get-connected-users', (callback) => {
+        try {
+            const connectedUsers = [];
+            for (let [socketId, clientSocket] of io.sockets.sockets) {
+                if (clientSocket.user) {
+                    connectedUsers.push({
+                        socketId: socketId,
+                        userId: clientSocket.user.userId,
+                        role: clientSocket.user.role,
+                        name: clientSocket.user.name || clientSocket.user.firstName + ' ' + clientSocket.user.lastName
+                    });
+                }
+            }
+            logger.info(`Connected users: ${JSON.stringify(connectedUsers, null, 2)}`);
+            if (callback) callback(connectedUsers);
+        } catch (error) {
+            logger.error('Error getting connected users:', error);
+            if (callback) callback([]);
+        }
+    });
+
+    // Get waiting patients for admin dashboard
+    socket.on('get-waiting-patients', async (data) => {
+        try {
+            const { sessionId } = data;
+            
+            if (!sessionId) {
+                socket.emit('error', { message: 'Session ID is required' });
+                return;
+            }
+
+            // Verify admin role
+            if (socket.user.role !== 'admin' && socket.user.role !== 'therapist') {
+                socket.emit('error', { message: 'Only admins or therapists can view waiting patients' });
+                return;
+            }
+
+            const waitingPatients = getWaitingPatients(sessionId);
+            
+            socket.emit('waiting-patients-list', {
+                sessionId: sessionId,
+                patients: waitingPatients
+            });
+        } catch (error) {
+            logger.error('Error getting waiting patients:', error);
+            socket.emit('error', { message: 'Failed to get waiting patients' });
+        }
+    });
     // Join a video call room (both 1-on-1 and group)
     socket.on('join-room', async (data) => {
         try {
@@ -73,7 +624,78 @@ const setupVideoCallHandlers = (io, socket) => {
                 isTherapist = session.therapistId && session.therapistId._id.toString() === userId;
                 const isAdmin = socket.user.role === 'admin';
 
-                // Allow admins to join for monitoring purposes
+                // Check if patient was approved (should be in video room registry)
+                const videoRoomParticipants = getAllParticipantsInRoom(sessionId);
+                console.log(`🔍 Checking approval for user ${userId} in session ${sessionId}`);
+                console.log(`📋 Video room participants:`, JSON.stringify(videoRoomParticipants, null, 2));
+                console.log(`🎯 Looking for userId: ${userId}`);
+                
+                let isApproved = false;
+                let existingParticipant = null;
+                
+                // Look for the user in the registry by userId (not socketId, since it might change after redirect)
+                for (const participant of videoRoomParticipants) {
+                    if (participant.userId === userId) {
+                        isApproved = true;
+                        existingParticipant = participant;
+                        console.log(`🔄 Found existing participant: ${JSON.stringify(participant)}`);
+                        break;
+                    }
+                }
+                
+                // If user was approved but socket ID has changed (after redirect), update the registry
+                if (isApproved && existingParticipant && existingParticipant.socketId !== socket.id) {
+                    console.log(`🔄 Updating socket ID for approved user ${userId} from ${existingParticipant.socketId} to ${socket.id}`);
+                    
+                    // Remove the old entry and add the new one with updated socket ID
+                    removeParticipantFromRoom(sessionId, existingParticipant.socketId);
+                    
+                    // Create updated participant with new socket ID
+                    const updatedParticipant = {
+                        ...existingParticipant,
+                        socketId: socket.id
+                    };
+                    
+                    addParticipantToRoom(sessionId, socket.id, updatedParticipant);
+                    console.log(`✅ Updated participant registry with new socket ID`);
+                }
+                
+                // Check if this is an approved patient joining via waiting room (special case)
+                const isApprovedPatient = data.userType === 'approved-patient';
+                
+                // Allow approved patients to join directly
+                if (isUser && socket.user.role === 'patient' && !isApproved && !isApprovedPatient) {
+                    // Check if the patient has been approved but is trying to join via the wrong endpoint
+                    const hasBeenApproved = isPatientApproved(sessionId, userId);
+                    const isInWaitingRoom = isPatientInWaitingRoom(sessionId, userId);
+                    
+                    if (hasBeenApproved) {
+                        // Patient has been approved but is trying to join via join-room instead of join-video-room
+                        // This might be a timing issue - redirect to use the correct endpoint
+                        console.log(`🔄 Patient ${userId} was approved but trying to join via wrong endpoint, redirecting to join-video-room`);
+                        // Let the join-video-room handler take care of this
+                        socket.emit('error', { 
+                            message: 'Processing your approval, please wait...',
+                            retry: true
+                        });
+                        return;
+                    } else if (isInWaitingRoom) {
+                        // Patient is still in waiting room, meaning they haven't been approved yet
+                        socket.emit('error', { 
+                            message: 'Patients must join through the waiting room first. Please navigate to the waiting room.',
+                            redirect: `/waiting-room?sessionId=${sessionId}`
+                        });
+                    } else {
+                        // Patient is not in waiting room and not approved - they need to go through waiting room
+                        socket.emit('error', { 
+                            message: 'Patients must join through the waiting room first. Please navigate to the waiting room.',
+                            redirect: `/waiting-room?sessionId=${sessionId}`
+                        });
+                    }
+                    return;
+                }
+
+                // Allow admins and therapists to join for monitoring purposes
                 if (!isUser && !isTherapist && !isAdmin) {
                     socket.emit('error', { message: 'Unauthorized to join this session' });
                     return;
@@ -231,7 +853,7 @@ const setupVideoCallHandlers = (io, socket) => {
     socket.on('leave-room', async (data) => {
         try {
             const { roomId, roomType } = data;
-            const userId = socket.user.userId;
+            // const userId = socket.user.userId;
             
             socket.leave(roomId);
             logger.info(`User ${userId} left ${roomType} room ${roomId}`);
@@ -303,6 +925,12 @@ const setupVideoCallHandlers = (io, socket) => {
                     socket.emit('error', { message: 'Only therapist can start the call' });
                     return;
                 }
+            }
+
+            // Update session status to 'live'
+            if (roomType === 'session') {
+                await Session.findByIdAndUpdate(roomId, { status: 'live' });
+                logger.info(`Updated session ${roomId} status to live`);
             }
 
             // Create call log entry
@@ -555,6 +1183,12 @@ const setupVideoCallHandlers = (io, socket) => {
                 }
             }
 
+            // Update session status to 'completed'
+            // if (roomType === 'session') {
+            //     await Session.findByIdAndUpdate(roomId, { status: 'completed' });
+            //     logger.info(`Updated session ${roomId} status to completed`);
+            // }
+
             // Update call log
             const callLog = await CallLog.findOne({
                 [roomType === 'group' ? 'groupSessionId' : 'sessionId']: roomId,
@@ -591,7 +1225,7 @@ const setupVideoCallHandlers = (io, socket) => {
                         }
                     }
                 }
-
+                
                 await callLog.save();
             }
 
@@ -608,59 +1242,84 @@ const setupVideoCallHandlers = (io, socket) => {
 
     // Handle disconnect
     socket.on('disconnect', () => {
-        logger.info(`Socket ${socket.id} disconnected from video call`);
+        logger.info(`Socket ${socket.id} disconnected`);
         
         // Remove participant from all rooms they were in
         (async () => {
             try {
-                // Find all rooms the user was in
-                for (const [roomId, room] of io.sockets.adapter.rooms) {
-                    if (room.has(socket.id)) {
-                        const userId = socket.user?.userId;
-                        if (userId) {
-                            // Remove from room registry
-                            const removedParticipant = removeParticipantFromRoom(roomId, socket.id);
-                            
-                            // Notify others in the room
-                            if (removedParticipant) {
-                                socket.to(roomId).emit('participant-left', {
-                                    socketId: socket.id,
-                                    userId: userId,
-                                    roomId: roomId
-                                });
-                            }
+                const userId = socket.user?.userId;
+                if (!userId) return;
 
-                            // Update call log if call is active
-                            let roomType = null;
+                // Clean up waiting room entries
+                for (const [sessionId, waitingRoom] of waitingRooms) {
+                    if (waitingRoom.has(socket.id)) {
+                        const removedPatient = removePatientFromWaitingRoom(sessionId, socket.id);
+                        if (removedPatient) {
+                            logger.info(`Removed disconnected patient ${userId} from waiting room ${sessionId}`);
                             
-                            // Determine room type
-                            const session = await Session.findById(roomId);
+                            // Notify therapist/admin about patient disconnect
+                            const session = await Session.findById(sessionId).populate('therapistId');
                             if (session) {
-                                roomType = 'session';
-                            } else {
-                                const groupSession = await GroupSession.findById(roomId);
-                                if (groupSession) {
-                                    roomType = 'group';
+                                const therapistId = session.therapistId._id.toString();
+                                for (let [socketId, clientSocket] of io.sockets.sockets) {
+                                    if (clientSocket.user && 
+                                        (clientSocket.user.userId === therapistId || clientSocket.user.role === 'admin')) {
+                                        clientSocket.emit('patient-disconnected', {
+                                            patient: removedPatient,
+                                            sessionId: sessionId
+                                        });
+                                    }
                                 }
                             }
+                        }
+                    }
+                }
 
-                            if (roomType) {
-                                const activeCallLog = await CallLog.findOne({
-                                    [roomType === 'group' ? 'groupSessionId' : 'sessionId']: roomId,
-                                    status: 'active'
-                                }).sort({ callStartedAt: -1 });
+                // Clean up video room entries
+                for (const [roomId, room] of io.sockets.adapter.rooms) {
+                    if (room.has(socket.id)) {
+                        // Remove from room registry
+                        const removedParticipant = removeParticipantFromRoom(roomId, socket.id);
+                        
+                        // Notify others in the room
+                        if (removedParticipant) {
+                            socket.to(roomId).emit('participant-left', {
+                                socketId: socket.id,
+                                userId: userId,
+                                roomId: roomId
+                            });
+                        }
 
-                                if (activeCallLog) {
-                                    const participantIndex = activeCallLog.participants.findIndex(
-                                        p => p.userId.toString() === userId
-                                    );
+                        // Update call log if call is active
+                        let roomType = null;
+                        
+                        // Determine room type
+                        const session = await Session.findById(roomId);
+                        if (session) {
+                            roomType = 'session';
+                        } else {
+                            const groupSession = await GroupSession.findById(roomId);
+                            if (groupSession) {
+                                roomType = 'group';
+                            }
+                        }
 
-                                    if (participantIndex !== -1) {
-                                        activeCallLog.participants[participantIndex].leftAt = new Date();
-                                        activeCallLog.participants[participantIndex].duration =
-                                            (new Date() - activeCallLog.participants[participantIndex].joinedAt) / 1000;
-                                        await activeCallLog.save();
-                                    }
+                        if (roomType) {
+                            const activeCallLog = await CallLog.findOne({
+                                [roomType === 'group' ? 'groupSessionId' : 'sessionId']: roomId,
+                                status: 'active'
+                            }).sort({ callStartedAt: -1 });
+
+                            if (activeCallLog) {
+                                const participantIndex = activeCallLog.participants.findIndex(
+                                    p => p.userId.toString() === userId
+                                );
+
+                                if (participantIndex !== -1) {
+                                    activeCallLog.participants[participantIndex].leftAt = new Date();
+                                    activeCallLog.participants[participantIndex].duration =
+                                        (new Date() - activeCallLog.participants[participantIndex].joinedAt) / 1000;
+                                    await activeCallLog.save();
                                 }
                             }
                         }

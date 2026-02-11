@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const Session = require('../models/Session.model');
+const GroupSession = require('../models/GroupSession.model');
 const CallLog = require('../models/CallLog.model');
 const User = require('../models/User.model');
 const logger = require('../utils/logger');
