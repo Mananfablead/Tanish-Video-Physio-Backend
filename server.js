@@ -32,8 +32,8 @@ app.use(
                     "http://localhost:8080",
                     "http://localhost:8081",
                     "https://tanishvideo.fableadtech.in",
-                    "https://tanishvideo.fableadtech.in/admin",
-                    "https://apitanishvideo.fableadtech.in"
+                    "https://apitanishvideo.fableadtech.in",
+                    "https://tanishphysiofitness.in/physio-admin"
                 ],
                 mediaSrc: [
                     "'self'",
@@ -44,7 +44,8 @@ app.use(
                     "http://localhost:8081",
                     "https://tanishvideo.fableadtech.in",
                     "https://tanishvideo.fableadtech.in/admin",
-                    "https://apitanishvideo.fableadtech.in"
+                    "https://apitanishvideo.fableadtech.in",
+                    "https://tanishphysiofitness.in/physio-admin"
                 ],
             },
         },
@@ -70,9 +71,9 @@ const corsOptions = {
                     origin === 'http://localhost:8080' ||
                     origin === 'http://localhost:8081' ||
                     origin === 'https://tanishvideo.fableadtech.in' ||
-                    origin === 'https://tanishvideo.fableadtech.in/admin' ||
+                    origin === 'https://tanishphysiofitness.in/physio-admin' ||
                     origin === 'https://tanishphysiofitness.in' ||
-                    origin === 'https://tanishphysiofitness.in/admin'
+                    origin === 'https://tanishphysiofitness.in/physio-admin'
                 ) {
                     callback(null, true);
                 } else {

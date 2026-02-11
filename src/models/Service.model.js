@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { generateUniqueSlug } = require('../utils/slug.utils');
 
 const serviceSchema = new mongoose.Schema({
     name: {
@@ -6,6 +7,12 @@ const serviceSchema = new mongoose.Schema({
         required: [true, 'Service name is required'],
         trim: true,
         maxlength: [100, 'Service name cannot exceed 100 characters']
+    },
+    slug: {
+        type: String,
+        unique: true,
+        sparse: true, // Allows multiple documents with null/undefined slug
+        trim: true
     },
     description: {
         type: String,
@@ -67,6 +74,17 @@ const serviceSchema = new mongoose.Schema({
 }, {
     timestamps: true
 });
+
+// Pre-save middleware to auto-generate slug
+serviceSchema.pre('save', async function (next) {
+    if (this.isModified('name') || (this.isNew && !this.slug)) {
+        this.slug = await generateUniqueSlug(this.constructor, this.name, this._id);
+    }
+    next();
+});
+
+// Index for slug field to improve query performance
+serviceSchema.index({ slug: 1 });
 
 
 
