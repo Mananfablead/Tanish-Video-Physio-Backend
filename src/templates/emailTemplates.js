@@ -53,7 +53,7 @@ class EmailTemplates {
         <tr>
             <td align="center">
                 <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden;">
-                    ${this.generateHeader(
+                    ${EmailTemplates.generateHeader(
                         data.title || 'Important Notification',
                         '',
                         { start: '#1e3a8a', end: '#3b82f6', text: '#e0f2fe' },
@@ -78,7 +78,7 @@ class EmailTemplates {
                         </td>
                     </tr>
                     
-                    ${this.generateFooter(
+                    ${EmailTemplates.generateFooter(
                         '#1e293b',
                         { light: '#cbd5e1', accent: '#94a3b8', border: '#334155' },
                         'Best regards, Tanish Physio Team'
@@ -107,7 +107,7 @@ class EmailTemplates {
         <tr>
             <td align="center">
                 <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #e0f2fe;">
-                    ${this.generateHeader(
+                    ${EmailTemplates.generateHeader(
                         'Booking Request Submitted!',
                         "We've received your request",
                         { start: '#0ea5e9', end: '#0284c7', text: '#e0f2fe' },
@@ -143,7 +143,7 @@ class EmailTemplates {
                         </td>
                     </tr>
                     
-                    ${this.generateFooter(
+                    ${EmailTemplates.generateFooter(
                         '#0c4a6e',
                         { light: '#bae6fd', accent: '#7dd3fc', border: '#1e5a8a' },
                         'Questions? Contact our support team'
@@ -185,7 +185,7 @@ class EmailTemplates {
         <tr>
             <td align="center">
                 <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #bbf7d0;">
-                    ${this.generateHeader(
+                    ${EmailTemplates.generateHeader(
                         'Booking Confirmed!',
                         'Your appointment is secured',
                         { start: '#16a34a', end: '#15803d', text: '#dcfce7' },
@@ -248,7 +248,7 @@ class EmailTemplates {
                         </td>
                     </tr>
                     
-                    ${this.generateFooter(
+                    ${EmailTemplates.generateFooter(
                         '#14532d',
                         { light: '#bbf7d0', accent: '#86efac', border: '#166534' },
                         'Need to make changes to your appointment?'
@@ -277,7 +277,7 @@ class EmailTemplates {
         <tr>
             <td align="center">
                 <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #fecaca;">
-                    ${this.generateHeader(
+                    ${EmailTemplates.generateHeader(
                         'Booking Cancelled',
                         'We sincerely apologize',
                         { start: '#dc2626', end: '#b91c1c', text: '#fecaca' },
@@ -326,7 +326,7 @@ class EmailTemplates {
                         </td>
                     </tr>
                     
-                    ${this.generateFooter(
+                    ${EmailTemplates.generateFooter(
                         '#7f1d1d',
                         { light: '#fecaca', accent: '#fca5a5', border: '#991b1b' },
                         'Need immediate assistance?'
@@ -355,7 +355,7 @@ class EmailTemplates {
         <tr>
             <td align="center">
                 <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #fed7aa;">
-                    ${this.generateHeader(
+                    ${EmailTemplates.generateHeader(
                         'Payment Reminder',
                         'Secure your appointment today',
                         { start: '#f59e0b', end: '#d97706', text: '#fed7aa' },
@@ -405,7 +405,7 @@ class EmailTemplates {
                         </td>
                     </tr>
                     
-                    ${this.generateFooter(
+                    ${EmailTemplates.generateFooter(
                         '#92400e',
                         { light: '#fed7aa', accent: '#fdba74', border: '#c2410c' },
                         'Having trouble with payment?'
@@ -434,7 +434,7 @@ class EmailTemplates {
         <tr>
             <td align="center">
                 <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #bbf7d0;">
-                    ${this.generateHeader(
+                    ${EmailTemplates.generateHeader(
                         'Payment Successful!',
                         'Transaction confirmed',
                         { start: '#16a34a', end: '#15803d', text: '#dcfce7' },
@@ -489,7 +489,7 @@ class EmailTemplates {
                         </td>
                     </tr>
                     
-                    ${this.generateFooter(
+                    ${EmailTemplates.generateFooter(
                         '#14532d',
                         { light: '#bbf7d0', accent: '#86efac', border: '#166534' },
                         'Have questions about your payment or appointment?'
@@ -518,7 +518,7 @@ class EmailTemplates {
         <tr>
             <td align="center">
                 <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #bae6fd;">
-                    ${this.generateHeader(
+                    ${EmailTemplates.generateHeader(
                         'Session Reminder',
                         'Your appointment is coming up',
                         { start: '#0284c7', end: '#0369a1', text: '#bae6fd' },
@@ -606,7 +606,7 @@ class EmailTemplates {
                         </td>
                     </tr>
                     
-                    ${this.generateFooter(
+                    ${EmailTemplates.generateFooter(
                         '#083344',
                         { light: '#bae6fd', accent: '#7dd3fc', border: '#0c4a6e' },
                         'Need to reschedule or have questions?'
@@ -635,7 +635,7 @@ class EmailTemplates {
         <tr>
             <td align="center">
                 <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #dbeafe;">
-                    ${this.generateHeader(
+                    ${EmailTemplates.generateHeader(
                         'New Booking Request',
                         'Action required',
                         { start: '#2563eb', end: '#1d4ed8', text: '#dbeafe' },
@@ -710,7 +710,7 @@ class EmailTemplates {
                         </td>
                     </tr>
                     
-                    ${this.generateFooter(
+                    ${EmailTemplates.generateFooter(
                         '#1e3a8a',
                         { light: '#dbeafe', accent: '#a5b4fc', border: '#3730a3' },
                         'Tanish Physio Administration System'
@@ -739,7 +739,7 @@ class EmailTemplates {
         <tr>
             <td align="center">
                 <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #bbf7d0;">
-                    ${this.generateHeader(
+                    ${EmailTemplates.generateHeader(
                         'Payment Received',
                         'Transaction confirmed',
                         { start: '#16a34a', end: '#15803d', text: '#dcfce7' },
@@ -803,7 +803,7 @@ class EmailTemplates {
                         </td>
                     </tr>
                     
-                    ${this.generateFooter(
+                    ${EmailTemplates.generateFooter(
                         '#14532d',
                         { light: '#bbf7d0', accent: '#86efac', border: '#166534' },
                         'Tanish Physio Financial Management'
@@ -832,7 +832,7 @@ class EmailTemplates {
         <tr>
             <td align="center">
                 <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #bae6fd;">
-                    ${this.generateHeader(
+                    ${EmailTemplates.generateHeader(
                         'Upcoming Session',
                         'Scheduled for tomorrow',
                         { start: '#0284c7', end: '#0369a1', text: '#bae6fd' },
@@ -915,7 +915,7 @@ class EmailTemplates {
                         </td>
                     </tr>
                     
-                    ${this.generateFooter(
+                    ${EmailTemplates.generateFooter(
                         '#083344',
                         { light: '#bae6fd', accent: '#7dd3fc', border: '#0c4a6e' },
                         'Tanish Physio Operations Management'

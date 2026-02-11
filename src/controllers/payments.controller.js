@@ -474,7 +474,6 @@ const verifyGuestPayment = async (req, res, next) => {
 
        
 
-
             res.status(200).json(
                 ApiResponse.success({
                     paymentId,

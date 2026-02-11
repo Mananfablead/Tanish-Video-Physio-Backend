@@ -380,7 +380,7 @@ class NotificationService {
             accessToken: process.env.WHATSAPP_ACCESS_TOKEN,
             phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID,
             businessId: process.env.WHATSAPP_BUSINESS_ID,
-            apiUrl: 'https://graph.facebook.com/v21.0/'
+            apiUrl: 'https://graph.facebook.com/v21.0'
         };
 
         // Initialize transports
@@ -534,10 +534,15 @@ Thank you for choosing Tanish Physio!`;
     // Send email notification
     async sendEmail(to, template, data) {
         try {
+            // Handle both string subjects and function subjects
+            const subject = typeof template.subject === 'function'
+                ? template.subject(data)
+                : template.subject;
+
             const mailOptions = {
                 from: process.env.EMAIL_USER,
                 to: to,
-                subject: template.subject,
+                subject: subject,
                 html: template.template(data)
             };
 
@@ -642,6 +647,21 @@ Thank you for choosing Tanish Physio!`;
                                error.message || 
                                'Unknown WhatsApp API error';
             
+            // Check if the error is specifically about phone number not being in allowed list
+            if (errorMessage.includes('(#131030) Recipient phone number not in allowed list')) {
+                console.warn(`WhatsApp message blocked: Phone number ${formattedPhone} is not in the approved list. This is a sandbox limitation.`);
+
+                return {
+                    success: false,
+                    error: `WhatsApp message blocked: Phone number ${formattedPhone} is not in the approved list. This is a sandbox limitation.`,
+                    details: {
+                        status: error.response?.status,
+                        statusText: error.response?.statusText,
+                        url: error.response?.config?.url
+                    }
+                };
+            }
+
             return { 
                 success: false, 
                 error: errorMessage,
