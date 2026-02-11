@@ -115,56 +115,66 @@ exports.getStepsAdmin = async (req, res) => {
 };
 
 exports.createStep = async (req, res) => {
-    try {
-        // Check if multiple steps are being sent
-        if (Array.isArray(req.body)) {
-            // Handle multiple steps creation
-            const createdSteps = [];
-            
-            for (const stepData of req.body) {
-                // Clean up the request body to remove any problematic id fields
-                const cleanedStepData = { ...stepData };
-                delete cleanedStepData._id;
-                delete cleanedStepData.id;
-                
-                const step = new CmsStep(cleanedStepData);
-                await step.save();
-                createdSteps.push(step);
-            }
-            
-            res.status(201).json({
-                success: true,
-                message: `${createdSteps.length} step(s) created successfully`,
-                data: createdSteps
-            });
-        } else {
-            // Handle single step creation
-            // Clean up the request body to remove any problematic id fields
-            const stepData = { ...req.body };
-            delete stepData._id;
-            delete stepData.id;
-            
-            // If there's an uploaded file, update the image field with the full URL
-            if (req.file) {
-                stepData.image = `${config.BASE_URL}/uploads/cms-images/${req.file.filename}`;
-            }
-            
-            const step = new CmsStep(stepData);
-            await step.save();
-            res.status(201).json({
-                success: true,
-                message: 'Step created successfully',
-                data: step
-            });
-        }
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Error creating step',
-            error: error.message
-        });
+  try {
+    let { heading, subHeading } = req.body;
+
+    // 🔁 If heading/subHeading present → replace in ALL steps
+    if (heading || subHeading) {
+      const updateFields = {};
+      if (heading) updateFields.heading = heading;
+      if (subHeading) updateFields.subHeading = subHeading;
+
+      await CmsStep.updateMany({}, { $set: updateFields });
     }
+
+    // MULTIPLE STEPS
+    if (Array.isArray(req.body)) {
+      const createdSteps = [];
+
+      for (const stepData of req.body) {
+        const cleanedStepData = { ...stepData };
+        delete cleanedStepData._id;
+        delete cleanedStepData.id;
+
+        const step = new CmsStep(cleanedStepData);
+        await step.save();
+        createdSteps.push(step);
+      }
+
+      return res.status(201).json({
+        success: true,
+        message: `${createdSteps.length} step(s) created successfully`,
+        data: createdSteps
+      });
+    }
+
+    // SINGLE STEP
+    const stepData = { ...req.body };
+    delete stepData._id;
+    delete stepData.id;
+
+    if (req.file) {
+      stepData.image = `${config.BASE_URL}/uploads/cms-images/${req.file.filename}`;
+    }
+
+    const step = new CmsStep(stepData);
+    await step.save();
+
+    res.status(201).json({
+      success: true,
+      message: 'Step created successfully',
+      data: step
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error creating step',
+      error: error.message
+    });
+  }
 };
+
 
 exports.updateStep = async (req, res) => {
     try {
@@ -1449,6 +1459,19 @@ exports.updateAbout = async (req, res) => {
         const aboutData = { ...req.body };
         delete aboutData._id;
         delete aboutData.id;
+        
+        // Parse values if it's a JSON string
+        if (aboutData.values && typeof aboutData.values === 'string') {
+            try {
+                const parsedValues = JSON.parse(aboutData.values);
+                if (Array.isArray(parsedValues)) {
+                    aboutData.values = parsedValues;
+                }
+            } catch (e) {
+                // If parsing fails, keep the original value
+                console.log('Failed to parse values, keeping original:', e.message);
+            }
+        }
         
         // Handle multiple image uploads
         if (req.files && req.files.length > 0) {
