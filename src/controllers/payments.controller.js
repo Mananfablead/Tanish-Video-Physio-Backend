@@ -265,6 +265,30 @@ const verifyPayment = async (req, res, next) => {
                 // Set payment status to paid
                 booking.paymentStatus = 'paid';
 
+                // If booking has a scheduled date and time slot, update the availability status to 'booked'
+                if (booking.scheduledDate && booking.timeSlot && booking.timeSlot.start && booking.timeSlot.end) {
+                    const Availability = require('../models/Availability.model');
+                    
+                    // Find the availability record for this therapist and date
+                    const availability = await Availability.findOne({
+                        therapistId: booking.therapistId,
+                        date: booking.scheduledDate
+                    });
+                    
+                    if (availability) {
+                        // Update the specific time slot status to 'booked'
+                        const slotIndex = availability.timeSlots.findIndex(slot => 
+                            slot.start === booking.timeSlot.start && 
+                            slot.end === booking.timeSlot.end
+                        );
+                        
+                        if (slotIndex !== -1) {
+                            availability.timeSlots[slotIndex].status = 'booked';
+                            await availability.save();
+                        }
+                    }
+                }
+
                 // Calculate service expiry based on the service's validity
                 const service = await Service.findById(booking.serviceId);
                 if (service && service.validity > 0) {
@@ -456,6 +480,30 @@ const verifyGuestPayment = async (req, res, next) => {
             if (booking) {
                 // Set payment status to paid
                 booking.paymentStatus = 'paid';
+
+                // If booking has a scheduled date and time slot, update the availability status to 'booked'
+                if (booking.scheduledDate && booking.timeSlot && booking.timeSlot.start && booking.timeSlot.end) {
+                    const Availability = require('../models/Availability.model');
+                    
+                    // Find the availability record for this therapist and date
+                    const availability = await Availability.findOne({
+                        therapistId: booking.therapistId,
+                        date: booking.scheduledDate
+                    });
+                    
+                    if (availability) {
+                        // Update the specific time slot status to 'booked'
+                        const slotIndex = availability.timeSlots.findIndex(slot => 
+                            slot.start === booking.timeSlot.start && 
+                            slot.end === booking.timeSlot.end
+                        );
+                        
+                        if (slotIndex !== -1) {
+                            availability.timeSlots[slotIndex].status = 'booked';
+                            await availability.save();
+                        }
+                    }
+                }
 
                 // Calculate service expiry based on the service's validity
                 const service = await Service.findById(booking.serviceId);

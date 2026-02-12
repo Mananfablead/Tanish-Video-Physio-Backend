@@ -40,7 +40,7 @@ const bookingSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['pending', 'confirmed', 'cancelled', 'completed'],
+        enum: ['pending', 'confirmed', 'cancelled', 'completed', 'scheduled'],
         default: 'pending'
     },
     notes: {
@@ -79,6 +79,23 @@ const bookingSchema = new mongoose.Schema({
     },
     googleMeetLink: {
         type: String
+    },
+    scheduleType: {
+        type: String,
+        enum: ['now', 'later'],
+        default: 'now'
+    },
+    scheduledDate: {
+        type: String, // Format: YYYY-MM-DD
+        default: null
+    },
+    scheduledTime: {
+        type: String, // Format: HH:MM
+        default: null
+    },
+    timeSlot: {
+        start: String,
+        end: String
     }
 }, {
     timestamps: true
