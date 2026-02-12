@@ -176,7 +176,7 @@ async function sendWelcomeEmailWithCredentials(email, name, username, password) 
 // Create a payment order for Razorpay
 const createOrder = async (req, res, next) => {
     try {
-        const { bookingId, amount, currency = 'INR' } = req.body;
+        const { bookingId, amount, currency = 'INR', couponCode } = req.body;
 
         // Verify the booking belongs to the user
         const booking = await Booking.findOne({ _id: bookingId, userId: req.user.userId });
@@ -184,9 +184,89 @@ const createOrder = async (req, res, next) => {
             return res.status(404).json(ApiResponse.error('Booking not found'));
         }
 
+        let validatedAmount = amount;
+        
+        // If coupon code is provided, re-validate it before creating payment order
+        if (couponCode) {
+            const Offer = require('../models/Offer');
+            const offer = await Offer.findOne({ code: couponCode.toUpperCase() }).populate('appliesToUsers', '_id');
+            
+            if (offer) {
+                // Re-validate the coupon
+                const now = new Date();
+                
+                // Check if offer is active
+                if (!offer.isActive) {
+                    return res.status(400).json(ApiResponse.error('Offer is not active'));
+                }
+                
+                // Check date range
+                if (now < offer.startDate || now > offer.endDate) {
+                    return res.status(400).json(ApiResponse.error('Offer is not valid at this time'));
+                }
+                
+                // Check minimum amount
+                if (offer.minimumAmount > amount) {
+                    return res.status(400).json(ApiResponse.error(`Minimum order amount ₹${offer.minimumAmount} required for this offer`));
+                }
+                
+                // Check usage limit
+                if (offer.usageLimit && offer.usedCount >= offer.usageLimit) {
+                    return res.status(400).json(ApiResponse.error('Offer usage limit reached'));
+                }
+                
+                // Check booking type limitation
+                if (offer.allowedBookingTypes && offer.allowedBookingTypes.length > 0) {
+                    if (!offer.allowedBookingTypes.includes('booking')) {
+                        return res.status(400).json(ApiResponse.error('Offer is not applicable for booking type')); 
+                    }
+                }
+                
+                // Check user-specific restrictions
+                if (req.user.userId) {
+                    // Check if offer is restricted to specific users
+                    if (offer.appliesToUsers && offer.appliesToUsers.length > 0) {
+                        const userFound = offer.appliesToUsers.some(user => user._id.toString() === req.user.userId);
+                        if (!userFound) {
+                            return res.status(400).json(ApiResponse.error('Offer is not applicable to this user'));
+                        }
+                    }
+                    
+                    // Check if offer is for new users only
+                    if (offer.appliesToNewUsersOnly) {
+                        const User = require('../models/User.model');
+                        const user = await User.findById(req.user.userId);
+                        if (user && user.createdAt) {
+                            // Check if user was created more than 30 days ago (considered not new)
+                            const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+                            if (user.createdAt < thirtyDaysAgo) {
+                                return res.status(400).json(ApiResponse.error('Offer is only available for new users'));
+                            }
+                        }
+                    }
+                }
+                
+                // Calculate discount
+                let discount = 0;
+                if (offer.type === 'percentage') {
+                    discount = Math.min(amount * (offer.value / 100), offer.maxDiscountAmount || Infinity);
+                } else {
+                    discount = Math.min(offer.value, amount);
+                }
+                
+                validatedAmount = amount - discount;
+                
+                // Update booking with coupon info
+                booking.couponCode = couponCode;
+                booking.discountAmount = discount;
+                booking.finalAmount = validatedAmount;
+                await booking.save();
+            }
+        }
+
         // Create order in Razorpay
         const options = {
-            amount: amount * 100, // Razorpay expects amount in paise
+            amount: validatedAmount * 100, // Razorpay expects amount in paise
             currency: currency,
             receipt: `booking_${bookingId}`,
             payment_capture: 1 // Auto-capture payment
@@ -198,10 +278,12 @@ const createOrder = async (req, res, next) => {
         const payment = new Payment({
             bookingId,
             userId: req.user.userId,
-            amount,
+            amount: validatedAmount,
+            originalAmount: amount,
             currency,
             orderId: order.id,
-            status: 'created'
+            status: 'created',
+            couponCode: couponCode || null
         });
 
         await payment.save();
@@ -258,6 +340,17 @@ const verifyPayment = async (req, res, next) => {
                     verifiedAt: new Date()
                 }
             );
+
+            // If coupon was used, increment its usage count
+            if (payment.couponCode) {
+                const Offer = require('../models/Offer');
+                const offer = await Offer.findOne({ code: payment.couponCode.toUpperCase() });
+                if (offer) {
+                    // Increment usage count
+                    offer.usedCount = offer.usedCount + 1;
+                    await offer.save();
+                }
+            }
 
             // Update booking payment status and calculate service expiry
             const booking = await Booking.findById(payment.bookingId);
@@ -332,7 +425,7 @@ const verifyPayment = async (req, res, next) => {
 // Create a payment order for Razorpay for guest users
 const createGuestOrder = async (req, res, next) => {
     try {
-        const { bookingId, amount, currency = 'INR', clientName, clientEmail, clientPhone } = req.body;
+        const { bookingId, amount, currency = 'INR', clientName, clientEmail, clientPhone, couponCode } = req.body;
 
         // Validate required fields for guest payment
         if (!clientName || !clientEmail || !clientPhone) {
@@ -361,9 +454,87 @@ const createGuestOrder = async (req, res, next) => {
             return res.status(404).json(ApiResponse.error('Booking not found'));
         }
 
+        let validatedAmount = amount;
+        
+        // If coupon code is provided, re-validate it before creating payment order
+        if (couponCode) {
+            const Offer = require('../models/Offer');
+            const offer = await Offer.findOne({ code: couponCode.toUpperCase() }).populate('appliesToUsers', '_id');
+            
+            if (offer) {
+                // Re-validate the coupon
+                const now = new Date();
+                
+                // Check if offer is active
+                if (!offer.isActive) {
+                    return res.status(400).json(ApiResponse.error('Offer is not active'));
+                }
+                
+                // Check date range
+                if (now < offer.startDate || now > offer.endDate) {
+                    return res.status(400).json(ApiResponse.error('Offer is not valid at this time'));
+                }
+                
+                // Check minimum amount
+                if (offer.minimumAmount > amount) {
+                    return res.status(400).json(ApiResponse.error(`Minimum order amount ₹${offer.minimumAmount} required for this offer`));
+                }
+                
+                // Check usage limit
+                if (offer.usageLimit && offer.usedCount >= offer.usageLimit) {
+                    return res.status(400).json(ApiResponse.error('Offer usage limit reached'));
+                }
+                
+                // Check booking type limitation
+                if (offer.allowedBookingTypes && offer.allowedBookingTypes.length > 0) {
+                    if (!offer.allowedBookingTypes.includes('booking')) {
+                        return res.status(400).json(ApiResponse.error('Offer is not applicable for booking type')); 
+                    }
+                }
+                
+                // Check user-specific restrictions
+                if (existingUser) {
+                    // Check if offer is restricted to specific users
+                    if (offer.appliesToUsers && offer.appliesToUsers.length > 0) {
+                        const userFound = offer.appliesToUsers.some(user => user._id.toString() === existingUser._id.toString());
+                        if (!userFound) {
+                            return res.status(400).json(ApiResponse.error('Offer is not applicable to this user'));
+                        }
+                    }
+                    
+                    // Check if offer is for new users only
+                    if (offer.appliesToNewUsersOnly) {
+                        if (existingUser && existingUser.createdAt) {
+                            // Check if user was created more than 30 days ago (considered not new)
+                            const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+                            if (existingUser.createdAt < thirtyDaysAgo) {
+                                return res.status(400).json(ApiResponse.error('Offer is only available for new users'));
+                            }
+                        }
+                    }
+                }
+                
+                // Calculate discount
+                let discount = 0;
+                if (offer.type === 'percentage') {
+                    discount = Math.min(amount * (offer.value / 100), offer.maxDiscountAmount || Infinity);
+                } else {
+                    discount = Math.min(offer.value, amount);
+                }
+                
+                validatedAmount = amount - discount;
+                
+                // Update booking with coupon info
+                booking.couponCode = couponCode;
+                booking.discountAmount = discount;
+                booking.finalAmount = validatedAmount;
+                await booking.save();
+            }
+        }
+
         // Create order in Razorpay
         const options = {
-            amount: amount * 100, // Razorpay expects amount in paise
+            amount: validatedAmount * 100, // Razorpay expects amount in paise
             currency: currency,
             receipt: `booking_${bookingId}_guest`,
             payment_capture: 1 // Auto-capture payment
@@ -375,13 +546,15 @@ const createGuestOrder = async (req, res, next) => {
         // Store guest info temporarily without creating user account yet
         const payment = new Payment({
             bookingId,
-            amount,
+            amount: validatedAmount,
+            originalAmount: amount,
             currency,
             orderId: order.id,
             status: 'created',
             guestName: clientName,
             guestEmail: clientEmail,
-            guestPhone: clientPhone
+            guestPhone: clientPhone,
+            couponCode: couponCode || null
         });
 
         await payment.save();
@@ -473,7 +646,17 @@ const verifyGuestPayment = async (req, res, next) => {
                 }
             );
 
-          
+            // If coupon was used, increment its usage count
+            if (payment.couponCode) {
+                const Offer = require('../models/Offer');
+                const offer = await Offer.findOne({ code: payment.couponCode.toUpperCase() });
+                if (offer) {
+                    // Increment usage count
+                    offer.usedCount = offer.usedCount + 1;
+                    await offer.save();
+                }
+            }
+            
             // Update the booking status as well
             // Update booking payment status and calculate service expiry
             const booking = await Booking.findById(payment.bookingId);
@@ -520,7 +703,7 @@ const verifyGuestPayment = async (req, res, next) => {
                 await booking.save();
             }
 
-       
+            
 
             res.status(200).json(
                 ApiResponse.success({
@@ -703,7 +886,7 @@ const handleWebhook = async (req, res) => {
 // Create a subscription payment order for Razorpay
 const createSubscriptionOrder = async (req, res, next) => {
     try {
-        const { planId, amount, currency = 'INR' } = req.body;
+        const { planId, amount, currency = 'INR', couponCode } = req.body;
 
         // Validate plan exists in the database
         const plan = await SubscriptionPlan.findOne({ planId, status: 'active' });
@@ -712,11 +895,84 @@ const createSubscriptionOrder = async (req, res, next) => {
         }
 
         // Use the actual plan price instead of the provided amount
-        const planAmount = plan.price;
+        let planAmount = plan.price;
+        let validatedAmount = planAmount;
+        
+        // If coupon code is provided, re-validate it before creating payment order
+        if (couponCode) {
+            const Offer = require('../models/Offer');
+            const offer = await Offer.findOne({ code: couponCode.toUpperCase() }).populate('appliesToUsers', '_id');
+            
+            if (offer) {
+                // Re-validate the coupon
+                const now = new Date();
+                
+                // Check if offer is active
+                if (!offer.isActive) {
+                    return res.status(400).json(ApiResponse.error('Offer is not active'));
+                }
+                
+                // Check date range
+                if (now < offer.startDate || now > offer.endDate) {
+                    return res.status(400).json(ApiResponse.error('Offer is not valid at this time'));
+                }
+                
+                // Check minimum amount
+                if (offer.minimumAmount > planAmount) {
+                    return res.status(400).json(ApiResponse.error(`Minimum order amount ₹${offer.minimumAmount} required for this offer`));
+                }
+                
+                // Check usage limit
+                if (offer.usageLimit && offer.usedCount >= offer.usageLimit) {
+                    return res.status(400).json(ApiResponse.error('Offer usage limit reached'));
+                }
+                
+                // Check booking type limitation
+                if (offer.allowedBookingTypes && offer.allowedBookingTypes.length > 0) {
+                    if (!offer.allowedBookingTypes.includes('subscription')) {
+                        return res.status(400).json(ApiResponse.error('Offer is not applicable for subscription type')); 
+                    }
+                }
+                
+                // Check user-specific restrictions
+                if (req.user.userId) {
+                    // Check if offer is restricted to specific users
+                    if (offer.appliesToUsers && offer.appliesToUsers.length > 0) {
+                        const userFound = offer.appliesToUsers.some(user => user._id.toString() === req.user.userId);
+                        if (!userFound) {
+                            return res.status(400).json(ApiResponse.error('Offer is not applicable to this user'));
+                        }
+                    }
+                    
+                    // Check if offer is for new users only
+                    if (offer.appliesToNewUsersOnly) {
+                        const User = require('../models/User.model');
+                        const user = await User.findById(req.user.userId);
+                        if (user && user.createdAt) {
+                            // Check if user was created more than 30 days ago (considered not new)
+                            const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+                            if (user.createdAt < thirtyDaysAgo) {
+                                return res.status(400).json(ApiResponse.error('Offer is only available for new users'));
+                            }
+                        }
+                    }
+                }
+                
+                // Calculate discount
+                let discount = 0;
+                if (offer.type === 'percentage') {
+                    discount = Math.min(planAmount * (offer.value / 100), offer.maxDiscountAmount || Infinity);
+                } else {
+                    discount = Math.min(offer.value, planAmount);
+                }
+                
+                validatedAmount = planAmount - discount;
+            }
+        }
 
         // Create order in Razorpay
         const options = {
-            amount: planAmount * 100, // Razorpay expects amount in paise
+            amount: validatedAmount * 100, // Razorpay expects amount in paise
             currency: currency,
             receipt: `sub_${planId}_${req.user.userId}`,
             payment_capture: 1 // Auto-capture payment
@@ -729,10 +985,12 @@ const createSubscriptionOrder = async (req, res, next) => {
             userId: req.user.userId,
             planId,
             planName: plan.name,
-            amount: planAmount,
+            amount: validatedAmount,
+            originalAmount: planAmount,
             currency,
             orderId: order.id,
-            status: 'created'
+            status: 'created',
+            couponCode: couponCode || null
         });
 
         await subscription.save();
@@ -753,7 +1011,7 @@ const createSubscriptionOrder = async (req, res, next) => {
 // Create a subscription payment order for Razorpay for guest users
 const createGuestSubscriptionOrder = async (req, res, next) => {
     try {
-        const { planId, amount, currency = 'INR', clientName, clientEmail, clientPhone } = req.body;
+        const { planId, amount, currency = 'INR', clientName, clientEmail, clientPhone, couponCode } = req.body;
 
         // Validate required fields for guest subscription
         if (!clientName || !clientEmail || !clientPhone) {
@@ -781,11 +1039,82 @@ const createGuestSubscriptionOrder = async (req, res, next) => {
         }
 
         // Use the actual plan price instead of the provided amount
-        const planAmount = plan.price;
+        let planAmount = plan.price;
+        let validatedAmount = planAmount;
+        
+        // If coupon code is provided, re-validate it before creating payment order
+        if (couponCode) {
+            const Offer = require('../models/Offer');
+            const offer = await Offer.findOne({ code: couponCode.toUpperCase() }).populate('appliesToUsers', '_id');
+            
+            if (offer) {
+                // Re-validate the coupon
+                const now = new Date();
+                
+                // Check if offer is active
+                if (!offer.isActive) {
+                    return res.status(400).json(ApiResponse.error('Offer is not active'));
+                }
+                
+                // Check date range
+                if (now < offer.startDate || now > offer.endDate) {
+                    return res.status(400).json(ApiResponse.error('Offer is not valid at this time'));
+                }
+                
+                // Check minimum amount
+                if (offer.minimumAmount > planAmount) {
+                    return res.status(400).json(ApiResponse.error(`Minimum order amount ₹${offer.minimumAmount} required for this offer`));
+                }
+                
+                // Check usage limit
+                if (offer.usageLimit && offer.usedCount >= offer.usageLimit) {
+                    return res.status(400).json(ApiResponse.error('Offer usage limit reached'));
+                }
+                
+                // Check booking type limitation
+                if (offer.allowedBookingTypes && offer.allowedBookingTypes.length > 0) {
+                    if (!offer.allowedBookingTypes.includes('subscription')) {
+                        return res.status(400).json(ApiResponse.error('Offer is not applicable for subscription type')); 
+                    }
+                }
+                
+                // Check user-specific restrictions
+                if (existingUser) {
+                    // Check if offer is restricted to specific users
+                    if (offer.appliesToUsers && offer.appliesToUsers.length > 0) {
+                        const userFound = offer.appliesToUsers.some(user => user._id.toString() === existingUser._id.toString());
+                        if (!userFound) {
+                            return res.status(400).json(ApiResponse.error('Offer is not applicable to this user'));
+                        }
+                    }
+                    
+                    // Check if offer is for new users only
+                    if (offer.appliesToNewUsersOnly) {
+                        if (existingUser && existingUser.createdAt) {
+                            // Check if user was created more than 30 days ago (considered not new)
+                            const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+                            if (existingUser.createdAt < thirtyDaysAgo) {
+                                return res.status(400).json(ApiResponse.error('Offer is only available for new users'));
+                            }
+                        }
+                    }
+                }
+                
+                // Calculate discount
+                let discount = 0;
+                if (offer.type === 'percentage') {
+                    discount = Math.min(planAmount * (offer.value / 100), offer.maxDiscountAmount || Infinity);
+                } else {
+                    discount = Math.min(offer.value, planAmount);
+                }
+                
+                validatedAmount = planAmount - discount;
+            }
+        }
 
         // Create order in Razorpay
         const options = {
-            amount: planAmount * 100, // Razorpay expects amount in paise
+            amount: validatedAmount * 100, // Razorpay expects amount in paise
             currency: currency,
             receipt: `sub_guest_${planId}`,
             payment_capture: 1 // Auto-capture payment
@@ -798,13 +1127,15 @@ const createGuestSubscriptionOrder = async (req, res, next) => {
         const subscription = new Subscription({
             planId,
             planName: plan.name,
-            amount: planAmount,
+            amount: validatedAmount,
+            originalAmount: planAmount,
             currency,
             orderId: order.id,
             status: 'created',
             guestName: clientName,
             guestEmail: clientEmail,
-            guestPhone: clientPhone
+            guestPhone: clientPhone,
+            couponCode: couponCode || null
         });
 
         await subscription.save();
@@ -863,6 +1194,17 @@ const verifySubscriptionPayment = async (req, res, next) => {
                     verifiedAt: new Date()
                 }
             );
+
+            // If coupon was used, increment its usage count
+            if (subscription.couponCode) {
+                const Offer = require('../models/Offer');
+                const offer = await Offer.findOne({ code: subscription.couponCode.toUpperCase() });
+                if (offer) {
+                    // Increment usage count
+                    offer.usedCount = offer.usedCount + 1;
+                    await offer.save();
+                }
+            }
 
             // Activate the subscription with calculated end date
             const updatedSubscription = await activateSubscription(subscription._id);
@@ -970,6 +1312,17 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
                     verifiedAt: new Date()
                 }
             );
+
+            // If coupon was used, increment its usage count
+            if (subscription.couponCode) {
+                const Offer = require('../models/Offer');
+                const offer = await Offer.findOne({ code: subscription.couponCode.toUpperCase() });
+                if (offer) {
+                    // Increment usage count
+                    offer.usedCount = offer.usedCount + 1;
+                    await offer.save();
+                }
+            }
 
             // Activate the subscription with calculated end date
             const updatedSubscription = await activateSubscription(subscription._id);
