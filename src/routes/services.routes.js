@@ -1,5 +1,19 @@
 const express = require('express');
-const { getAllServices, getServiceById, getServiceBySlug, getServiceBySlugAdmin, getAllServicesSlugAdmin, createService, updateService, deleteService, getAllServicesAdmin, getServiceByIdAdmin, removeMediaFromService } = require('../controllers/services.controller');
+const {
+    getAllServices,
+    getServiceById,
+    getServiceBySlug,
+    getServiceBySlugAdmin,
+    getAllServicesSlugAdmin,
+    createService,
+    updateService,
+    deleteService,
+    getAllServicesAdmin,
+    getServiceByIdAdmin,
+    removeMediaFromService,
+    getFeaturedServices,
+
+} = require('../controllers/services.controller');
 const { authenticateToken, authorizeRoles } = require('../middlewares/auth.middleware');
 const serviceUpload = require('../middlewares/serviceUpload.middleware');
 
@@ -7,6 +21,7 @@ const router = express.Router();
 
 // Public routes
 router.get('/', getAllServices);
+router.get('/featured', getFeaturedServices);
 router.get('/:id', getServiceById);
 router.get('/slug/:slug', getServiceBySlug);
 

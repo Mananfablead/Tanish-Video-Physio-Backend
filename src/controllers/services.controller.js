@@ -301,7 +301,7 @@ const getServiceByIdAdmin = async (req, res, next) => {
 // Create a new service (admin only)
 const createService = async (req, res, next) => {
     try {
-        const { name, description, about, price, duration, category, status, features, prerequisites, benefits, contraindications, sessions, validity } = req.body;
+        const { name, description, about, price, duration, category, status, features, prerequisites, benefits, contraindications, sessions, validity, featured } = req.body;
 
             // Prepare service object
             const serviceData = {
@@ -317,7 +317,12 @@ const createService = async (req, res, next) => {
                 benefits: safeJsonParse(benefits, []),
                 contraindications: safeJsonParse(contraindications, []),
                 sessions,
-                validity
+                validity,
+                featured: featured !== undefined && featured !== ''
+                    ? (typeof featured === 'string'
+                        ? featured.toLowerCase() === 'true' || featured === '1'
+                        : Boolean(featured))
+                    : false // Default to false if not provided or empty
             };
 
             // Process uploaded files if they exist
@@ -357,7 +362,7 @@ const createService = async (req, res, next) => {
 // Update service by ID (admin only)
 const updateService = async (req, res, next) => {
     try {
-        const { name, description, about, price, duration, category, status, features, prerequisites, benefits, contraindications, sessions, validity } = req.body;
+        const { name, description, about, price, duration, category, status, features, prerequisites, benefits, contraindications, sessions, validity, featured } = req.body;
 
             // Prepare update object
             const updateData = {};
@@ -375,6 +380,14 @@ const updateService = async (req, res, next) => {
             if (contraindications) updateData.contraindications = safeJsonParse(contraindications);
             if (sessions !== undefined) updateData.sessions = sessions;
             if (validity !== undefined) updateData.validity = validity;
+        if (featured !== undefined && featured !== '') {
+            // Handle different ways the boolean value might be passed
+            if (typeof featured === 'string') {
+                updateData.featured = featured.toLowerCase() === 'true' || featured === '1';
+            } else {
+                updateData.featured = Boolean(featured);
+            }
+        }
 
             // Process uploaded files if they exist
             if (req.files && Object.keys(req.files).length > 0) {
@@ -434,6 +447,32 @@ const deleteService = async (req, res, next) => {
         }
     };
 
+
+
+
+
+
+// Get featured services
+const getFeaturedServices = async (req, res, next) => {
+    try {
+        const services = await Service.find({
+            status: 'active',
+            featured: true
+        })
+            .sort({ createdAt: -1 }); // Sort by createdAt descending
+
+        // Convert relative paths to absolute URLs
+        const servicesWithAbsoluteUrls = services.map(service => {
+            return convertToAbsoluteUrls(service.toObject());
+        });
+
+        res.status(200).json(ApiResponse.success({ services: servicesWithAbsoluteUrls }, 'Featured services retrieved successfully'));
+    } catch (error) {
+        console.error('Error in getFeaturedServices:', error);
+        next(error);
+    }
+};
+
 // Remove specific media from a service
 const removeMediaFromService = async (req, res, next) => {
     try {
@@ -475,13 +514,15 @@ const removeMediaFromService = async (req, res, next) => {
 module.exports = {
     getAllServices,
     getServiceById,
-        getServiceBySlug,
-        getServiceBySlugAdmin,
-        getAllServicesAdmin,
-        getAllServicesSlugAdmin,
-        getServiceByIdAdmin,
-        createService,
-        updateService,
-        deleteService,
-        removeMediaFromService
-    };
+    getServiceBySlug,
+    getServiceBySlugAdmin,
+    getAllServicesAdmin,
+    getAllServicesSlugAdmin,
+    getServiceByIdAdmin,
+    createService,
+    updateService,
+    deleteService,
+    removeMediaFromService,
+    getFeaturedServices,
+
+};

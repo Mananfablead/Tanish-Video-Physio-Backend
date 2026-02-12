@@ -70,6 +70,10 @@ const serviceSchema = new mongoose.Schema({
         type: Number,
         min: 0,
         required: [true, 'Validity period is required']
+    },
+    featured: {
+        type: Boolean,
+        default: false
     }
 }, {
     timestamps: true
