@@ -26,6 +26,52 @@ const getAdminChatMessages = async (req, res, next) => {
             }
         }
 
+        // For video call chats, only show messages from completed sessions
+        if (messageType === 'video-call-chat') {
+            // Find completed sessions
+            const completedSessions = await Session.find({ status: 'completed' }).select('_id');
+            const completedSessionIds = completedSessions.map(session => session._id);
+            
+            // Update filter to only include messages from completed sessions
+            if (completedSessionIds.length > 0) {
+                if (filter.sessionId) {
+                    // If a specific sessionId was requested, check if it's in completed sessions
+                    if (!completedSessionIds.some(id => id.equals(filter.sessionId))) {
+                        // If specific sessionId is not completed, return empty results
+                        return res.status(200).json(
+                            ApiResponse.success({
+                                messages: [],
+                                pagination: {
+                                    currentPage: 1,
+                                    totalPages: 0,
+                                    totalMessages: 0,
+                                    hasNextPage: false,
+                                    hasPrevPage: false
+                                }
+                            }, 'Admin chat messages retrieved successfully')
+                        );
+                    }
+                } else {
+                    // Only show messages that have a sessionId (not default-chat) and are from completed sessions
+                    filter.sessionId = { $in: completedSessionIds };
+                }
+            } else {
+                // If no completed sessions exist, return empty results
+                return res.status(200).json(
+                    ApiResponse.success({
+                        messages: [],
+                        pagination: {
+                            currentPage: 1,
+                            totalPages: 0,
+                            totalMessages: 0,
+                            hasNextPage: false,
+                            hasPrevPage: false
+                        }
+                    }, 'Admin chat messages retrieved successfully')
+                );
+            }
+        }
+
         // Convert page and limit to integers
         const pageNum = parseInt(page);
         const limitNum = parseInt(limit);
@@ -304,31 +350,6 @@ const getActiveChats = async (req, res, next) => {
     }
 };
 
-// Get admin online status
-const getAdminOnlineStatus = async (req, res, next) => {
-    try {
-        // Import the online admins map from socket handler
-        const { getOnlineAdminsCount, isAnyAdminOnline } = require('../sockets/admin.socket');
-
-        const onlineCount = getOnlineAdminsCount();
-        const anyAdminOnline = isAnyAdminOnline();
-
-        res.status(200).json(
-            ApiResponse.success(
-                {
-                    onlineCount: onlineCount,
-                    anyAdminOnline: anyAdminOnline,
-                    adminsOnline: onlineCount > 0
-                },
-                'Admin online status retrieved successfully'
-            )
-        );
-    } catch (error) {
-        logger.error('Error getting admin online status:', error);
-        next(error);
-    }
-};
-
 // Get chat statistics
 const getChatStats = async (req, res, next) => {
     try {
@@ -384,6 +405,5 @@ module.exports = {
     getUnreadMessagesCount,
     markMessagesAsRead,
     getActiveChats,
-    getChatStats,
-    getAdminOnlineStatus
+    getChatStats
 };
