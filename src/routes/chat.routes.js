@@ -24,6 +24,48 @@ router.post('/leave', (req, res) => {
 // Send a chat message
 router.post('/send/:sessionId', sendMessage);
 
+// Special endpoint for default live chat (no session validation)
+router.post('/send/default-live-chat', async (req, res, next) => {
+    try {
+        const { message } = req.body;
+
+        // Validate required fields
+        if (!message || typeof message !== 'string' || message.trim().length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Message is required and must be a non-empty string',
+                error: null,
+                statusCode: 400
+            });
+        }
+
+        // For default live chat, we'll create a special message without session validation
+        // This is for general support chat that doesn't belong to a specific session
+        const ChatMessage = require('../models/ChatMessage.model');
+
+        const chatMessage = new ChatMessage({
+            sessionId: null, // No session for default chat
+            senderId: req.user.userId,
+            message,
+            senderType: req.user.role === 'admin' ? 'admin' : 'user',
+            messageType: 'default-chat'
+        });
+
+        await chatMessage.save();
+        await chatMessage.populate('senderId', 'name');
+
+        res.status(201).json({
+            success: true,
+            message: 'Message sent successfully',
+            data: { message: chatMessage },
+            statusCode: 201
+        });
+    } catch (error) {
+        console.error('Default chat send message error:', error);
+        next(error);
+    }
+});
+
 // Debug endpoint to check session info
 router.get('/debug/:sessionId', async (req, res) => {
     try {
@@ -64,6 +106,31 @@ router.get('/debug/:sessionId', async (req, res) => {
 
 // Get chat messages for a session
 router.get('/:sessionId', getChatMessages);
+
+// Special endpoint to get default chat messages (for support chat)
+router.get('/default/messages', async (req, res, next) => {
+    try {
+        const ChatMessage = require('../models/ChatMessage.model');
+
+        // Get default chat messages (where sessionId is null and messageType is default-chat)
+        const messages = await ChatMessage.find({
+            sessionId: null,
+            messageType: 'default-chat'
+        })
+            .populate('senderId', 'name email role')
+            .sort({ createdAt: 1 }); // Sort by creation time, oldest first
+
+        res.status(200).json({
+            success: true,
+            message: 'Default chat messages retrieved successfully',
+            data: { messages },
+            statusCode: 200
+        });
+    } catch (error) {
+        console.error('Error fetching default chat messages:', error);
+        next(error);
+    }
+});
 
 // Typing indicator
 router.post('/typing', (req, res) => {

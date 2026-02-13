@@ -229,14 +229,16 @@ const startServer = async () => {
         io.on('connection', (socket) => {
             console.log('New client connected:', socket.id);
 
-            // Load chat, video call, and notification handlers
+            // Load chat, video call, notification, and admin handlers
             const setupChatHandlers = require('./src/sockets/chat.socket');
             const setupVideoCallHandlers = require('./src/sockets/videoCall.socket');
             const { setupNotificationHandlers } = require('./src/sockets/notification.socket');
+            const { setupAdminHandlers } = require('./src/sockets/admin.socket');
 
             setupChatHandlers(io, socket);
             setupVideoCallHandlers(io, socket);
             setupNotificationHandlers(io, socket);
+            setupAdminHandlers(io, socket);
 
             socket.on('disconnect', () => {
                 console.log('Client disconnected:', socket.id);

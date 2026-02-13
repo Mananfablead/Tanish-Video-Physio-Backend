@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const cmsController = require('../controllers/cms.controller');
+const contactController = require('../controllers/contact.controller');
 const { authenticateToken, authorizeRoles } = require('../middlewares/auth.middleware');
 const cmsUpload = require('../middlewares/cmsUpload.middleware');
 
@@ -14,6 +15,7 @@ router.get('/public/terms', cmsController.getTermsPublic);
 router.get('/public/featuredTherapist', cmsController.getFeaturedTherapistPublic);
 router.get('/public/contact', cmsController.getContactPublic);
 router.get('/public/about', cmsController.getAboutPublic);
+router.post('/public/contact-message', contactController.createContactMessage);
 
 // Admin routes (require authentication and admin role)
 router.use(authenticateToken);
@@ -67,6 +69,13 @@ router.put('/admin/contact', cmsController.updateContact);
 // About Section
 router.get('/admin/about', cmsController.getAboutAdmin);
 router.put('/admin/about', cmsUpload.array('images', 10), cmsController.updateAbout);
+
+// Contact Messages (admin only)
+router.get('/admin/contact-messages', contactController.getAllContactMessages);
+router.get('/admin/contact-messages/:id', contactController.getContactMessageById);
+router.put('/admin/contact-messages/:id', contactController.updateContactMessageStatus);
+router.delete('/admin/contact-messages/:id', contactController.deleteContactMessage);
+router.get('/admin/contact-messages-stats', contactController.getContactMessagesStats);
 
 // Get all CMS data
 router.get('/admin/all', cmsController.getAllCmsData);

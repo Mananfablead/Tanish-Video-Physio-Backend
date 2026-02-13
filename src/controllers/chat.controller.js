@@ -59,6 +59,65 @@ const sendMessage = async (req, res, next) => {
         const { sessionId } = req.params;
         const { message } = req.body;
 
+        // Validate required fields
+        if (!message || typeof message !== 'string' || message.trim().length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Message is required and must be a non-empty string',
+                error: null,
+                statusCode: 400
+            });
+        }
+
+        // Handle default live chat specially
+        if (sessionId === 'default-live-chat') {
+            const chatMessage = new ChatMessage({
+                sessionId: null,
+                senderId: req.user.userId,
+                message,
+                senderType: req.user.role === 'admin' ? 'admin' : 'user',
+                messageType: 'default-chat'
+            });
+
+            await chatMessage.save();
+            await chatMessage.populate('senderId', 'name');
+
+            // Broadcast to all users in default chat room
+            const io = req.app.get('io');
+            if (io) {
+                // Emit to all users in default chat room
+                io.to('default-live-chat').emit('admin-reply-received', {
+                    message: chatMessage,
+                    senderName: chatMessage.senderId.name || 'User'
+                });
+
+                // Also emit to all connected users for default chat
+                io.emit('admin-reply-to-user', {
+                    message: chatMessage
+                });
+
+                // Emit to all admins for default chat notification
+                io.emit('admin-new-message', {
+                    content: chatMessage.message,
+                    senderId: chatMessage.senderId._id || chatMessage.senderId,
+                    senderName: chatMessage.senderId.name || 'User',
+                    timestamp: chatMessage.createdAt,
+                    messageType: chatMessage.messageType,
+                    message: chatMessage,
+                    senderType: chatMessage.senderType,
+                    userId: req.user.userId,
+                    userName: chatMessage.senderId.name || 'User'
+                });
+            }
+
+            return res.status(201).json({
+                success: true,
+                message: 'Message sent successfully',
+                data: { message: chatMessage },
+                statusCode: 201
+            });
+        }
+
         // Debug logging
         console.log('Send message debug info:');
         console.log('- Session ID from params:', sessionId);
@@ -111,6 +170,34 @@ const sendMessage = async (req, res, next) => {
         await chatMessage.save();
 
         await chatMessage.populate('senderId', 'name');
+
+        // Broadcast to all users in the session room via socket
+        const io = req.app.get('io');
+        if (io) {
+            // Emit to all users in the session room
+            io.to(sessionId).emit('message-received', {
+                content: chatMessage.message,
+                senderId: req.user.userId,
+                senderName: chatMessage.senderId.name || 'User',
+                timestamp: chatMessage.createdAt,
+                senderType: chatMessage.senderType,
+                message: chatMessage // Include full message object for compatibility
+            });
+
+            // Also emit to all admins for notification
+            io.emit('admin-new-message', {
+                content: chatMessage.message,
+                senderId: chatMessage.senderId._id || chatMessage.senderId,
+                senderName: chatMessage.senderId.name || 'User',
+                timestamp: chatMessage.createdAt,
+                messageType: 'live-chat',
+                message: chatMessage,
+                senderType: chatMessage.senderType,
+                userId: req.user.userId,
+                userName: chatMessage.senderId.name || 'User',
+                sessionId: sessionId
+            });
+        }
 
         res.status(201).json(ApiResponse.success({ message: chatMessage }, 'Message sent successfully'));
     } catch (error) {

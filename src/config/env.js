@@ -6,6 +6,8 @@ const path = require('path');
 console.log('NODE_ENV:', process.env.NODE_ENV);
 console.log('RAZORPAY_KEY_ID exists:', !!process.env.RAZORPAY_KEY_ID);
 console.log('RAZORPAY_KEY_SECRET exists:', !!process.env.RAZORPAY_KEY_SECRET);
+console.log('EMAIL_HOST:', process.env.EMAIL_HOST);
+console.log('ADMIN_EMAIL:', process.env.ADMIN_EMAIL);
 
 const config = {
     NODE_ENV: process.env.NODE_ENV || 'development',
@@ -22,6 +24,7 @@ const config = {
     EMAIL_PORT: process.env.EMAIL_PORT,
     EMAIL_USER: process.env.EMAIL_USER,
     EMAIL_PASS: process.env.EMAIL_PASS,
+    ADMIN_EMAIL: process.env.ADMIN_EMAIL,
 };
 
 // Validate required environment variables

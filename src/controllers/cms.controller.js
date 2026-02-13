@@ -1375,12 +1375,37 @@ exports.getContactPublic = async (req, res) => {
 
 exports.getContactAdmin = async (req, res) => {
     try {
+        console.log('=== GET CONTACT ADMIN ===');
+        console.log('Request received at:', new Date().toISOString());
+        console.log('Request headers:', req.headers);
+        console.log('Request user:', req.user);
+
         const contact = await CmsContact.findOne().sort({ createdAt: -1 });
+
+        console.log('Contact data found:', contact ? 'Yes' : 'No');
+        if (contact) {
+            console.log('Contact data:', {
+                id: contact._id,
+                email: contact.email,
+                phone: contact.phone,
+                address: contact.address,
+                latitude: contact.latitude,
+                longitude: contact.longitude,
+                socialLinks: contact.socialLinks,
+                createdAt: contact.createdAt,
+                updatedAt: contact.updatedAt
+            });
+        }
+
         res.json({
             success: true,
             data: contact || {}
         });
+
+        console.log('=== GET CONTACT ADMIN RESPONSE SENT ===');
     } catch (error) {
+        console.error('=== GET CONTACT ADMIN ERROR ===');
+        console.error('Error details:', error);
         res.status(500).json({
             success: false,
             message: 'Error fetching contact section',
@@ -1391,27 +1416,68 @@ exports.getContactAdmin = async (req, res) => {
 
 exports.updateContact = async (req, res) => {
     try {
+        console.log('=== UPDATE CONTACT ===');
+        console.log('Request received at:', new Date().toISOString());
+        console.log('Request method:', req.method);
+        console.log('Request headers:', req.headers);
+        console.log('Request user:', req.user);
+        console.log('Request body:', req.body);
+        console.log('Request body keys:', Object.keys(req.body));
+
         // Clean up the request body to remove any problematic id fields
         const contactData = { ...req.body };
         delete contactData._id;
         delete contactData.id;
         
+        console.log('Cleaned contact data:', contactData);
+
         let contact = await CmsContact.findOne().sort({ createdAt: -1 });
+
+        console.log('Existing contact found:', contact ? 'Yes' : 'No');
+        if (contact) {
+            console.log('Existing contact data before update:', {
+                id: contact._id,
+                email: contact.email,
+                phone: contact.phone,
+                address: contact.address,
+                latitude: contact.latitude,
+                longitude: contact.longitude
+            });
+        }
 
         if (contact) {
             Object.assign(contact, contactData);
             await contact.save();
+            console.log('Contact updated successfully');
         } else {
             contact = new CmsContact(contactData);
             await contact.save();
+            console.log('New contact created successfully');
         }
+
+        console.log('Final contact data:', {
+            id: contact._id,
+            email: contact.email,
+            phone: contact.phone,
+            address: contact.address,
+            latitude: contact.latitude,
+            longitude: contact.longitude,
+            socialLinks: contact.socialLinks,
+            createdAt: contact.createdAt,
+            updatedAt: contact.updatedAt
+        });
 
         res.json({
             success: true,
             message: 'Contact section updated successfully',
             data: contact
         });
+
+        console.log('=== UPDATE CONTACT RESPONSE SENT ===');
     } catch (error) {
+        console.error('=== UPDATE CONTACT ERROR ===');
+        console.error('Error details:', error);
+        console.error('Error stack:', error.stack);
         res.status(500).json({
             success: false,
             message: 'Error updating contact section',

@@ -64,11 +64,15 @@ const setupChatHandlers = (io, socket) => {
             // Determine session ID based on room type
             const sessionId = roomType === 'group' ? roomId.replace('group-', '') : roomId;
 
-            // Verify session exists and user has access
-            const session = await Session.findById(sessionId);
-            if (!session) {
-                socket.emit('error', { message: 'Session not found' });
-                return;
+            // Handle default live chat specially (no session required)
+            let session = null;
+            if (sessionId !== 'default-live-chat') {
+                // Verify session exists and user has access for regular sessions
+                session = await Session.findById(sessionId);
+                if (!session) {
+                    socket.emit('error', { message: 'Session not found' });
+                    return;
+                }
             }
 
             // Determine sender type
@@ -79,10 +83,11 @@ const setupChatHandlers = (io, socket) => {
 
             // Create new message
             const chatMessage = new ChatMessage({
-                sessionId,
+                sessionId: sessionId === 'default-live-chat' ? null : sessionId, // No session for default chat
                 senderId: socket.user.userId,
                 senderType: senderType,
-                message: message.content || message.message || message.text || message
+                message: message.content || message.message || message.text || message,
+                messageType: sessionId === 'default-live-chat' ? 'default-chat' : 'live-chat'
             });
 
             await chatMessage.save();
@@ -94,7 +99,9 @@ const setupChatHandlers = (io, socket) => {
                 senderId: socket.user.userId,
                 senderName: chatMessage.senderId.name || 'User',
                 timestamp: chatMessage.createdAt,
-                message: chatMessage // Include full message object for compatibility
+                messageType: chatMessage.messageType,
+                message: chatMessage, // Include full message object for compatibility
+                sessionId: sessionId
             };
 
             // Broadcast message to room (real-time)
@@ -109,6 +116,25 @@ const setupChatHandlers = (io, socket) => {
                 message: chatMessage
             });
 
+            // Emit admin notification if message is from user (so admin can see it in real-time)
+            if (senderType === 'user' || sessionId === 'default-live-chat') {
+                // Emit to all admins for default chat or user messages
+                io.emit('admin-new-message', {
+                    ...messageData,
+                    senderType: senderType,
+                    userId: socket.user.userId,
+                    userName: chatMessage.senderId.name || 'User'
+                });
+
+                // Also emit to a specific admin room if needed
+                io.to('admin-room').emit('new-support-message', {
+                    ...messageData,
+                    senderType: senderType,
+                    userId: socket.user.userId,
+                    userName: chatMessage.senderId.name || 'User'
+                });
+            }
+
             logger.info(`Message sent by ${socket.user.userId} in room ${roomId}`);
 
         } catch (error) {
@@ -122,30 +148,52 @@ const setupChatHandlers = (io, socket) => {
         try {
             const { sessionId, message } = data;
 
-            // Verify session exists and user has access
-            const session = await Session.findById(sessionId);
-            if (!session) {
-                socket.emit('error', { message: 'Session not found' });
-                return;
+            // Handle default live chat specially (no session required)
+            if (sessionId !== 'default-live-chat') {
+                // Verify session exists and user has access for regular sessions
+                const session = await Session.findById(sessionId);
+                if (!session) {
+                    socket.emit('error', { message: 'Session not found' });
+                    return;
+                }
             }
 
             // Create new message
             const chatMessage = new ChatMessage({
-                sessionId,
+                sessionId: sessionId === 'default-live-chat' ? null : sessionId, // No session for default chat
                 senderId: socket.user.userId,
-                senderType: 'user', // This would be 'therapist' if sent by therapist
-                message: message.trim()
+                message: message.trim(),
+                senderType: 'user', // Default sender type
+                messageType: sessionId === 'default-live-chat' ? 'default-chat' : 'live-chat'
             });
 
             await chatMessage.save();
             await chatMessage.populate('senderId', 'name');
 
-            // Broadcast message to room
+            // Prepare message data for broadcast
+            const messageData = {
+                content: chatMessage.message,
+                senderId: socket.user.userId,
+                senderName: chatMessage.senderId.name || 'User',
+                timestamp: chatMessage.createdAt,
+                messageType: chatMessage.messageType,
+                message: chatMessage // Include full message object for compatibility
+            };
+
+            // Broadcast to session room
             io.to(sessionId).emit('new-message', {
-                message: chatMessage
+                ...messageData
             });
 
+            // Also emit for real-time compatibility
+            io.to(sessionId).emit('message-received', {
+                ...messageData
+            });
+
+            logger.info(`Legacy message sent by ${socket.user.userId} in room ${sessionId}`);
+
         } catch (error) {
+            logger.error('Error sending legacy message:', error);
             socket.emit('error', { message: 'Failed to send message' });
         }
     });

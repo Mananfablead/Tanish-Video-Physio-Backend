@@ -38,6 +38,14 @@ const cmsContactSchema = new mongoose.Schema({
         required: true,
         trim: true
     },
+    latitude: {
+        type: Number,
+        required: false
+    },
+    longitude: {
+        type: Number,
+        required: false
+    },
     hours: {
         type: String,
         required: true

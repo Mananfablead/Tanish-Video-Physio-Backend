@@ -4,7 +4,10 @@ const chatMessageSchema = new mongoose.Schema({
     sessionId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Session',
-        required: [true, 'Session ID is required']
+        required: function () {
+            // sessionId is required unless messageType is 'default-chat'
+            return this.messageType !== 'default-chat';
+        }
     },
     senderId: {
         type: mongoose.Schema.Types.ObjectId,
@@ -13,7 +16,7 @@ const chatMessageSchema = new mongoose.Schema({
     },
     senderType: {
         type: String,
-        enum: ['user', 'therapist'],
+        enum: ['user', 'therapist', 'admin'],
         required: [true, 'Sender type is required']
     },
     message: {
@@ -29,6 +32,16 @@ const chatMessageSchema = new mongoose.Schema({
     read: {
         type: Boolean,
         default: false
+    },
+    messageType: {
+        type: String,
+        enum: ['live-chat', 'video-call-chat', 'default-chat'],
+        default: 'live-chat'
+    },
+    replyTo: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'ChatMessage',
+        default: null
     }
 }, {
     timestamps: true
