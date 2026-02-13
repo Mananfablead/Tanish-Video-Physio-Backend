@@ -53,6 +53,24 @@ const userSchema = new mongoose.Schema(
       medications: String,
       emergencyContact: String,
       additionalNotes: String,
+      // Dynamic questionnaire responses
+      questionnaireResponses: {
+        type: Map,
+        of: String,
+        default: () => new Map()
+      },
+      // Store questionnaire metadata
+      questionnaireMetadata: {
+        questionnaireId: String,
+        completedAt: Date,
+        responses: [{
+          questionId: String,
+          questionText: String,
+          answer: String,
+          questionType: String,
+          timestamp: { type: Date, default: Date.now }
+        }]
+      }
     },
     profilePicture: {
       type: String, // URL to the image
