@@ -2,6 +2,7 @@ const User = require('../models/User.model');
 const Booking = require('../models/Booking.model');
 const Subscription = require('../models/Subscription.model');
 const ApiResponse = require('../utils/apiResponse');
+const { generateToken } = require('../config/jwt');
 
 // Get all users (admin only)
 const getAllUsers = async (req, res, next) => {
@@ -279,11 +280,59 @@ const updateUserProfile = async (req, res, next) => {
     }
 };
 
+// Check if user exists by email (for guest booking flow)
+const checkUserExists = async (req, res, next) => {
+    try {
+        const { email } = req.body;
+        
+        if (!email) {
+            return res.status(400).json(ApiResponse.error('Email is required'));
+        }
+        
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json(ApiResponse.error('Invalid email format'));
+        }
+        
+        // Check if user exists
+        const user = await User.findOne({ email }).select('-password');
+        
+        if (user) {
+            // User exists - return user info and token for auto-login
+            const token = generateToken({ 
+                userId: user._id.toString(), 
+                role: user.role 
+            });
+            
+            return res.status(200).json(ApiResponse.success({
+                exists: true,
+                user: {
+                    id: user._id,
+                    name: user.name,
+                    email: user.email,
+                    phone: user.phone,
+                    role: user.role
+                },
+                token
+            }, 'User exists'));
+        } else {
+            // User doesn't exist
+            return res.status(200).json(ApiResponse.success({
+                exists: false
+            }, 'User does not exist'));
+        }
+    } catch (error) {
+        next(error);
+    }
+};
+
 module.exports = {
     getAllUsers,
     getUserById,
     updateUser,
     deleteUser,
     getUserProfile,
-    updateUserProfile
+    updateUserProfile,
+    checkUserExists
 };

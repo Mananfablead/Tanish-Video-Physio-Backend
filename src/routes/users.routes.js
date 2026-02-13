@@ -1,5 +1,5 @@
 const express = require('express');
-const { getAllUsers, getUserById, updateUser, deleteUser, getUserProfile, updateUserProfile } = require('../controllers/users.controller');
+const { getAllUsers, getUserById, updateUser, deleteUser, getUserProfile, updateUserProfile, checkUserExists } = require('../controllers/users.controller');
 const { authenticateToken, authorizeRoles } = require('../middlewares/auth.middleware');
 
 const router = express.Router();
@@ -10,5 +10,6 @@ router.get('/:id', authenticateToken, getUserById);
 router.put('/profile', authenticateToken, updateUserProfile);
 router.put('/:id', authenticateToken, authorizeRoles('admin'), updateUser);
 router.delete('/:id', authenticateToken, authorizeRoles('admin'), deleteUser);
+router.post('/check-exists', checkUserExists); // Public endpoint to check if user exists
 
 module.exports = router;

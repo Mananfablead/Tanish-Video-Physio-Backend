@@ -7,6 +7,7 @@ const SubscriptionPlan = require('../models/SubscriptionPlan.model');
 const User = require('../models/User.model');
 const ApiResponse = require('../utils/apiResponse');
 const { hashPassword } = require('../utils/auth.utils');
+const { generateToken } = require('../config/jwt');
 
 // Utility function to calculate end date based on plan validity
 async function calculateEndDate(planId, startDate = new Date()) {
@@ -397,11 +398,25 @@ const verifyPayment = async (req, res, next) => {
                 await booking.save();
             }
 
+            // Generate JWT token for auto-login
+            let authToken = null;
+            if (payment.userId) {
+                const user = await User.findById(payment.userId).select('-password');
+                if (user) {
+                    authToken = generateToken({ 
+                        userId: user._id.toString(), 
+                        role: user.role 
+                    });
+                }
+            }
+
             res.status(200).json(
                 ApiResponse.success({
                     paymentId,
                     orderId,
-                    status: 'paid'
+                    status: 'paid',
+                    token: authToken,
+                    userId: payment.userId
                 }, 'Payment verified successfully')
             );
         } else {
@@ -703,13 +718,25 @@ const verifyGuestPayment = async (req, res, next) => {
                 await booking.save();
             }
 
-            
+            // Generate JWT token for auto-login
+            let authToken = null;
+            if (payment.userId) {
+                const user = await User.findById(payment.userId).select('-password');
+                if (user) {
+                    authToken = generateToken({ 
+                        userId: user._id.toString(), 
+                        role: user.role 
+                    });
+                }
+            }
 
             res.status(200).json(
                 ApiResponse.success({
                     paymentId,
                     orderId,
-                    status: 'paid'
+                    status: 'paid',
+                    token: authToken,
+                    userId: payment.userId
                 }, 'Payment verified successfully')
             );
         } else {
@@ -1209,11 +1236,25 @@ const verifySubscriptionPayment = async (req, res, next) => {
             // Activate the subscription with calculated end date
             const updatedSubscription = await activateSubscription(subscription._id);
 
+            // Generate JWT token for auto-login
+            let authToken = null;
+            if (subscription.userId) {
+                const user = await User.findById(subscription.userId).select('-password');
+                if (user) {
+                    authToken = generateToken({ 
+                        userId: user._id.toString(), 
+                        role: user.role 
+                    });
+                }
+            }
+
             res.status(200).json(
                 ApiResponse.success({
                     paymentId,
                     orderId,
                     status: 'paid',
+                    token: authToken,
+                    userId: subscription.userId,
                     subscription: {
                         id: updatedSubscription._id,
                         planId: updatedSubscription.planId,
@@ -1334,11 +1375,25 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
                 await sendWelcomeEmailWithCredentials(subscription.guestEmail, subscription.guestName, subscription.guestEmail, tempPassword);
             }
 
+            // Generate JWT token for auto-login
+            let authToken = null;
+            if (subscription.userId) {
+                const user = await User.findById(subscription.userId).select('-password');
+                if (user) {
+                    authToken = generateToken({ 
+                        userId: user._id.toString(), 
+                        role: user.role 
+                    });
+                }
+            }
+
             res.status(200).json(
                 ApiResponse.success({
                     paymentId,
                     orderId,
                     status: 'paid',
+                    token: authToken,
+                    userId: subscription.userId,
                     subscription: {
                         id: updatedSubscription._id,
                         planId: updatedSubscription.planId,
