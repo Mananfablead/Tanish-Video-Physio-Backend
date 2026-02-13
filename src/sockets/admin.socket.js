@@ -1,137 +1,130 @@
 const logger = require('../utils/logger');
 
-// Store online admins
-const onlineAdmins = new Map();
-
 // Function to setup admin socket handlers
 const setupAdminHandlers = (io, socket) => {
-    // Handle admin connection
-    if (socket.user.role === 'admin') {
-        // Add admin to online admins list
-        onlineAdmins.set(socket.user.userId, {
-            socketId: socket.id,
-            userId: socket.user.userId,
-            name: socket.user.name,
-            connectedAt: new Date()
-        });
+    // Join admin support room
+    socket.on('join-default-chat', async () => {
+        try {
+            const userId = socket.user?.userId;
+            if (!userId) {
+                socket.emit('error', { message: 'User not authenticated' });
+                return;
+            }
 
-        logger.info(`Admin ${socket.user.userId} (${socket.user.name}) connected`);
+            // Join the default chat room for admin support
+            socket.join('default-chat-room');
 
-        // Broadcast admin status to all clients
-        io.emit('admin-status-update', {
-            online: true,
-            adminId: socket.user.userId,
-            adminName: socket.user.name,
-            timestamp: new Date()
-        });
+            logger.info(`User ${userId} joined default chat room`);
 
-        // Broadcast admin presence to default chat room
-        io.to('default-live-chat').emit('admin-presence', {
-            presence: 'online',
-            adminId: socket.user.userId,
-            adminName: socket.user.name
-        });
-    }
-
-    // Handle admin joining default chat room
-    socket.on('join-default-chat', () => {
-        socket.join('default-live-chat');
-        logger.info(`Admin ${socket.user.userId} joined default chat room`);
-
-        // Notify clients that admin is in the chat room
-        socket.to('default-live-chat').emit('admin-in-room', {
-            adminId: socket.user.userId,
-            adminName: socket.user.name
-        });
-    });
-
-    // Handle admin leaving default chat room
-    socket.on('leave-default-chat', () => {
-        socket.leave('default-live-chat');
-        logger.info(`Admin ${socket.user.userId} left default chat room`);
-    });
-
-    // Handle admin status request
-    socket.on('admin-status-request', () => {
-        if (socket.user.role === 'admin') {
-            const onlineCount = getOnlineAdminsCount();
-            const anyAdminOnline = isAnyAdminOnline();
-
-            // Send current status back to requesting client
-            socket.emit('admin-status-update', {
-                online: anyAdminOnline,
-                onlineCount: onlineCount,
-                anyAdminOnline: anyAdminOnline,
-                adminsOnline: onlineCount > 0,
+            // Notify admin about new user in chat
+            socket.to('admin-support-room').emit('user-joined-default-chat', {
+                userId,
                 timestamp: new Date()
             });
 
-            logger.info(`Admin status sent to client: ${onlineCount} admins online`);
+            socket.emit('default-chat-joined', {
+                message: 'Successfully joined default chat room'
+            });
+        } catch (error) {
+            logger.error('Error joining default chat:', error);
+            socket.emit('error', { message: 'Failed to join chat room' });
         }
     });
 
-    // Handle admin status update
-    socket.on('admin-status-change', (data) => {
-        if (socket.user.role === 'admin') {
-            const status = data.status || 'online';
-            logger.info(`Admin ${socket.user.userId} status changed to: ${status}`);
+    // Leave default chat room
+    socket.on('leave-default-chat', async () => {
+        try {
+            const userId = socket.user?.userId;
+            if (!userId) {
+                return;
+            }
 
-            // Broadcast to all clients
-            io.emit('admin-status-update', {
-                online: status === 'online',
-                status: status,
-                adminId: socket.user.userId,
-                adminName: socket.user.name,
+            socket.leave('default-chat-room');
+
+            logger.info(`User ${userId} left default chat room`);
+
+            // Notify admin about user leaving
+            socket.to('admin-support-room').emit('user-left-default-chat', {
+                userId,
+                timestamp: new Date()
+            });
+        } catch (error) {
+            logger.error('Error leaving default chat:', error);
+        }
+    });
+
+    // Admin status request
+    socket.on('admin-status-request', async () => {
+        try {
+            // Check if any admins are online
+            const adminSockets = await io.in('admin-support-room').allSockets();
+            const isAdminOnline = adminSockets.size > 0;
+
+            socket.emit('admin-status-update', {
+                online: isAdminOnline,
+                onlineCount: adminSockets.size
+            });
+        } catch (error) {
+            logger.error('Error checking admin status:', error);
+        }
+    });
+
+    // Handle admin presence
+    socket.on('admin-presence', async (data) => {
+        try {
+            const userId = socket.user?.userId;
+            if (!userId) {
+                return;
+            }
+
+            // Broadcast admin presence to all users in default chat
+            socket.to('default-chat-room').emit('admin-presence', {
+                presence: data.presence || 'online',
+                adminId: userId,
+                timestamp: new Date()
+            });
+        } catch (error) {
+            logger.error('Error handling admin presence:', error);
+        }
+    });
+
+    // Handle admin replies to default chat
+    socket.on('admin-reply-default-chat', async (data) => {
+        try {
+            const userId = socket.user?.userId;
+            if (!userId) {
+                socket.emit('error', { message: 'Admin not authenticated' });
+                return;
+            }
+
+            // Broadcast admin message to all users in default chat
+            socket.to('default-chat-room').emit('admin-new-message', {
+                content: data.message,
+                senderId: userId,
+                senderName: data.senderName || 'Support Team',
+                senderType: 'admin',
                 timestamp: new Date()
             });
 
-            // Broadcast to default chat room
-            io.to('default-live-chat').emit('admin-presence', {
-                presence: status,
-                adminId: socket.user.userId,
-                adminName: socket.user.name
-            });
+            logger.info(`Admin ${userId} sent message to default chat`);
+        } catch (error) {
+            logger.error('Error sending admin reply:', error);
+            socket.emit('error', { message: 'Failed to send message' });
         }
     });
 
     // Handle disconnect
     socket.on('disconnect', () => {
-        if (socket.user.role === 'admin') {
-            // Remove admin from online list
-            onlineAdmins.delete(socket.user.userId);
-            logger.info(`Admin ${socket.user.userId} disconnected`);
+        logger.info(`Admin socket ${socket.id} disconnected`);
 
-            // Broadcast admin offline status
-            io.emit('admin-status-update', {
-                online: false,
-                adminId: socket.user.userId,
-                adminName: socket.user.name,
-                timestamp: new Date()
-            });
-
-            // Broadcast to default chat room
-            io.to('default-live-chat').emit('admin-presence', {
+        // Notify users if this was an admin socket
+        if (socket.rooms.has('admin-support-room')) {
+            socket.to('default-chat-room').emit('admin-presence', {
                 presence: 'offline',
-                adminId: socket.user.userId,
-                adminName: socket.user.name
+                timestamp: new Date()
             });
         }
     });
 };
 
-// Helper function to get online admins count
-const getOnlineAdminsCount = () => {
-    return onlineAdmins.size;
-};
-
-// Helper function to check if any admin is online
-const isAnyAdminOnline = () => {
-    return onlineAdmins.size > 0;
-};
-
-module.exports = {
-    setupAdminHandlers,
-    getOnlineAdminsCount,
-    isAnyAdminOnline,
-    onlineAdmins
-};
+module.exports = { setupAdminHandlers };

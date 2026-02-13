@@ -5,8 +5,7 @@ const {
     getUnreadMessagesCount,
     markMessagesAsRead,
     getActiveChats,
-    getChatStats,
-    getAdminOnlineStatus
+    getChatStats
 } = require('../controllers/adminChat.controller');
 const { authenticateToken, authorizeRoles } = require('../middlewares/auth.middleware');
 
@@ -36,8 +35,5 @@ router.get('/active-chats', getActiveChats);
 
 // Get chat statistics
 router.get('/stats', getChatStats);
-
-// Get admin online status
-router.get('/admin-status', getAdminOnlineStatus);
 
 module.exports = router;
