@@ -57,7 +57,11 @@ async function activateSubscription(subscriptionId) {
         startDate: new Date(),
         endDate: endDate,
         nextBillingDate: nextBillingDate,
-        activatedAt: new Date()
+        activatedAt: new Date(),
+        // Preserve coupon information
+        finalAmount: subscription.finalAmount,
+        discountAmount: subscription.discountAmount,
+        couponCode: subscription.couponCode
     });
 
     return await Subscription.findById(subscriptionId);
@@ -180,10 +184,13 @@ const createOrder = async (req, res, next) => {
         const { bookingId, amount, currency = 'INR', couponCode } = req.body;
 
         // Verify the booking belongs to the user
-        const booking = await Booking.findOne({ _id: bookingId, userId: req.user.userId });
+        const booking = await Booking.findOne({ _id: bookingId, userId: req.user.userId }).populate('serviceId');
         if (!booking) {
             return res.status(404).json(ApiResponse.error('Booking not found'));
         }
+        
+        // Get original service price for coupon calculation
+        const originalServicePrice = booking.serviceId ? booking.serviceId.price : amount;
 
         let validatedAmount = amount;
         
@@ -207,7 +214,7 @@ const createOrder = async (req, res, next) => {
                 }
                 
                 // Check minimum amount
-                if (offer.minimumAmount > amount) {
+                if (offer.minimumAmount > originalServicePrice) {
                     return res.status(400).json(ApiResponse.error(`Minimum order amount ₹${offer.minimumAmount} required for this offer`));
                 }
                 
@@ -247,20 +254,21 @@ const createOrder = async (req, res, next) => {
                     }
                 }
                 
-                // Calculate discount
+                // Calculate discount based on original service price
                 let discount = 0;
                 if (offer.type === 'percentage') {
-                    discount = Math.min(amount * (offer.value / 100), offer.maxDiscountAmount || Infinity);
+                    discount = Math.min(originalServicePrice * (offer.value / 100), offer.maxDiscountAmount || Infinity);
                 } else {
-                    discount = Math.min(offer.value, amount);
+                    discount = Math.min(offer.value, originalServicePrice);
                 }
                 
-                validatedAmount = amount - discount;
+                validatedAmount = originalServicePrice - discount;
                 
                 // Update booking with coupon info
                 booking.couponCode = couponCode;
                 booking.discountAmount = discount;
                 booking.finalAmount = validatedAmount;
+                booking.originalAmount = originalServicePrice;
                 await booking.save();
             }
         }
@@ -464,10 +472,13 @@ const createGuestOrder = async (req, res, next) => {
         }
 
         // Find the booking to associate with this payment
-        const booking = await Booking.findById(bookingId);
+        const booking = await Booking.findById(bookingId).populate('serviceId');
         if (!booking) {
             return res.status(404).json(ApiResponse.error('Booking not found'));
         }
+        
+        // Get original service price for coupon calculation
+        const originalServicePrice = booking.serviceId ? booking.serviceId.price : amount;
 
         let validatedAmount = amount;
         
@@ -491,7 +502,7 @@ const createGuestOrder = async (req, res, next) => {
                 }
                 
                 // Check minimum amount
-                if (offer.minimumAmount > amount) {
+                if (offer.minimumAmount > originalServicePrice) {
                     return res.status(400).json(ApiResponse.error(`Minimum order amount ₹${offer.minimumAmount} required for this offer`));
                 }
                 
@@ -529,20 +540,21 @@ const createGuestOrder = async (req, res, next) => {
                     }
                 }
                 
-                // Calculate discount
+                // Calculate discount based on original service price
                 let discount = 0;
                 if (offer.type === 'percentage') {
-                    discount = Math.min(amount * (offer.value / 100), offer.maxDiscountAmount || Infinity);
+                    discount = Math.min(originalServicePrice * (offer.value / 100), offer.maxDiscountAmount || Infinity);
                 } else {
-                    discount = Math.min(offer.value, amount);
+                    discount = Math.min(offer.value, originalServicePrice);
                 }
                 
-                validatedAmount = amount - discount;
+                validatedAmount = originalServicePrice - discount;
                 
                 // Update booking with coupon info
                 booking.couponCode = couponCode;
                 booking.discountAmount = discount;
                 booking.finalAmount = validatedAmount;
+                booking.originalAmount = originalServicePrice;
                 await booking.save();
             }
         }
@@ -915,15 +927,20 @@ const createSubscriptionOrder = async (req, res, next) => {
     try {
         const { planId, amount, currency = 'INR', couponCode } = req.body;
 
+        console.log('🔍 Subscription order request:', { planId, amount, currency, couponCode });
+        
         // Validate plan exists in the database
         const plan = await SubscriptionPlan.findOne({ planId, status: 'active' });
+        console.log('📊 Found plan:', plan ? { planId: plan.planId, name: plan.name, price: plan.price, duration: plan.duration } : 'NOT FOUND');
         if (!plan) {
             return res.status(400).json(ApiResponse.error('Invalid or inactive plan ID'));
         }
 
-        // Use the actual plan price instead of the provided amount
+        // Use the provided amount if it's less than or equal to plan price (discount applied)
+        // Otherwise use the actual plan price
         let planAmount = plan.price;
-        let validatedAmount = planAmount;
+        let validatedAmount = amount <= planAmount ? amount : planAmount;
+        console.log('💰 Amount calculation:', { planAmount, providedAmount: amount, validatedAmount });
         
         // If coupon code is provided, re-validate it before creating payment order
         if (couponCode) {
@@ -1005,8 +1022,13 @@ const createSubscriptionOrder = async (req, res, next) => {
             payment_capture: 1 // Auto-capture payment
         };
 
+        console.log('💳 Razorpay order options:', options);
         const order = await razorpay.orders.create(options);
+        console.log('💳 Razorpay order created:', { orderId: order.id, amount: order.amount, currency: order.currency });
 
+        // Calculate discount amount
+        const discountAmount = planAmount - validatedAmount;
+        
         // Create subscription record in our database
         const subscription = new Subscription({
             userId: req.user.userId,
@@ -1014,6 +1036,8 @@ const createSubscriptionOrder = async (req, res, next) => {
             planName: plan.name,
             amount: validatedAmount,
             originalAmount: planAmount,
+            finalAmount: validatedAmount,
+            discountAmount: discountAmount,
             currency,
             orderId: order.id,
             status: 'created',
@@ -1065,9 +1089,10 @@ const createGuestSubscriptionOrder = async (req, res, next) => {
             // This addresses the issue where paid users couldn't subscribe again
         }
 
-        // Use the actual plan price instead of the provided amount
+        // Use the provided amount if it's less than or equal to plan price (discount applied)
+        // Otherwise use the actual plan price
         let planAmount = plan.price;
-        let validatedAmount = planAmount;
+        let validatedAmount = amount <= planAmount ? amount : planAmount;
         
         // If coupon code is provided, re-validate it before creating payment order
         if (couponCode) {
@@ -1149,6 +1174,9 @@ const createGuestSubscriptionOrder = async (req, res, next) => {
 
         const order = await razorpay.orders.create(options);
 
+        // Calculate discount amount
+        const discountAmount = planAmount - validatedAmount;
+        
         // Create subscription record in our database
         // Store guest info temporarily without creating user account yet
         const subscription = new Subscription({
@@ -1156,6 +1184,8 @@ const createGuestSubscriptionOrder = async (req, res, next) => {
             planName: plan.name,
             amount: validatedAmount,
             originalAmount: planAmount,
+            finalAmount: validatedAmount,
+            discountAmount: discountAmount,
             currency,
             orderId: order.id,
             status: 'created',
@@ -1218,7 +1248,11 @@ const verifySubscriptionPayment = async (req, res, next) => {
                 {
                     paymentId,
                     status: 'paid',
-                    verifiedAt: new Date()
+                    verifiedAt: new Date(),
+                    // Preserve coupon information
+                    finalAmount: subscription.finalAmount,
+                    discountAmount: subscription.discountAmount,
+                    couponCode: subscription.couponCode
                 }
             );
 
@@ -1350,7 +1384,11 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
                 {
                     paymentId,
                     status: 'paid',
-                    verifiedAt: new Date()
+                    verifiedAt: new Date(),
+                    // Preserve coupon information
+                    finalAmount: subscription.finalAmount,
+                    discountAmount: subscription.discountAmount,
+                    couponCode: subscription.couponCode
                 }
             );
 

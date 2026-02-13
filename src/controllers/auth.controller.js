@@ -166,8 +166,9 @@ const getProfile = async (req, res, next) => {
         }));
 
         // Separate active and expired subscriptions
+        // Only show subscriptions that are actually paid
         const activeSubscriptions = subscriptionsWithExpiry.filter(sub => 
-            !sub.isExpired && (sub.status === 'active' || sub.status === 'paid')
+            !sub.isExpired && sub.status === 'paid'
         );
         
         expiredSubscriptions = subscriptionsWithExpiry.filter(sub => sub.isExpired);
@@ -175,9 +176,12 @@ const getProfile = async (req, res, next) => {
         // First check for active subscriptions
         activeSubscription = activeSubscriptions[0] || null;
 
-        // If no active subscription found, get the most recent one
+        // If no active subscription found, get the most recent paid one
         if (!activeSubscription && subscriptions.length > 0) {
-            activeSubscription = subscriptionsWithExpiry[0];
+            const paidSubscriptions = subscriptionsWithExpiry.filter(sub => sub.status === 'paid');
+            if (paidSubscriptions.length > 0) {
+                activeSubscription = paidSubscriptions[0];
+            }
         }
 
         // Get user's bookings with service information

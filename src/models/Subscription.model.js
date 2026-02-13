@@ -66,6 +66,17 @@ const subscriptionSchema = new mongoose.Schema({
     guestPhone: {
         type: String,
         required: false // Only for guest subscriptions
+    },
+    finalAmount: {
+        type: Number,
+        min: 0
+    },
+    couponCode: {
+        type: String
+    },
+    discountAmount: {
+        type: Number,
+        min: 0
     }
 }, {
     timestamps: true
