@@ -109,7 +109,7 @@ const getBookingDetails = async (req, res, next) => {
 // Create a new booking with notification triggers
 const createBooking = async (req, res, next) => {
     try {
-        const { serviceId, date, time, notes, clientName } = req.body;
+        const { serviceId, date, time, notes, clientName, scheduleType, scheduledDate, scheduledTime, timeSlot } = req.body;
 
         // Validate service exists
         const service = await Service.findById(serviceId);
@@ -141,9 +141,13 @@ const createBooking = async (req, res, next) => {
             notes,
             amount: service.price,
             paymentStatus: 'pending', // Default from existing enum
-            status: 'pending', // Default from existing enum
+            status: scheduleType === 'later' ? 'pending' : 'scheduled', // Default from existing enum
             serviceValidityDays: service.validity,
-            purchaseDate: new Date()
+            purchaseDate: new Date(),
+            scheduleType: scheduleType || 'now',
+            scheduledDate: scheduledDate || null,
+            scheduledTime: scheduledTime || null,
+            timeSlot: timeSlot || null
         });
 
         await booking.save();
@@ -179,6 +183,122 @@ const createBooking = async (req, res, next) => {
         }
 
         res.status(201).json(ApiResponse.success({ booking }, 'Booking created successfully'));
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Check if time slot is available
+const checkSlotAvailability = async (req, res, next) => {
+    try {
+        const { therapistId, date, timeSlot } = req.body;
+
+        // Validate required fields
+        if (!therapistId || !date || !timeSlot) {
+            return res.status(400).json(ApiResponse.error('Therapist ID, date, and time slot are required'));
+        }
+
+        // Validate time slot format
+        const { start, end } = timeSlot;
+        if (!start || !end) {
+            return res.status(400).json(ApiResponse.error('Start and end times are required for time slot'));
+        }
+
+        // Validate therapistId format (should be a valid MongoDB ObjectId)
+        const mongoose = require('mongoose');
+        if (!mongoose.Types.ObjectId.isValid(therapistId)) {
+            return res.status(400).json(ApiResponse.error('Invalid data format - therapistId must be a valid MongoDB ObjectId'));
+        }
+
+        // Check if the therapist exists
+        const therapist = await User.findById(therapistId);
+        if (!therapist) {
+            return res.status(404).json(ApiResponse.error('Therapist not found'));
+        }
+
+        // Check if there's availability for the therapist on the given date
+        const availability = await Availability.findOne({
+            therapistId,
+            date
+        });
+
+        if (availability) {
+            // Check if the requested time slot exists in availability
+            const requestedSlot = availability.timeSlots.find(slot => 
+                slot.start === start && slot.end === end && slot.status !== 'booked'
+            );
+
+            if (!requestedSlot) {
+                return res.status(409).json(ApiResponse.error('Requested time slot is not available'));
+            }
+        } else {
+            // If no availability record exists for the date, assume slot is not available
+            return res.status(409).json(ApiResponse.error('No availability found for the selected date')); 
+        }
+
+        // Check if there's already a booking for this therapist at the same time
+        const existingBooking = await Booking.findOne({
+            therapistId,
+            date,
+            $or: [
+                { scheduledDate: date, 'timeSlot.start': start, 'timeSlot.end': end },
+                { scheduledDate: date, time: { $regex: `^${start.substring(0, 5)}.*` } } // Match if time starts with the same hour
+            ]
+        });
+
+        if (existingBooking) {
+            return res.status(409).json(ApiResponse.error('A booking already exists for this time slot')); 
+        }
+
+        res.status(200).json(ApiResponse.success({ available: true }, 'Time slot is available')); 
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Update booking with scheduling information
+const updateBookingWithSchedule = async (req, res, next) => {
+    try {
+        const { id: bookingId } = req.params;
+        const { scheduledDate, scheduledTime, timeSlot, status } = req.body;
+
+        // Build query based on user role
+        let query;
+        if (req.user.role === 'admin') {
+            // Admin can update any booking
+            query = { _id: bookingId };
+        } else {
+            // Regular user can only update their own bookings
+            query = { _id: bookingId, userId: req.user.userId };
+        }
+
+        // Get current booking
+        const currentBooking = await Booking.findOne(query);
+        if (!currentBooking) {
+            return res.status(404).json(ApiResponse.error('Booking not found or unauthorized'));
+        }
+
+        // Prepare update data
+        const updateData = {};
+        if (scheduledDate) updateData.scheduledDate = scheduledDate;
+        if (scheduledTime) updateData.scheduledTime = scheduledTime;
+        if (timeSlot) updateData.timeSlot = timeSlot;
+        if (status) updateData.status = status;
+        
+        // If scheduling now, update status to scheduled
+        if (scheduledDate && scheduledTime) {
+            updateData.status = 'scheduled';
+        }
+
+        // Update booking
+        const booking = await Booking.findOneAndUpdate(
+            query,
+            updateData,
+            { new: true, runValidators: true }
+        ).populate('serviceId', 'name price duration validity images')
+          .populate('therapistId', 'name email role profilePicture');
+
+        res.status(200).json(ApiResponse.success({ booking }, 'Booking updated with schedule successfully'));
     } catch (error) {
         next(error);
     }
@@ -372,9 +492,9 @@ const updateGuestBookingStatus = async (req, res, next) => {
         const { id: bookingId } = req.params; // Changed from bookingId to id to match the route parameter
 
         // Validate status
-        const validStatuses = ['pending', 'confirmed', 'completed', 'cancelled'];
+        const validStatuses = ['pending', 'confirmed', 'completed', 'cancelled', 'scheduled'];
         if (!validStatuses.includes(status)) {
-            return res.status(400).json(ApiResponse.error('Invalid status. Valid statuses: pending, confirmed, completed, cancelled'));
+            return res.status(400).json(ApiResponse.error('Invalid status. Valid statuses: pending, confirmed, completed, cancelled, scheduled'));
         }
 
         // For guest users, we'll identify the booking by ID and require some identifying information
@@ -419,9 +539,9 @@ const updateGuestBookingStatus = async (req, res, next) => {
 
             if (bookingUser && bookingUser.email === clientEmail) {
                 // Update the booking status for guest bookings
-                // Only allow certain status changes for guest bookings
-                if (['cancelled'].includes(status)) {
-                    // Only allow cancelling for guest bookings to prevent unauthorized status changes
+                // Allow certain status changes for guest bookings
+                if (['cancelled', 'scheduled'].includes(status)) {
+                    // Allow cancelling and scheduling for guest bookings
                     const updatedBooking = await Booking.findByIdAndUpdate(
                         bookingId,
                         { status },
@@ -549,7 +669,7 @@ const getBookingsByStatus = async (req, res, next) => {
 // Create a new booking for guest users
 const createGuestBooking = async (req, res, next) => {
     try {
-        const { serviceId, date, time, notes, clientName, clientEmail, clientPhone } = req.body;
+        const { serviceId, date, time, notes, clientName, clientEmail, clientPhone, scheduleType, scheduledDate, scheduledTime, timeSlot } = req.body;
 
         // Validate required fields for guest booking
         if (!clientName || !clientEmail || !clientPhone) {
@@ -627,7 +747,12 @@ const createGuestBooking = async (req, res, next) => {
             notes,
             amount: service.price, // Get from service model
             paymentStatus: 'pending', // Initially pending until payment is made
-            purchaseDate: new Date() // Set purchase date when booking is created
+            purchaseDate: new Date(), // Set purchase date when booking is created
+            scheduleType: scheduleType || 'now',
+            scheduledDate: scheduledDate || null,
+            scheduledTime: scheduledTime || null,
+            timeSlot: timeSlot || null,
+            status: scheduleType === 'later' ? 'pending' : 'scheduled'
         });
 
         await booking.save();
@@ -914,6 +1039,8 @@ module.exports = {
     getBookingsByStatus,
     getAllBookingsForAdmin,
     getBookingDetails, // Single unified function
+    checkSlotAvailability,
+    updateBookingWithSchedule,
 
     // Enhanced functions
     bulkUpdateStatus,

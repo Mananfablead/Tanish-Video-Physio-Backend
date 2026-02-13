@@ -1,5 +1,5 @@
 const express = require('express');
-const { getAllBookings, getBookingById, createBooking, createGuestBooking, updateBooking, updateBookingStatus, updateGuestBookingStatus, deleteBooking, getBookingsByStatus, getAllBookingsForAdmin, getBookingDetails } = require('../controllers/bookings.controller');
+const { getAllBookings, getBookingById, createBooking, createGuestBooking, updateBooking, updateBookingStatus, updateGuestBookingStatus, deleteBooking, getBookingsByStatus, getAllBookingsForAdmin, getBookingDetails, checkSlotAvailability, updateBookingWithSchedule } = require('../controllers/bookings.controller');
 const { authenticateToken } = require('../middlewares/auth.middleware');
 const { requirePatientRole, requireAdminRole } = require('../middlewares/role.middleware');
 
@@ -19,5 +19,9 @@ router.put('/guest-status/:id', updateGuestBookingStatus);
 router.delete('/:id', authenticateToken, deleteBooking);
 // Unified route for booking details (works for both guest and authenticated users)
 router.post('/details/:id', getBookingDetails);
+
+// Routes for scheduling functionality
+router.post('/check-slot-availability', checkSlotAvailability);
+router.put('/:id/schedule', authenticateToken, updateBookingWithSchedule);
 
 module.exports = router;
