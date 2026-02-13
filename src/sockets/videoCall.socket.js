@@ -116,6 +116,35 @@ const getAllParticipantsInRoom = (roomId) => {
 // Function to setup video call socket handlers
 const setupVideoCallHandlers = (io, socket) => {
     // Handle patient request to join waiting room
+    // Handle join video session for chat messaging
+    socket.on('join-video-session', async (data) => {
+        try {
+            const { sessionId } = data;
+            if (!sessionId) {
+                socket.emit('error', { message: 'Session ID is required' });
+                return;
+            }
+    
+            // Join the session room for messaging
+            socket.join(sessionId);
+            logger.info(`User ${socket.user.userId} joined video session room: ${sessionId}`);
+    
+            // Also join a prefixed room for video call specific messaging
+            const videoRoomId = `video-call-${sessionId}`;
+            socket.join(videoRoomId);
+            logger.info(`User ${socket.user.userId} joined video call room: ${videoRoomId}`);
+    
+            socket.emit('joined-video-session', {
+                sessionId: sessionId,
+                message: 'Successfully joined video session'
+            });
+        } catch (error) {
+            logger.error('Error joining video session:', error);
+            socket.emit('error', { message: 'Failed to join video session' });
+        }
+    });
+    
+    // Handle patient request to join waiting room
     socket.on('request-to-join', async (data) => {
         try {
             const { sessionId } = data;

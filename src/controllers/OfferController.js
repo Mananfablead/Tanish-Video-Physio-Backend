@@ -37,8 +37,13 @@ exports.createOffer = async (req, res, next) => {
 
     // Validate dates
     const now = new Date();
-    if (new Date(startDate) < now) {
-      return next(ApiResponse.error("Start date must be in the future", 400));
+    // Reset time part to compare only dates
+    const currentDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startDateObj = new Date(startDate);
+    const startOnlyDate = new Date(startDateObj.getFullYear(), startDateObj.getMonth(), startDateObj.getDate());
+    
+    if (startOnlyDate < currentDate) {
+      return next(ApiResponse.error("Start date cannot be in the past", 400));
     }
     if (new Date(endDate) <= new Date(startDate)) {
       return next(ApiResponse.error("End date must be after start date", 400));
@@ -248,7 +253,7 @@ exports.deleteOffer = async (req, res, next) => {
       );
     }
 
-    await offer.deleteOne();
+    await offer.remove();
 
     res.status(200).json({
       success: true,
