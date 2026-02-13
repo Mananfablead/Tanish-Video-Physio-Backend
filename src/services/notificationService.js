@@ -392,13 +392,7 @@ class NotificationService {
         // Notification templates
         this.templates = {
             // User notifications
-            booking_created: {
-                email: {
-                    subject: 'Booking Request Submitted - Tanish Physio',
-                    template: EmailTemplates.bookingCreated
-                },
-                whatsapp: (data) => `Booking request submitted for ${data.serviceName}. Awaiting confirmation.`
-            },
+
 
             booking_confirmed: {
                 email: {

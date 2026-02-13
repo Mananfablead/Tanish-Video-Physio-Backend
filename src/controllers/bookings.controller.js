@@ -169,12 +169,13 @@ const createBooking = async (req, res, next) => {
             time: time
         };
 
-        // Notify user (using the booking creator's contact info)
-        await NotificationService.sendNotification(
-            { email: req.user.email, phone: req.user.phone },
-            'booking_created',
-            notificationData
-        );
+        // Removed booking request submitted notification
+        // Previous code: Notify user (using the booking creator's contact info)
+        // await NotificationService.sendNotification(
+        //     { email: req.user.email, phone: req.user.phone },
+        //     'booking_created',
+        //     notificationData
+        // );
 
         // Notify admin
         const admins = await User.find({ role: 'admin' }).select('email phone name');
@@ -803,12 +804,13 @@ const createGuestBooking = async (req, res, next) => {
             time: time
         };
 
-        // Notify guest user
-        await NotificationService.sendNotification(
-            { email: clientEmail, phone: clientPhone },
-            'booking_created',
-            notificationData
-        );
+        // Removed booking request submitted notification
+        // Previous code: Notify guest user
+        // await NotificationService.sendNotification(
+        //     { email: clientEmail, phone: clientPhone },
+        //     'booking_created',
+        //     notificationData
+        // );
 
         // Notify admins
         const admins = await User.find({ role: 'admin' }).select('email phone name');
