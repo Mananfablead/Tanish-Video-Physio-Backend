@@ -63,8 +63,7 @@ const serviceSchema = new mongoose.Schema({
     }],
     sessions: {
         type: Number,
-        min: 0,
-        required: [true, 'Number of sessions is required']
+        default: 1
     },
     validity: {
         type: Number,

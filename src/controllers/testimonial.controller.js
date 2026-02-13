@@ -1,5 +1,7 @@
 const Testimonial = require('../models/Testimonial.model');
 const User = require('../models/User.model');
+const path = require('path');
+const fs = require('fs');
 
 // Get all testimonials with filtering and search
 exports.getAllTestimonials = async (req, res) => {
@@ -128,11 +130,31 @@ exports.createTestimonial = async (req, res) => {
             featured: req.user?.role === 'admin' ? req.body.featured : false
         };
 
-        // If authenticated user is creating testimonial, use their userId
-        if (req.user && !testimonialData.userId) {
-            testimonialData.userId = req.user._id;
+        // Handle video upload
+        if (req.file) {
+            testimonialData.video = `/uploads/testimonial-videos/${req.file.filename}`;
         }
 
+        // If authenticated user is creating testimonial, use their userId
+        if (req.user && !testimonialData.userId) {
+            testimonialData.userId = req.user.userId;
+        }
+        
+        // Validate required fields
+        if (!testimonialData.userId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Authentication required. Please log in to submit a testimonial.'
+            });
+        }
+        
+        if (!testimonialData.rating || !testimonialData.content || !testimonialData.problem || !testimonialData.serviceUsed) {
+            return res.status(400).json({
+                success: false,
+                message: 'Missing required fields: rating, content, problem, or serviceUsed'
+            });
+        }
+        
         const testimonial = new Testimonial(testimonialData);
         await testimonial.save();
 
@@ -154,9 +176,18 @@ exports.createTestimonial = async (req, res) => {
 exports.updateTestimonial = async (req, res) => {
     try {
         const { id } = req.params;
+        
+        // Prepare update data
+        const updateData = { ...req.body };
+        
+        // Handle video upload
+        if (req.file) {
+            updateData.video = `/uploads/testimonial-videos/${req.file.filename}`;
+        }
+        
         const testimonial = await Testimonial.findByIdAndUpdate(
             id,
-            req.body,
+            updateData,
             { new: true, runValidators: true }
         )
             .populate('userId', 'name email profilePicture');
@@ -268,8 +299,30 @@ exports.toggleFeaturedStatus = async (req, res) => {
 exports.deleteTestimonial = async (req, res) => {
     try {
         const { id } = req.params;
-        const testimonial = await Testimonial.findByIdAndDelete(id)
+        const testimonial = await Testimonial.findById(id)
             .populate('userId', 'name email profilePicture');
+
+        if (!testimonial) {
+            return res.status(404).json({
+                success: false,
+                message: 'Testimonial not found'
+            });
+        }
+
+        // Delete associated video file if it exists
+        if (testimonial.video) {
+            const videoPath = path.join(__dirname, '..', '..', testimonial.video);
+            try {
+                if (fs.existsSync(videoPath)) {
+                    fs.unlinkSync(videoPath);
+                }
+            } catch (err) {
+                console.error('Error deleting video file:', err);
+            }
+        }
+
+        // Delete the testimonial from database
+        await Testimonial.findByIdAndDelete(id);
 
         if (!testimonial) {
             return res.status(404).json({
@@ -315,6 +368,26 @@ exports.getTestimonialStats = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Error fetching testimonial stats',
+            error: error.message
+        });
+    }
+};
+
+// Get testimonials by current user
+exports.getUserTestimonials = async (req, res) => {
+    try {
+        const testimonials = await Testimonial.find({ userId: req.user.userId })
+            .sort({ createdAt: -1 });
+            
+        res.status(200).json({
+            success: true,
+            message: 'User testimonials fetched successfully',
+            data: testimonials
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching user testimonials',
             error: error.message
         });
     }

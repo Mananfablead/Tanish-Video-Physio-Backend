@@ -40,6 +40,16 @@ const testimonialSchema = new mongoose.Schema({
     featured: {
         type: Boolean,
         default: false
+    },
+    video: {
+        type: String,
+        trim: true,
+        default: null
+    },
+    sessionId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Session',
+        required: false // Not required since admin can create testimonials not tied to a session
     }
 }, {
     timestamps: true // Adds createdAt and updatedAt fields
