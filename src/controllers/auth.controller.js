@@ -319,6 +319,16 @@ const getAllAdminProfiles = async (req, res, next) => {
                 });
             }
 
+            // Handle languages - convert to string if it's an array
+            let languagesDisplay = '';
+            if (admin.doctorProfile?.languages) {
+                if (Array.isArray(admin.doctorProfile.languages)) {
+                    languagesDisplay = admin.doctorProfile.languages.join(', ');
+                } else {
+                    languagesDisplay = admin.doctorProfile.languages;
+                }
+            }
+            
             return {
                 id: admin._id,
                 name: admin.name,
@@ -331,8 +341,9 @@ const getAllAdminProfiles = async (req, res, next) => {
                     specialization: admin.doctorProfile.specialization,
                     bio: admin.doctorProfile.bio,
                     education: admin.doctorProfile.education,
-                    languages: admin.doctorProfile.languages,
-                    certifications: certificationsUrls
+                    languages: languagesDisplay,
+                    certifications: certificationsUrls,
+                    certificationNames: admin.doctorProfile.certificationNames || []
                 } : null,
                 joinDate: admin.joinDate
             };
@@ -366,6 +377,16 @@ const getPublicProfile = async (req, res, next) => {
             user.profilePicture = `${baseUrl}${user.profilePicture}`;
         }
 
+        // Handle languages - convert to string if it's an array
+        let languagesDisplay = '';
+        if (user.doctorProfile?.languages) {
+            if (Array.isArray(user.doctorProfile.languages)) {
+                languagesDisplay = user.doctorProfile.languages.join(', ');
+            } else {
+                languagesDisplay = user.doctorProfile.languages;
+            }
+        }
+        
         // Prepare admin-specific public data
         const publicAdminData = {
             id: user._id,
@@ -379,8 +400,9 @@ const getPublicProfile = async (req, res, next) => {
                 specialization: user.doctorProfile.specialization,
                 bio: user.doctorProfile.bio,
                 education: user.doctorProfile.education,
-                languages: user.doctorProfile.languages,
-                certifications: user.doctorProfile.certifications
+                languages: languagesDisplay,
+                certifications: user.doctorProfile.certifications,
+                certificationNames: user.doctorProfile.certificationNames || []
             } : null,
             joinDate: user.joinDate
         };
@@ -429,15 +451,64 @@ const updateProfile = async (req, res, next) => {
             } catch (e) {
                 // If it's not JSON, create an object from individual fields
                 doctorProfile = {};
-                Object.keys(req.body).forEach(key => {
-                    if (key.startsWith('doctorProfile[')) {
-                        const field = key.match(/doctorProfile\[(.*?)\]/)[1];
-                        if (!doctorProfile[field]) {
-                            doctorProfile[field] = req.body[key];
+            }
+        } else if (!doctorProfile) {
+            doctorProfile = {};
+        }
+        
+        // Handle individual doctorProfile fields (doctorProfile[...])
+        Object.keys(req.body).forEach(key => {
+            if (key.startsWith('doctorProfile[')) {
+                const field = key.match(/doctorProfile\[(.*?)\]/)[1];
+                if (!doctorProfile[field]) {
+                    doctorProfile[field] = req.body[key];
+                    
+                    // Handle certificationNames specifically
+                    if (field === 'certificationNames' && typeof req.body[key] === 'string') {
+                        try {
+                            // Handle deeply nested JSON strings
+                            let parsed = req.body[key];
+                            // Keep parsing while it's a string that looks like JSON
+                            while (typeof parsed === 'string' && (parsed.startsWith('[') || parsed.startsWith('{'))) {
+                                try {
+                                    parsed = JSON.parse(parsed);
+                                } catch (e) {
+                                    break;
+                                }
+                            }
+                            doctorProfile[field] = Array.isArray(parsed) ? parsed : [parsed];
+                        } catch (parseError) {
+                            doctorProfile[field] = [req.body[key]];
                         }
                     }
-                });
+                }
             }
+        });
+        
+        // Handle certificationNames that come directly in req.body
+        let certificationNames = req.body.certificationNames;
+        if (typeof certificationNames === 'string') {
+            try {
+                // Handle deeply nested JSON strings
+                let parsed = certificationNames;
+                // Keep parsing while it's a string that looks like JSON
+                while (typeof parsed === 'string' && (parsed.startsWith('[') || parsed.startsWith('{'))) {
+                    try {
+                        parsed = JSON.parse(parsed);
+                    } catch (e) {
+                        break;
+                    }
+                }
+                certificationNames = Array.isArray(parsed) ? parsed : [parsed];
+            } catch (e) {
+                certificationNames = [certificationNames];
+            }
+            
+            // If we have certificationNames but no doctorProfile, create one
+            if (!doctorProfile) {
+                doctorProfile = {};
+            }
+            doctorProfile.certificationNames = certificationNames;
         }
 
         // Handle profile picture if uploaded
