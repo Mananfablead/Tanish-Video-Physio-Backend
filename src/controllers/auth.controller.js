@@ -168,7 +168,7 @@ const getProfile = async (req, res, next) => {
         // Separate active and expired subscriptions
         // Only show subscriptions that are actually paid
         const activeSubscriptions = subscriptionsWithExpiry.filter(sub => 
-            !sub.isExpired && sub.status === 'paid'
+            !sub.isExpired && sub.status === 'paid' || sub.status === 'active'
         );
         
         expiredSubscriptions = subscriptionsWithExpiry.filter(sub => sub.isExpired);
