@@ -248,7 +248,7 @@ exports.deleteOffer = async (req, res, next) => {
       );
     }
 
-    await offer.remove();
+    await offer.deleteOne();
 
     res.status(200).json({
       success: true,
