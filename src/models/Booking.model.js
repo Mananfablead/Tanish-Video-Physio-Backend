@@ -83,7 +83,7 @@ const bookingSchema = new mongoose.Schema({
     scheduleType: {
         type: String,
         enum: ['now', 'later'],
-        default: 'now'
+        default: 'later'
     },
     scheduledDate: {
         type: String, // Format: YYYY-MM-DD
@@ -96,6 +96,21 @@ const bookingSchema = new mongoose.Schema({
     timeSlot: {
         start: String,
         end: String
+    },
+    finalAmount: {
+        type: Number,
+        min: 0
+    },
+    couponCode: {
+        type: String
+    },
+    discountAmount: {
+        type: Number,
+        min: 0
+    },
+    originalAmount: {
+        type: Number,
+        min: 0
     }
 }, {
     timestamps: true

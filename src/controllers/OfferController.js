@@ -44,9 +44,19 @@ exports.createOffer = async (req, res, next) => {
       return next(ApiResponse.error("End date must be after start date", 400));
     }
 
+    // Auto-generate discount display string if not provided
+    let discountDisplay = discount;
+    if (!discountDisplay) {
+      if (type === 'percentage') {
+        discountDisplay = `${value}% OFF`;
+      } else if (type === 'fixed') {
+        discountDisplay = `₹${value} OFF`;
+      }
+    }
+
     const offer = await Offer.create({
       code: code.toUpperCase(),
-      discount,
+      discount: discountDisplay,
       type,
       value,
       description,
@@ -282,7 +292,7 @@ exports.validateOffer = async (req, res, next) => {
       return next(ApiResponse.error("Offer is not valid at this time", 400));
     }
 
-    // Check minimum amount
+    // Check minimum amount (use original service price for validation)
     if (amount && offer.minimumAmount > amount) {
       return next(
         ApiResponse.error(
