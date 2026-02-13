@@ -788,3 +788,7 @@
 {"level":"info","message":"User 69807c09f9b2913f02cc7eba disconnected from chat","service":"tanish-physio-backend","timestamp":"2026-02-13T11:43:48.242Z"}
 {"level":"info","message":"Socket nqK2AheMc0Q7pVkOAAAD disconnected","service":"tanish-physio-backend","timestamp":"2026-02-13T11:43:48.245Z"}
 {"level":"info","message":"Admin socket nqK2AheMc0Q7pVkOAAAD disconnected","service":"tanish-physio-backend","timestamp":"2026-02-13T11:43:48.247Z"}
+{"level":"info","message":"Initializing external services...","service":"tanish-physio-backend","timestamp":"2026-02-13T15:10:54.276Z"}
+{"level":"info","message":"Google Calendar API initialized successfully","service":"tanish-physio-backend","timestamp":"2026-02-13T15:10:54.292Z"}
+{"level":"info","message":"✓ Google Calendar API initialized successfully","service":"tanish-physio-backend","timestamp":"2026-02-13T15:10:54.295Z"}
+{"level":"info","message":"External services initialization completed","service":"tanish-physio-backend","timestamp":"2026-02-13T15:10:54.298Z"}
