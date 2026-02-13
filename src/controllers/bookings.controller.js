@@ -109,7 +109,7 @@ const getBookingDetails = async (req, res, next) => {
 // Create a new booking with notification triggers
 const createBooking = async (req, res, next) => {
     try {
-        const { serviceId, date, time, notes, clientName, scheduleType, scheduledDate, scheduledTime, timeSlot } = req.body;
+        const { serviceId, date, time, notes, clientName, scheduleType, scheduledDate, scheduledTime, timeSlot, couponCode, discountAmount, finalAmount } = req.body;
 
         // Validate service exists
         const service = await Service.findById(serviceId);
@@ -140,6 +140,10 @@ const createBooking = async (req, res, next) => {
             time,
             notes,
             amount: service.price,
+            originalAmount: service.price, // Store original price for discount calculations
+            finalAmount: finalAmount || service.price,
+            couponCode: couponCode || null,
+            discountAmount: discountAmount || 0,
             paymentStatus: 'pending', // Default from existing enum
             status: scheduleType === 'later' ? 'pending' : 'scheduled', // Default from existing enum
             serviceValidityDays: service.validity,
@@ -165,12 +169,13 @@ const createBooking = async (req, res, next) => {
             time: time
         };
 
-        // Notify user (using the booking creator's contact info)
-        await NotificationService.sendNotification(
-            { email: req.user.email, phone: req.user.phone },
-            'booking_created',
-            notificationData
-        );
+        // Removed booking request submitted notification
+        // Previous code: Notify user (using the booking creator's contact info)
+        // await NotificationService.sendNotification(
+        //     { email: req.user.email, phone: req.user.phone },
+        //     'booking_created',
+        //     notificationData
+        // );
 
         // Notify admin
         const admins = await User.find({ role: 'admin' }).select('email phone name');
@@ -260,7 +265,7 @@ const checkSlotAvailability = async (req, res, next) => {
 const updateBookingWithSchedule = async (req, res, next) => {
     try {
         const { id: bookingId } = req.params;
-        const { scheduledDate, scheduledTime, timeSlot, status } = req.body;
+        const { scheduledDate, scheduledTime, timeSlot, status, couponCode, discountAmount, finalAmount } = req.body;
 
         // Build query based on user role
         let query;
@@ -285,6 +290,11 @@ const updateBookingWithSchedule = async (req, res, next) => {
         if (timeSlot) updateData.timeSlot = timeSlot;
         if (status) updateData.status = status;
         
+        // Add coupon information if provided
+        if (couponCode !== undefined) updateData.couponCode = couponCode;
+        if (discountAmount !== undefined) updateData.discountAmount = discountAmount;
+        if (finalAmount !== undefined) updateData.finalAmount = finalAmount;
+        
         // If scheduling now, update status to scheduled
         if (scheduledDate && scheduledTime) {
             updateData.status = 'scheduled';
@@ -307,7 +317,7 @@ const updateBookingWithSchedule = async (req, res, next) => {
 // Update booking by ID with status-based logic
 const updateBooking = async (req, res, next) => {
     try {
-        const { date, time, notes, status, cancellationReason } = req.body;
+        const { date, time, notes, status, cancellationReason, couponCode, discountAmount, finalAmount } = req.body;
         const bookingId = req.params.id;
 
         // Build query based on user role
@@ -347,6 +357,11 @@ const updateBooking = async (req, res, next) => {
 
         // Prepare update data
         const updateData = { date, time, notes };
+        
+        // Add coupon information if provided
+        if (couponCode !== undefined) updateData.couponCode = couponCode;
+        if (discountAmount !== undefined) updateData.discountAmount = discountAmount;
+        if (finalAmount !== undefined) updateData.finalAmount = finalAmount;
 
         if (status) {
             updateData.status = status;
@@ -418,7 +433,7 @@ const updateBooking = async (req, res, next) => {
 // Update booking status by ID
 const updateBookingStatus = async (req, res, next) => {
     try {
-        const { status } = req.body;
+        const { status, couponCode, discountAmount, finalAmount } = req.body;
 
         // Validate status
         const validStatuses = ['pending', 'confirmed', 'completed', 'cancelled'];
@@ -436,9 +451,15 @@ const updateBookingStatus = async (req, res, next) => {
             query = { _id: req.params.id, userId: req.user.userId };
         }
 
+        // Prepare update data
+        const updateData = { status };
+        if (couponCode !== undefined) updateData.couponCode = couponCode;
+        if (discountAmount !== undefined) updateData.discountAmount = discountAmount;
+        if (finalAmount !== undefined) updateData.finalAmount = finalAmount;
+        
         const booking = await Booking.findOneAndUpdate(
             query,
-            { status },
+            updateData,
             { new: true, runValidators: true }
         )
             .populate('serviceId', 'name price duration validity images')
@@ -457,6 +478,9 @@ const updateBookingStatus = async (req, res, next) => {
 // Delete/cancel booking by ID
 const deleteBooking = async (req, res, next) => {
     try {
+        // Get coupon information if provided
+        const { couponCode, discountAmount, finalAmount } = req.body;
+        
         // Build query based on user role
         let query;
         if (req.user.role === 'admin') {
@@ -467,9 +491,15 @@ const deleteBooking = async (req, res, next) => {
             query = { _id: req.params.id, userId: req.user.userId };
         }
 
+        // Prepare update data
+        const updateData = { status: 'cancelled' };
+        if (couponCode !== undefined) updateData.couponCode = couponCode;
+        if (discountAmount !== undefined) updateData.discountAmount = discountAmount;
+        if (finalAmount !== undefined) updateData.finalAmount = finalAmount;
+        
         const booking = await Booking.findOneAndUpdate(
             query,
-            { status: 'cancelled' },
+            updateData,
             { new: true }
         )
             .populate('serviceId', 'name price duration validity images')
@@ -488,7 +518,7 @@ const deleteBooking = async (req, res, next) => {
 // Update booking status by ID for guest users
 const updateGuestBookingStatus = async (req, res, next) => {
     try {
-        const { status } = req.body;
+        const { status, couponCode, discountAmount, finalAmount } = req.body;
         const { id: bookingId } = req.params; // Changed from bookingId to id to match the route parameter
 
         // Validate status
@@ -669,7 +699,7 @@ const getBookingsByStatus = async (req, res, next) => {
 // Create a new booking for guest users
 const createGuestBooking = async (req, res, next) => {
     try {
-        const { serviceId, date, time, notes, clientName, clientEmail, clientPhone, scheduleType, scheduledDate, scheduledTime, timeSlot } = req.body;
+        const { serviceId, date, time, notes, clientName, clientEmail, clientPhone, scheduleType, scheduledDate, scheduledTime, timeSlot, couponCode, discountAmount, finalAmount } = req.body;
 
         // Validate required fields for guest booking
         if (!clientName || !clientEmail || !clientPhone) {
@@ -746,6 +776,10 @@ const createGuestBooking = async (req, res, next) => {
             time,
             notes,
             amount: service.price, // Get from service model
+            originalAmount: service.price, // Store original price for discount calculations
+            finalAmount: finalAmount || service.price,
+            couponCode: couponCode || null,
+            discountAmount: discountAmount || 0,
             paymentStatus: 'pending', // Initially pending until payment is made
             purchaseDate: new Date(), // Set purchase date when booking is created
             scheduleType: scheduleType || 'now',
@@ -770,12 +804,13 @@ const createGuestBooking = async (req, res, next) => {
             time: time
         };
 
-        // Notify guest user
-        await NotificationService.sendNotification(
-            { email: clientEmail, phone: clientPhone },
-            'booking_created',
-            notificationData
-        );
+        // Removed booking request submitted notification
+        // Previous code: Notify guest user
+        // await NotificationService.sendNotification(
+        //     { email: clientEmail, phone: clientPhone },
+        //     'booking_created',
+        //     notificationData
+        // );
 
         // Notify admins
         const admins = await User.find({ role: 'admin' }).select('email phone name');

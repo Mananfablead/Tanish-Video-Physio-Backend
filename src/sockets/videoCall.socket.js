@@ -2,6 +2,7 @@ const Session = require('../models/Session.model');
 const User = require('../models/User.model');
 const GroupSession = require('../models/GroupSession.model');
 const CallLog = require('../models/CallLog.model');
+const ChatMessage = require('../models/ChatMessage.model'); // Add ChatMessage model
 const logger = require('../utils/logger');
 const mongoose = require('mongoose');
 const { createGoogleMeetEvent } = require('../utils/googleMeet.utils');
@@ -315,7 +316,7 @@ const setupVideoCallHandlers = (io, socket) => {
 
             // Move patient from waiting room to video room
             const approvalWaitingRoomId = `waiting-room-${sessionId}`;
-            const videoRoomId = `video-room-${sessionId}`;
+            const videoRoomId = `video-call-${sessionId}`;
             
             targetPatientSocket.leave(approvalWaitingRoomId);
             targetPatientSocket.join(videoRoomId);
@@ -495,8 +496,8 @@ const setupVideoCallHandlers = (io, socket) => {
                 return;
             }
 
-            // Join the video room
-            const videoRoomId = `video-room-${sessionId}`;
+            // Join the unified video call room
+            const videoRoomId = `video-call-${sessionId}`;
             socket.join(videoRoomId);
 
             // Create standardized participant object
@@ -1090,6 +1091,63 @@ const setupVideoCallHandlers = (io, socket) => {
         } catch (error) {
             logger.error('Error rejecting call:', error);
             socket.emit('error', { message: 'Failed to reject call' });
+        }
+    });
+
+    // Handle video call chat messages
+    socket.on('send-video-message', async (data) => {
+        try {
+            console.log(`📨 Video call message received:`, data);
+            const { sessionId, message, senderId } = data;
+
+            // Join the unified video call room for messaging
+            const videoRoomId = `video-call-${sessionId}`;
+
+            console.log(`📨 Sending video message from ${senderId} in room ${videoRoomId}:`, message);
+
+            // Save message to database with video-call-chat type
+            const senderType = socket.user.role === 'therapist' || socket.user.role === 'admin' ? 'therapist' : 'user';
+
+            const chatMessage = new ChatMessage({
+                sessionId: sessionId,
+                senderId: socket.user.userId,
+                senderType: senderType,
+                message: message,
+                messageType: 'video-call-chat' // Use specific type for video call messages
+            });
+
+            await chatMessage.save();
+            await chatMessage.populate('senderId', 'name');
+
+            console.log(`💾 Video call message saved to DB: ${chatMessage._id}`);
+            console.log(`💾 Saved message details:`, {
+                sessionId: chatMessage.sessionId,
+                senderId: chatMessage.senderId._id || chatMessage.senderId,
+                senderName: chatMessage.senderId.name,
+                message: chatMessage.message,
+                messageType: chatMessage.messageType,
+                timestamp: chatMessage.createdAt
+            });
+
+            // Broadcast message to all participants in the room except sender
+            socket.to(videoRoomId).emit('receive-video-message', {
+                message,
+                senderId: senderId || socket.user.userId,
+                timestamp: chatMessage.createdAt.toISOString(),
+                senderName: chatMessage.senderId.name || `User ${socket.user.userId.substring(0, 5)}`
+            });
+
+            // Also send confirmation to sender
+            socket.emit('message-sent', {
+                success: true,
+                message: 'Message sent successfully',
+                messageId: chatMessage._id
+            });
+
+            console.log(`✅ Message broadcast to room ${videoRoomId}`);
+        } catch (error) {
+            console.error('❌ Error handling video message:', error);
+            socket.emit('error', { message: 'Failed to send message' });
         }
     });
 

@@ -14,6 +14,7 @@ const fs = require('fs');
 const logger = require('./src/utils/logger');
 const { initializeServices } = require('./src/utils/serviceInitializer.utils');
 
+// Server restart trigger
 const app = express();
 // Security middleware
 app.use(

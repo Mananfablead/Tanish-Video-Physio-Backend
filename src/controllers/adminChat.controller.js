@@ -11,8 +11,20 @@ const getAdminChatMessages = async (req, res, next) => {
 
         // Build filter object
         const filter = {};
+
+        // Handle multiple message types
         if (messageType) {
             filter.messageType = messageType;
+        } else if (req.query.messageTypes) {
+            // Handle array of message types
+            let messageTypesArray;
+            if (Array.isArray(req.query.messageTypes)) {
+                messageTypesArray = req.query.messageTypes;
+            } else {
+                // Handle comma-separated string
+                messageTypesArray = req.query.messageTypes.split(',');
+            }
+            filter.messageType = { $in: messageTypesArray };
         }
         if (req.params.userId) {
             filter.senderId = req.params.userId;
@@ -27,7 +39,11 @@ const getAdminChatMessages = async (req, res, next) => {
         }
 
         // For video call chats, only show messages from completed sessions
-        if (messageType === 'video-call-chat') {
+        // Only apply this filter when specifically requesting video-call-chat and not including live-chat
+        if ((messageType === 'video-call-chat') ||
+            (req.query.messageTypes &&
+                req.query.messageTypes.includes('video-call-chat') &&
+                !req.query.messageTypes.includes('live-chat'))) {
             // Find completed sessions
             const completedSessions = await Session.find({ status: 'completed' }).select('_id');
             const completedSessionIds = completedSessions.map(session => session._id);
