@@ -29,7 +29,7 @@ class NotificationService {
                 }
             ]
         },
-        
+
         // Booking confirmation template
         booking_confirmation_template: {
             name: 'booking_confirmation',
@@ -54,7 +54,7 @@ class NotificationService {
                 }
             ]
         },
-        
+
         // Booking cancellation template
         booking_cancellation_template: {
             name: 'booking_cancellation',
@@ -78,7 +78,7 @@ class NotificationService {
                 }
             ]
         },
-        
+
         // Payment reminder template
         payment_reminder_template: {
             name: 'payment_reminder',
@@ -102,10 +102,10 @@ class NotificationService {
                 }
             ]
         },
-        
+
         // Payment success template
-        payment_success_template: {
-            name: 'payment_success',
+        payment_successful_template: {
+            name: 'payment_successful',
             language: 'en',
             components: [
                 {
@@ -127,7 +127,7 @@ class NotificationService {
                 }
             ]
         },
-        
+
         // Session reminder template
         session_reminder_template: {
             name: 'session_reminder',
@@ -160,7 +160,7 @@ class NotificationService {
                 }
             ]
         },
-        
+
         // Appointment rescheduled template
         appointment_rescheduled_template: {
             name: 'appointment_rescheduled',
@@ -197,7 +197,7 @@ class NotificationService {
 
         // Create a copy of the template
         const preparedTemplate = { ...template };
-        
+
         // Replace parameters based on template type
         switch (templateKey) {
             case 'welcome_template':
@@ -218,7 +218,7 @@ class NotificationService {
                     }
                 ];
                 break;
-                
+
             case 'booking_confirmation_template':
                 preparedTemplate.components = [
                     {
@@ -240,7 +240,7 @@ class NotificationService {
                     }
                 ];
                 break;
-                
+
             case 'booking_cancellation_template':
                 preparedTemplate.components = [
                     {
@@ -261,7 +261,7 @@ class NotificationService {
                     }
                 ];
                 break;
-                
+
             case 'payment_reminder_template':
                 preparedTemplate.components = [
                     {
@@ -282,8 +282,8 @@ class NotificationService {
                     }
                 ];
                 break;
-                
-            case 'payment_success_template':
+
+            case 'payment_successful_template':
                 preparedTemplate.components = [
                     {
                         type: 'body',
@@ -304,7 +304,7 @@ class NotificationService {
                     }
                 ];
                 break;
-                
+
             case 'session_reminder_template':
                 preparedTemplate.components = [
                     {
@@ -334,7 +334,7 @@ class NotificationService {
                     }
                 ];
                 break;
-                
+
             case 'appointment_rescheduled_template':
                 preparedTemplate.components = [
                     {
@@ -359,7 +359,7 @@ class NotificationService {
                 ];
                 break;
         }
-        
+
         return preparedTemplate;
     }
 
@@ -394,21 +394,21 @@ class NotificationService {
             // User notifications
 
 
-            booking_confirmed: {
+            booking_confirmation: {
                 email: {
                     subject: 'Booking Confirmed - Tanish Physio',
                     template: EmailTemplates.bookingConfirmed
                 },
                 whatsapp: (data) => {
-                    const formattedDate = data.date ? 
+                    const formattedDate = data.date ?
                         new Date(data.date).toLocaleDateString('en-IN', {
                             weekday: 'short',
                             month: 'short',
                             day: 'numeric'
                         }) : 'Not specified';
-                    
+
                     const formattedTime = data.time || 'Not specified';
-                    
+
                     return `✅ Booking Confirmed!
 
 Service: ${data.serviceName || 'Unknown Service'}
@@ -437,7 +437,7 @@ Thank you for choosing Tanish Physio!`;
                 whatsapp: (data) => `Payment reminder: Please pay ₹${data.amount} for ${data.serviceName}. Pay now: ${data.paymentLink}`
             },
 
-            payment_success: {
+            payment_successful: {
                 email: {
                     subject: 'Payment Successful - Tanish Physio',
                     template: EmailTemplates.paymentSuccess
@@ -461,7 +461,7 @@ Thank you for choosing Tanish Physio!`;
                 },
                 whatsapp: (data) => `${data.title}: ${data.message}`
             },
-            
+
             // Admin notifications
             new_booking: {
                 email: {
@@ -554,7 +554,7 @@ Thank you for choosing Tanish Physio!`;
         // Declare variables at method scope to be accessible in catch block
         let formattedPhone = '';
         let payload = null;
-        
+
         try {
             if (!this.whatsappEnabled) {
                 return { success: false, error: 'WhatsApp Business API not configured' };
@@ -573,12 +573,12 @@ Thank you for choosing Tanish Physio!`;
             // Remove +, spaces, and other non-numeric characters
             // WhatsApp requires country code without +
             formattedPhone = to.replace(/[^0-9]/g, '');
-            
+
             // If number starts with +, remove it
             if (to.startsWith('+')) {
                 formattedPhone = formattedPhone.substring(1);
             }
-            
+
             // Validate phone number length (should be 10-15 digits)
             if (formattedPhone.length < 10 || formattedPhone.length > 15) {
                 return { success: false, error: 'Invalid phone number format' };
@@ -613,7 +613,7 @@ Thank you for choosing Tanish Physio!`;
             }
 
             const url = `${this.whatsappConfig.apiUrl}/${this.whatsappConfig.phoneNumberId}/messages`;
-            
+
             const response = await axios.post(
                 url,
                 payload,
@@ -635,12 +635,12 @@ Thank you for choosing Tanish Physio!`;
                 url: `${this.whatsappConfig.apiUrl}/${this.whatsappConfig.phoneNumberId}/messages`,
                 payload: payload
             });
-            
-            const errorMessage = error.response?.data?.error?.message || 
-                               error.response?.data?.message || 
-                               error.message || 
-                               'Unknown WhatsApp API error';
-            
+
+            const errorMessage = error.response?.data?.error?.message ||
+                error.response?.data?.message ||
+                error.message ||
+                'Unknown WhatsApp API error';
+
             // Check if the error is specifically about phone number not being in allowed list
             if (errorMessage.includes('(#131030) Recipient phone number not in allowed list')) {
                 console.warn(`WhatsApp message blocked: Phone number ${formattedPhone} is not in the approved list. This is a sandbox limitation.`);
@@ -656,8 +656,8 @@ Thank you for choosing Tanish Physio!`;
                 };
             }
 
-            return { 
-                success: false, 
+            return {
+                success: false,
                 error: errorMessage,
                 details: {
                     status: error.response?.status,

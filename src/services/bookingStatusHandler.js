@@ -6,7 +6,8 @@ class BookingStatusHandler {
             PENDING: 'pending',
             CONFIRMED: 'confirmed',
             CANCELLED: 'cancelled',
-            COMPLETED: 'completed'
+            COMPLETED: 'completed',
+            SCHEDULED: 'scheduled'
         };
 
         this.PAYMENT_STATUS = {
@@ -57,6 +58,15 @@ class BookingStatusHandler {
                 allowStatusChange: false,
                 nextValidStatuses: [],
                 requiresRefund: paymentStatus === this.PAYMENT_STATUS.PAID
+            },
+
+            [this.BOOKING_STATUS.SCHEDULED]: {
+                description: 'Booking scheduled for future date',
+                canProcessPayment: true,
+                sendPaymentReminder: false,
+                sendSessionReminder: this.shouldSendSessionReminder(booking),
+                allowStatusChange: true,
+                nextValidStatuses: [this.BOOKING_STATUS.CONFIRMED, this.BOOKING_STATUS.CANCELLED, this.BOOKING_STATUS.COMPLETED]
             },
 
             [this.BOOKING_STATUS.COMPLETED]: {
@@ -143,8 +153,12 @@ class BookingStatusHandler {
     isValidStatusTransition(currentStatus, newStatus, userRole) {
         const validTransitions = {
             [this.BOOKING_STATUS.PENDING]: {
-                admin: [this.BOOKING_STATUS.CONFIRMED, this.BOOKING_STATUS.CANCELLED],
+                admin: [this.BOOKING_STATUS.CONFIRMED, this.BOOKING_STATUS.CANCELLED, this.BOOKING_STATUS.SCHEDULED],
                 user: [] // Users cannot change booking status
+            },
+            [this.BOOKING_STATUS.SCHEDULED]: {
+                admin: [this.BOOKING_STATUS.CONFIRMED, this.BOOKING_STATUS.CANCELLED, this.BOOKING_STATUS.COMPLETED, this.BOOKING_STATUS.PENDING],
+                user: []
             },
             [this.BOOKING_STATUS.CONFIRMED]: {
                 admin: [this.BOOKING_STATUS.COMPLETED, this.BOOKING_STATUS.CANCELLED],
@@ -173,7 +187,22 @@ class BookingStatusHandler {
             statusChange?.to === this.BOOKING_STATUS.CONFIRMED) {
             triggers.push({
                 type: 'user',
-                template: 'booking_confirmed',
+                template: 'booking_confirmation',
+                data: {
+                    bookingId: booking._id,
+                    serviceName: booking.serviceName,
+                    date: booking.date,
+                    time: booking.time,
+                    clientName: booking.clientName
+                }
+            });
+        }
+
+        if (statusChange?.from === this.BOOKING_STATUS.SCHEDULED &&
+            statusChange?.to === this.BOOKING_STATUS.CONFIRMED) {
+            triggers.push({
+                type: 'user',
+                template: 'booking_confirmation',
                 data: { 
                     bookingId: booking._id, 
                     serviceName: booking.serviceName,
@@ -195,7 +224,7 @@ class BookingStatusHandler {
         if (payment?.status === this.PAYMENT_MODEL_STATUS.PAID) {
             triggers.push({
                 type: 'user',
-                template: 'payment_success',
+                template: 'payment_successful',
                 data: { amount: payment.amount, orderId: payment.orderId }
             });
         }

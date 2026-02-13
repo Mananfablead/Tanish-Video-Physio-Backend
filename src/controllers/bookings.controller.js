@@ -111,6 +111,11 @@ const createBooking = async (req, res, next) => {
     try {
         const { serviceId, date, time, notes, clientName, scheduleType, scheduledDate, scheduledTime, timeSlot, couponCode, discountAmount, finalAmount } = req.body;
 
+        // Validate required fields
+        if (!serviceId) {
+            return res.status(400).json(ApiResponse.error('Service ID is required'));
+        }
+
         // Validate service exists
         const service = await Service.findById(serviceId);
 
@@ -126,6 +131,16 @@ const createBooking = async (req, res, next) => {
 
         if (!therapist) {
             return res.status(404).json(ApiResponse.error('No active therapists available'));
+        }
+
+        // If scheduling now, validate the scheduled date and time
+        if (scheduleType === 'now' && scheduledDate && scheduledTime) {
+            // Check if the requested time slot is available
+            const slotAvailability = await checkTimeSlotAvailability(therapist._id, scheduledDate, scheduledTime, timeSlot);
+
+            if (!slotAvailability.available) {
+                return res.status(409).json(ApiResponse.error(slotAvailability.message));
+            }
         }
 
         // Create booking with default status values
@@ -145,7 +160,7 @@ const createBooking = async (req, res, next) => {
             couponCode: couponCode || null,
             discountAmount: discountAmount || 0,
             paymentStatus: 'pending', // Default from existing enum
-            status: scheduleType === 'later' ? 'pending' : 'scheduled', // Default from existing enum
+            status: (scheduledDate && scheduledTime) ? 'scheduled' : (scheduleType === 'later' ? 'pending' : 'scheduled'), // Scheduled when time is selected, otherwise based on scheduleType
             serviceValidityDays: service.validity,
             purchaseDate: new Date(),
             scheduleType: scheduleType || 'now',
@@ -155,6 +170,11 @@ const createBooking = async (req, res, next) => {
         });
 
         await booking.save();
+
+        // If scheduling now, update availability to mark the slot as booked
+        if (scheduleType === 'now' && scheduledDate && scheduledTime && timeSlot) {
+            await updateAvailabilitySlot(therapist._id, scheduledDate, timeSlot.start, timeSlot.end, 'booked');
+        }
 
         // Populate for response
         await booking.populate('serviceId', 'name price duration validity images');
@@ -192,6 +212,106 @@ const createBooking = async (req, res, next) => {
         next(error);
     }
 };
+
+// Helper function to check time slot availability
+async function checkTimeSlotAvailability(therapistId, date, time, timeSlot) {
+    const mongoose = require('mongoose');
+
+    // Validate inputs
+    if (!mongoose.Types.ObjectId.isValid(therapistId)) {
+        return { available: false, message: 'Invalid therapist ID' };
+    }
+
+    if (!date || !time) {
+        return { available: false, message: 'Date and time are required for scheduling' };
+    }
+
+    // Check if the therapist exists
+    const therapist = await User.findById(therapistId);
+    if (!therapist) {
+        return { available: false, message: 'Therapist not found' };
+    }
+
+    // Check if there's availability for the therapist on the given date
+    const Availability = require('../models/Availability.model');
+    const availability = await Availability.findOne({
+        therapistId,
+        date
+    });
+
+    if (availability) {
+        // Check if the requested time slot exists in availability
+        if (timeSlot) {
+            const requestedSlot = availability.timeSlots.find(slot =>
+                slot.start === timeSlot.start && slot.end === timeSlot.end && slot.status !== 'booked'
+            );
+
+            if (!requestedSlot) {
+                return { available: false, message: 'Requested time slot is not available' };
+            }
+        } else {
+            // If no specific timeSlot provided, just check if the time exists and is available
+            const requestedSlot = availability.timeSlots.find(slot =>
+                slot.start === time && slot.status !== 'booked'
+            );
+
+            if (!requestedSlot) {
+                return { available: false, message: 'Requested time slot is not available' };
+            }
+        }
+    } else {
+        // If no availability record exists for the date, assume slot is not available
+        return { available: false, message: 'No availability found for the selected date' };
+    }
+
+    // Check if there's already a booking for this therapist at the same time
+    const Booking = require('../models/Booking.model');
+    const existingBooking = await Booking.findOne({
+        therapistId,
+        scheduledDate: date,
+        $or: [
+            { 'timeSlot.start': timeSlot ? timeSlot.start : time },
+            { scheduledTime: time }
+        ]
+    });
+
+    if (existingBooking) {
+        return { available: false, message: 'A booking already exists for this time slot' };
+    }
+
+    return { available: true, message: 'Time slot is available' };
+}
+
+// Helper function to update availability slot status
+async function updateAvailabilitySlot(therapistId, date, startTime, endTime, status) {
+    const Availability = require('../models/Availability.model');
+
+    try {
+        await Availability.updateOne(
+            {
+                therapistId,
+                date
+            },
+            {
+                $set: {
+                    "timeSlots.$[elem].status": status,
+                },
+            },
+            {
+                arrayFilters: [
+                    {
+                        "elem.start": startTime,
+                        "elem.end": endTime,
+                    },
+                ],
+                upsert: false // Don't create if doesn't exist
+            }
+        );
+    } catch (error) {
+        console.error("Error updating availability slot:", error);
+        // Continue without throwing error as it's not critical to booking
+    }
+}
 
 // Check if time slot is available
 const checkSlotAvailability = async (req, res, next) => {
@@ -765,6 +885,16 @@ const createGuestBooking = async (req, res, next) => {
             return res.status(404).json(ApiResponse.error('No active therapists available'));
         }
 
+        // If scheduling now, validate the scheduled date and time
+        if (scheduleType === 'now' && scheduledDate && scheduledTime) {
+            // Check if the requested time slot is available
+            const slotAvailability = await checkTimeSlotAvailability(therapist._id, scheduledDate, scheduledTime, timeSlot);
+
+            if (!slotAvailability.available) {
+                return res.status(409).json(ApiResponse.error(slotAvailability.message));
+            }
+        }
+
         const booking = new Booking({
             serviceId,
             serviceName: service.name, // Get from service model
@@ -786,10 +916,15 @@ const createGuestBooking = async (req, res, next) => {
             scheduledDate: scheduledDate || null,
             scheduledTime: scheduledTime || null,
             timeSlot: timeSlot || null,
-            status: scheduleType === 'later' ? 'pending' : 'scheduled'
+            status: (scheduledDate && scheduledTime) ? 'scheduled' : (scheduleType === 'later' ? 'pending' : 'scheduled') // Scheduled when time is selected, otherwise based on scheduleType
         });
 
         await booking.save();
+
+        // If scheduling now, update availability to mark the slot as booked
+        if (scheduleType === 'now' && scheduledDate && scheduledTime && timeSlot) {
+            await updateAvailabilitySlot(therapist._id, scheduledDate, timeSlot.start, timeSlot.end, 'booked');
+        }
 
         // Populate the response
         await booking.populate('serviceId', 'name price duration validity images');

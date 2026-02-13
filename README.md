@@ -146,7 +146,7 @@ javascript
 // When admin confirms a booking
 await NotificationService.sendNotification(
     { email: user.email, phone: user.phone },
-    'booking_confirmed',
+    'booking_confirmation',
     {
         clientName: "John Doe",
         serviceName: "Physiotherapy Session",

@@ -613,7 +613,7 @@ const createSession = async (req, res, next) => {
       startTime,
       endTime,
       type: type || "1-on-1",
-      status: status || "scheduled",
+      status: status, // Let it use the default 'pending' status from the model if not provided
       duration: duration || 0,
     };
     
