@@ -3,6 +3,15 @@ const Session = require('../models/Session.model');
 const User = require('../models/User.model');
 const logger = require('../utils/logger');
 
+// Generate UUID function
+const generateUUID = () => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+};
+
 // Function to setup chat socket handlers
 const setupChatHandlers = (io, socket) => {
     // Join a chat room
@@ -81,8 +90,9 @@ const setupChatHandlers = (io, socket) => {
                 senderType = 'therapist';
             }
 
-            // Create new message
+            // Create new message with UUID
             const chatMessage = new ChatMessage({
+                messageId: generateUUID(), // Add UUID for deduplication
                 sessionId: sessionId === 'default-live-chat' ? null : sessionId, // No session for default chat
                 senderId: socket.user.userId,
                 senderType: senderType,
@@ -95,6 +105,7 @@ const setupChatHandlers = (io, socket) => {
 
             // Prepare message data for broadcast
             const messageData = {
+                messageId: chatMessage.messageId, // Include UUID for deduplication
                 content: chatMessage.message,
                 senderId: socket.user.userId,
                 senderName: chatMessage.senderId.name || 'User',
@@ -104,16 +115,14 @@ const setupChatHandlers = (io, socket) => {
                 sessionId: sessionId
             };
 
-            // Broadcast message to room (real-time)
+            // Broadcast message to room (real-time) - single source of truth
             io.to(roomId).emit('message-received', {
-                ...messageData,
+                messageId: chatMessage.messageId,
+                content: chatMessage.message,
                 senderId: socket.user.userId,
-                senderName: chatMessage.senderId.name || 'User'
-            });
-
-            // Also emit the old event for backward compatibility
-            io.to(roomId).emit('new-message', {
-                message: chatMessage
+                senderName: chatMessage.senderId.name || 'User',
+                timestamp: chatMessage.createdAt,
+                sessionId: sessionId
             });
 
             // Emit admin notification if message is from user (so admin can see it in real-time)
@@ -139,61 +148,6 @@ const setupChatHandlers = (io, socket) => {
 
         } catch (error) {
             logger.error('Error sending message:', error);
-            socket.emit('error', { message: 'Failed to send message' });
-        }
-    });
-
-    // Legacy new-message handler (for backward compatibility)
-    socket.on('new-message', async (data) => {
-        try {
-            const { sessionId, message } = data;
-
-            // Handle default live chat specially (no session required)
-            if (sessionId !== 'default-live-chat') {
-                // Verify session exists and user has access for regular sessions
-                const session = await Session.findById(sessionId);
-                if (!session) {
-                    socket.emit('error', { message: 'Session not found' });
-                    return;
-                }
-            }
-
-            // Create new message
-            const chatMessage = new ChatMessage({
-                sessionId: sessionId === 'default-live-chat' ? null : sessionId, // No session for default chat
-                senderId: socket.user.userId,
-                message: message.trim(),
-                senderType: 'user', // Default sender type
-                messageType: sessionId === 'default-live-chat' ? 'default-chat' : 'live-chat'
-            });
-
-            await chatMessage.save();
-            await chatMessage.populate('senderId', 'name');
-
-            // Prepare message data for broadcast
-            const messageData = {
-                content: chatMessage.message,
-                senderId: socket.user.userId,
-                senderName: chatMessage.senderId.name || 'User',
-                timestamp: chatMessage.createdAt,
-                messageType: chatMessage.messageType,
-                message: chatMessage // Include full message object for compatibility
-            };
-
-            // Broadcast to session room
-            io.to(sessionId).emit('new-message', {
-                ...messageData
-            });
-
-            // Also emit for real-time compatibility
-            io.to(sessionId).emit('message-received', {
-                ...messageData
-            });
-
-            logger.info(`Legacy message sent by ${socket.user.userId} in room ${sessionId}`);
-
-        } catch (error) {
-            logger.error('Error sending legacy message:', error);
             socket.emit('error', { message: 'Failed to send message' });
         }
     });

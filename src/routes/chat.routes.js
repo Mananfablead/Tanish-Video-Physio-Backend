@@ -21,49 +21,22 @@ router.post('/leave', (req, res) => {
     res.json({ message: 'Left chat room successfully' });
 });
 
-// Send a chat message
-router.post('/send/:sessionId', sendMessage);
+// Send a chat message (DISABLED - using socket-only messaging)
+router.post('/send/:sessionId', (req, res) => {
+    res.status(400).json({
+        success: false,
+        message: 'Message sending is disabled. Please use socket events instead.',
+        error: 'Use socket.emit("send-message", data) for real-time messaging'
+    });
+});
 
-// Special endpoint for default live chat (no session validation)
-router.post('/send/default-live-chat', async (req, res, next) => {
-    try {
-        const { message } = req.body;
-
-        // Validate required fields
-        if (!message || typeof message !== 'string' || message.trim().length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'Message is required and must be a non-empty string',
-                error: null,
-                statusCode: 400
-            });
-        }
-
-        // For default live chat, we'll create a special message without session validation
-        // This is for general support chat that doesn't belong to a specific session
-        const ChatMessage = require('../models/ChatMessage.model');
-
-        const chatMessage = new ChatMessage({
-            sessionId: null, // No session for default chat
-            senderId: req.user.userId,
-            message,
-            senderType: req.user.role === 'admin' ? 'admin' : 'user',
-            messageType: 'default-chat'
-        });
-
-        await chatMessage.save();
-        await chatMessage.populate('senderId', 'name');
-
-        res.status(201).json({
-            success: true,
-            message: 'Message sent successfully',
-            data: { message: chatMessage },
-            statusCode: 201
-        });
-    } catch (error) {
-        console.error('Default chat send message error:', error);
-        next(error);
-    }
+// Special endpoint for default live chat (DISABLED - using socket-only messaging)
+router.post('/send/default-live-chat', (req, res) => {
+    res.status(400).json({
+        success: false,
+        message: 'Message sending is disabled. Please use socket events instead.',
+        error: 'Use socket.emit("send-message", data) for real-time messaging'
+    });
 });
 
 // Debug endpoint to check session info

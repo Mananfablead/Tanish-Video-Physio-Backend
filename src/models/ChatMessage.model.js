@@ -1,6 +1,12 @@
 const mongoose = require('mongoose');
 
 const chatMessageSchema = new mongoose.Schema({
+    messageId: {
+        type: String,
+        unique: true,
+        sparse: true,
+        required: false
+    },
     sessionId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Session',
