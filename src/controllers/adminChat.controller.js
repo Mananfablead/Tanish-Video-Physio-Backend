@@ -141,6 +141,7 @@ const sendAdminReply = async (req, res, next) => {
         }
 
         // For default-chat messageType, sessionId can be null
+        // For support rooms, sessionId is in format "support-<userId>"
         // For other message types, sessionId is required
         if (messageType !== 'default-chat' && !sessionId) {
             return res.status(400).json(
@@ -148,9 +149,12 @@ const sendAdminReply = async (req, res, next) => {
             );
         }
 
-        // Check if session exists (only for non-default-chat messages)
+        // Determine if this is a support room (1-on-1 private chat)
+        const isSupportRoom = typeof sessionId === 'string' && sessionId.startsWith('support-');
+
+        // Check if session exists (only for regular sessions, not support rooms or default chat)
         let session = null;
-        if (sessionId && messageType !== 'default-chat') {
+        if (sessionId && messageType !== 'default-chat' && !isSupportRoom) {
             session = await Session.findById(sessionId);
             if (!session) {
                 return res.status(404).json(
@@ -160,14 +164,25 @@ const sendAdminReply = async (req, res, next) => {
         }
 
         // Create admin reply message
-        const adminMessage = new ChatMessage({
-            sessionId,
+        const chatMessageData = {
             senderId: adminId,
             senderType: 'admin',
             message,
-            messageType,
+            messageType: isSupportRoom ? 'default-chat' : messageType,
             replyTo: replyTo || null
-        });
+        };
+
+        // For support rooms and default chat, don't store sessionId
+        if (!isSupportRoom && sessionId && messageType !== 'default-chat') {
+            chatMessageData.sessionId = sessionId;
+        }
+
+        // Store the chatRoom for support messages
+        if (isSupportRoom) {
+            chatMessageData.chatRoom = sessionId;
+        }
+
+        const adminMessage = new ChatMessage(chatMessageData);
 
         await adminMessage.save();
         await adminMessage.populate('senderId', 'name email');
@@ -175,8 +190,43 @@ const sendAdminReply = async (req, res, next) => {
         // Emit real-time notification to connected clients
         const io = req.app.get('io'); // Assuming socket.io instance is attached to app
         if (io) {
-            // Notify all users in the session room (only if session exists)
-            if (sessionId) {
+            if (isSupportRoom) {
+                // For support rooms, emit to the specific support room and user
+                io.to(sessionId).emit('message-received', {
+                    messageId: adminMessage.messageId,
+                    _id: adminMessage._id,
+                    content: adminMessage.message,
+                    senderId: adminMessage.senderId._id,
+                    senderName: adminMessage.senderId.name,
+                    timestamp: adminMessage.createdAt,
+                    senderType: 'admin',
+                    chatRoom: sessionId
+                });
+
+                // Also emit to admin_notifications so admin sees it in real-time
+                io.to('admin_notifications').emit('message-received', {
+                    messageId: adminMessage.messageId,
+                    _id: adminMessage._id,
+                    content: adminMessage.message,
+                    senderId: adminMessage.senderId._id,
+                    senderName: adminMessage.senderId.name,
+                    timestamp: adminMessage.createdAt,
+                    senderType: 'admin',
+                    chatRoom: sessionId
+                });
+
+                // Also emit to admin notifications
+                io.to('admin_notifications').emit('new-support-message', {
+                    content: adminMessage.message,
+                    senderId: adminMessage.senderId._id,
+                    senderName: adminMessage.senderId.name,
+                    timestamp: adminMessage.createdAt,
+                    senderType: 'admin',
+                    chatRoom: sessionId,
+                    message: adminMessage
+                });
+            } else if (sessionId) {
+                // Notify all users in the session room (for regular sessions)
                 io.to(sessionId).emit('admin-reply-received', {
                     message: adminMessage,
                     senderName: adminMessage.senderId.name

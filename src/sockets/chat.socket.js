@@ -25,7 +25,18 @@ const setupChatHandlers = (io, socket) => {
                 return;
             }
 
-            // Verify session exists and user has access
+            // Support rooms (support-<userId>) and admin rooms do not correspond to Session documents
+            if (typeof sessionId === 'string' && (sessionId.startsWith('support-') || sessionId === 'admin-support-room' || sessionId === 'default-chat-room')) {
+                socket.join(sessionId);
+                logger.info(`User ${socket.user.userId} joined special room ${sessionId}`);
+                socket.to(sessionId).emit('user-joined', {
+                    userId: socket.user.userId,
+                    sessionId
+                });
+                return;
+            }
+
+            // Regular session-based rooms: verify session exists and user has access
             const session = await Session.findById(sessionId).populate('userId');
             if (!session) {
                 socket.emit('error', { message: 'Session not found' });
@@ -73,9 +84,12 @@ const setupChatHandlers = (io, socket) => {
             // Determine session ID based on room type
             const sessionId = roomType === 'group' ? roomId.replace('group-', '') : roomId;
 
-            // Handle default live chat specially (no session required)
+            // Handle default live chat and support rooms specially (no Session required)
             let session = null;
-            if (sessionId !== 'default-live-chat') {
+            const isDefaultLive = sessionId === 'default-live-chat';
+            const isSupportRoom = typeof sessionId === 'string' && sessionId.startsWith('support-');
+
+            if (!isDefaultLive && !isSupportRoom) {
                 // Verify session exists and user has access for regular sessions
                 session = await Session.findById(sessionId);
                 if (!session) {
@@ -91,14 +105,21 @@ const setupChatHandlers = (io, socket) => {
             }
 
             // Create new message with UUID
-            const chatMessage = new ChatMessage({
+            const chatMessageData = {
                 messageId: generateUUID(), // Add UUID for deduplication
-                sessionId: sessionId === 'default-live-chat' ? null : sessionId, // No session for default chat
+                sessionId: isDefaultLive || isSupportRoom ? null : sessionId, // No Session reference for default/support chat
                 senderId: socket.user.userId,
                 senderType: senderType,
                 message: message.content || message.message || message.text || message,
-                messageType: sessionId === 'default-live-chat' ? 'default-chat' : 'live-chat'
-            });
+                messageType: isDefaultLive || isSupportRoom ? 'default-chat' : 'live-chat'
+            };
+
+            // If this is a support/private chat room, store the chatRoom name for querying
+            if (isSupportRoom) {
+                chatMessageData.chatRoom = sessionId;
+            }
+
+            const chatMessage = new ChatMessage(chatMessageData);
 
             await chatMessage.save();
             await chatMessage.populate('senderId', 'name');
@@ -122,26 +143,50 @@ const setupChatHandlers = (io, socket) => {
                 senderId: socket.user.userId,
                 senderName: chatMessage.senderId.name || 'User',
                 timestamp: chatMessage.createdAt,
-                sessionId: sessionId
+                sessionId: sessionId,
+                chatRoom: chatMessage.chatRoom || null,
+                senderType: senderType,
+                _id: chatMessage._id
             });
 
-            // Emit admin notification if message is from user (so admin can see it in real-time)
-            if (senderType === 'user' || sessionId === 'default-live-chat') {
-                // Emit to all admins for default chat or user messages
+            // For support rooms, also emit message-received to admin_notifications so admin sees it in real-time
+            if (isSupportRoom) {
+                io.to('admin_notifications').emit('message-received', {
+                    messageId: chatMessage.messageId,
+                    content: chatMessage.message,
+                    senderId: socket.user.userId,
+                    senderName: chatMessage.senderId.name || 'User',
+                    timestamp: chatMessage.createdAt,
+                    sessionId: sessionId,
+                    chatRoom: chatMessage.chatRoom || null,
+                    senderType: senderType,
+                    _id: chatMessage._id
+                });
+            }
+
+            // Emit admin notification if message is from user OR if this is a support room message from admin (so admin can see it in real-time)
+            if (senderType === 'user' || sessionId === 'default-live-chat' || (isSupportRoom && senderType !== 'user')) {
+                // Emit to all admins for default chat or user messages or support room messages
                 io.emit('admin-new-message', {
                     ...messageData,
                     senderType: senderType,
                     userId: socket.user.userId,
-                    userName: chatMessage.senderId.name || 'User'
+                    userName: chatMessage.senderId.name || 'User',
+                    chatRoom: chatMessage.chatRoom || null
                 });
 
-                // Also emit to a specific admin room if needed
-                io.to('admin-room').emit('new-support-message', {
+                // Also emit to admin support room for presence & notification
+                const adminPayload = {
                     ...messageData,
                     senderType: senderType,
                     userId: socket.user.userId,
-                    userName: chatMessage.senderId.name || 'User'
-                });
+                    userName: chatMessage.senderId.name || 'User',
+                    chatRoom: chatMessage.chatRoom || null
+                };
+
+                io.to('admin-support-room').emit('new-support-message', adminPayload);
+                // Also send to admin notifications channel so admins connected via notifications socket receive it
+                io.to('admin_notifications').emit('new-support-message', adminPayload);
             }
 
             logger.info(`Message sent by ${socket.user.userId} in room ${roomId}`);

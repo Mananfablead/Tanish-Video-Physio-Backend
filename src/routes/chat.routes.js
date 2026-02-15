@@ -77,8 +77,22 @@ router.get('/debug/:sessionId', async (req, res) => {
     }
 });
 
-// Get chat messages for a session
-router.get('/:sessionId', getChatMessages);
+// Get chat messages for a support/private chat room (chatRoom string)
+router.get('/support/:chatRoom', async (req, res, next) => {
+    try {
+        const ChatMessage = require('../models/ChatMessage.model');
+        const { chatRoom } = req.params;
+
+        const messages = await ChatMessage.find({ chatRoom })
+            .populate('senderId', 'name email role')
+            .sort({ createdAt: 1 });
+
+        res.status(200).json({ success: true, message: 'Support chat messages retrieved successfully', data: { messages } });
+    } catch (error) {
+        console.error('Error fetching support chat messages:', error);
+        next(error);
+    }
+});
 
 // Special endpoint to get default chat messages (for support chat)
 router.get('/default/messages', async (req, res, next) => {
@@ -104,6 +118,9 @@ router.get('/default/messages', async (req, res, next) => {
         next(error);
     }
 });
+
+// Get chat messages for a session
+router.get('/:sessionId', getChatMessages);
 
 // Typing indicator
 router.post('/typing', (req, res) => {
