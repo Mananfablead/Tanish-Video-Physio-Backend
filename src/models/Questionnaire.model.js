@@ -8,7 +8,7 @@ const questionSchema = new mongoose.Schema({
     },
     type: {
         type: String,
-        enum: ['text', 'mcq', 'slider', 'skalaeton'],
+        enum: ['text', 'mcq', 'slider', 'skalaeton', 'upload'],
         required: true
     },
     required: {

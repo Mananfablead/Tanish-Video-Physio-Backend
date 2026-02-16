@@ -266,6 +266,31 @@ const deleteSingleQuestion = async (req, res, next) => {
     }
 };
 
+// Upload questionnaire response file
+const uploadQuestionnaireFile = async (req, res, next) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json(
+                ApiResponse.error('No file provided', 400)
+            );
+        }
+
+        // Generate the file URL - this will be accessible publicly
+        const fileUrl = `/uploads/questionnaire-responses/${req.file.filename}`;
+        
+        res.status(200).json(
+            ApiResponse.success({
+                filename: req.file.originalname,
+                url: fileUrl,
+                size: req.file.size,
+                mimetype: req.file.mimetype
+            }, 'File uploaded successfully')
+        );
+    } catch (error) {
+        next(error);
+    }
+};
+
 module.exports = {
     getAllQuestionnaires,
     getActiveQuestionnaire,
@@ -275,5 +300,6 @@ module.exports = {
     updateQuestions,
     deleteQuestionnaire,
     activateQuestionnaire,
-    deleteSingleQuestion  // Export the new function
+    deleteSingleQuestion,  // Export the new function
+    uploadQuestionnaireFile  // Export the new upload function
 };
