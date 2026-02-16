@@ -20,6 +20,7 @@ const testimonialRoutes = require('./testimonial.routes');
 const groupSessionRoutes = require('./groupSession.route');
 const videoCallSignalingRoutes = require('./videoCallSignaling.routes');
 const offerRoutes = require('./offers');
+const credentialsRoutes = require('./credentials.routes');
 
 // Mount route modules
 router.use('/auth', authRoutes);
@@ -40,5 +41,6 @@ router.use('/testimonials', testimonialRoutes);
 router.use('/group-sessions', groupSessionRoutes);
 router.use('/video-call', videoCallSignalingRoutes);
 router.use('/offers', offerRoutes);
+router.use('/credentials', credentialsRoutes);
 
 module.exports = router;
