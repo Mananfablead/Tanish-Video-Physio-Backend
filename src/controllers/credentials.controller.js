@@ -63,27 +63,29 @@ const createCredential = async (req, res, next) => {
       return res.status(400).json(ApiResponse.error("Invalid credential type"));
     }
 
-    // Check for duplicates (optional - one active credential per type)
-    const existingActive = await Credentials.findOne({
-      credentialType,
-      isActive: true,
-    });
-
+    // Prevent creating more than one credential record per type.
+    // After a credential of a given type exists, admins must use update.
+    const existingAny = await Credentials.findOne({ credentialType });
+    if (existingAny) {
+      return res
+        .status(400)
+        .json(
+          ApiResponse.error(
+            `A ${credentialType} credential already exists. Use update instead.`
+          )
+        );
+    }
     const credential = new Credentials({
       credentialType,
       name,
       description,
       lastUpdatedBy: req.user.userId,
+      // Since creation is restricted to one per type, make it active by default
+      isActive: true,
       ...credentialData,
     });
 
     await credential.save();
-
-    // If this is the first active credential of this type, keep it active
-    if (!existingActive) {
-      credential.isActive = true;
-      await credential.save();
-    }
 
     res.status(201).json(
       ApiResponse.success(credential, "Credential created successfully")
