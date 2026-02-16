@@ -44,6 +44,12 @@ const chatMessageSchema = new mongoose.Schema({
         enum: ['live-chat', 'video-call-chat', 'default-chat'],
         default: 'live-chat'
     },
+    chatRoom: {
+        type: String,
+        required: false,
+        index: true,
+        default: null
+    },
     replyTo: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'ChatMessage',

@@ -630,6 +630,15 @@ const setupVideoCallHandlers = (io, socket) => {
     socket.on('join-room', async (data) => {
         try {
             const { sessionId, groupSessionId } = data;
+            // If this is a special non-session room (support/admin/notifications), join and return early
+            const specialRoom = (id) => typeof id === 'string' && (id.startsWith('support-') || id === 'admin-support-room' || id === 'admin_notifications' || id === 'default-chat-room');
+            if (specialRoom(sessionId) || specialRoom(groupSessionId)) {
+                const roomId = sessionId || groupSessionId;
+                socket.join(roomId);
+                logger.info(`User ${socket.user.userId} joined special non-video room ${roomId}`);
+                socket.to(roomId).emit('user-joined', { userId: socket.user.userId, sessionId: roomId });
+                return;
+            }
             const userId = socket.user.userId;
             
             let roomType, roomInfo;
