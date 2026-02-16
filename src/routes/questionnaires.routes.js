@@ -9,13 +9,16 @@ const {
     updateQuestions,
     deleteQuestionnaire,
     activateQuestionnaire,
-    deleteSingleQuestion  // Add the new function
+    deleteSingleQuestion,  // Add the new function
+    uploadQuestionnaireFile  // Add the upload function
 } = require('../controllers/questionnaire.controller');
 const { authenticateToken } = require('../middlewares/auth.middleware');
 const { isAdmin } = require('../middlewares/role.middleware');
+const { questionnaireUpload } = require('../middlewares/questionnaireUpload.middleware');
 
 // Public routes
 router.get('/active', getActiveQuestionnaire);
+router.post('/upload-file', questionnaireUpload, uploadQuestionnaireFile);  // Public file upload endpoint
 
 // Admin routes
 router.use(authenticateToken);
