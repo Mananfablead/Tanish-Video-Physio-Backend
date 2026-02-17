@@ -8,6 +8,8 @@ const CmsFeaturedTherapist = require('../models/CmsFeaturedTherapist.model');
 const CmsContact = require('../models/CmsContact.model');
 const CmsAbout = require('../models/CmsAbout.model');
 const config = require('../config/env');
+const fs = require('fs');
+const path = require('path');
 
 // Hero Section
 exports.getHeroPublic = async (req, res) => {
@@ -1082,12 +1084,42 @@ exports.getWhyUsAdmin = async (req, res) => {
 
 exports.updateWhyUs = async (req, res) => {
     try {
-        // Clean up the request body to remove any problematic id fields
-        const whyUsData = { ...req.body };
+        let whyUsData = { ...req.body };
+
         delete whyUsData._id;
         delete whyUsData.id;
-        
+
+        // Parse JSON strings back to objects/arrays
+        for (const key in whyUsData) {
+            try {
+                const parsedValue = JSON.parse(whyUsData[key]);
+                if (Array.isArray(parsedValue) || typeof parsedValue === 'object') {
+                    whyUsData[key] = parsedValue;
+                }
+            } catch (e) {
+                // If parsing fails, keep the original value
+                // This handles cases where the value is not JSON
+            }
+        }
+
+        // ❗ IMPORTANT FIX
+        if (!req.file) {
+            delete whyUsData.image; 
+        }
+
         let whyUs = await CmsWhyUs.findOne().sort({ createdAt: -1 });
+
+        if (req.file) {
+            // Delete old image if exists
+            if (whyUs?.image) {
+                const oldImagePath = path.join(__dirname, '../..', whyUs.image);
+                if (fs.existsSync(oldImagePath)) {
+                    fs.unlinkSync(oldImagePath);
+                }
+            }
+
+            whyUsData.image = `${config.BASE_URL}/uploads/${req.file.filename}`;
+        }
 
         if (whyUs) {
             Object.assign(whyUs, whyUsData);
@@ -1102,6 +1134,7 @@ exports.updateWhyUs = async (req, res) => {
             message: 'Why us section updated successfully',
             data: whyUs
         });
+
     } catch (error) {
         res.status(500).json({
             success: false,
@@ -1110,6 +1143,7 @@ exports.updateWhyUs = async (req, res) => {
         });
     }
 };
+
 
 // FAQ Section
 exports.getFaqsPublic = async (req, res) => {
@@ -1521,61 +1555,122 @@ exports.getAboutAdmin = async (req, res) => {
 
 exports.updateAbout = async (req, res) => {
     try {
+        console.log('=== UPDATE ABOUT DEBUG ===');
+        console.log('Request body:', req.body);
+        console.log('Request files:', req.files);
+        console.log('Files keys:', req.files ? Object.keys(req.files) : 'No files');
+        
         // Clean up the request body to remove any problematic id fields
         const aboutData = { ...req.body };
         delete aboutData._id;
         delete aboutData.id;
         
-        // Parse values if it's a JSON string
-        if (aboutData.values && typeof aboutData.values === 'string') {
-            try {
-                const parsedValues = JSON.parse(aboutData.values);
-                if (Array.isArray(parsedValues)) {
-                    aboutData.values = parsedValues;
+        // Get the current about section to preserve existing images if not overridden
+        const currentAbout = await CmsAbout.findOne().sort({ createdAt: -1 });
+        
+        // Handle images upload - support both adding new images and replacing all images
+        // When using multer.fields([{ name: 'images', maxCount: 10 }]), files are stored in req.files.images
+        if (req.files && req.files.images && Array.isArray(req.files.images)) {
+            console.log('Multiple images found:', req.files.images.length);
+            
+            // Initialize images array - either use existing or start fresh
+            let images = [];
+            
+            // Check if we should replace all images or add to existing ones
+            if (req.body.replaceImages === 'true' || req.body.replaceImages === true) {
+                // Replace all images with newly uploaded ones
+                req.files.images.forEach(file => {
+                    const imageUrl = `${config.BASE_URL}/uploads/cms-images/${file.filename}`;
+                    images.push(imageUrl);
+                    console.log('Added new image (replacing all):', imageUrl);
+                });
+            } else {
+                // Preserve existing images and add new ones
+                images = [...(currentAbout?.images || [])];
+                
+                req.files.images.forEach(file => {
+                    const imageUrl = `${config.BASE_URL}/uploads/cms-images/${file.filename}`;
+                    images.push(imageUrl);
+                    console.log('Added image (appending):', imageUrl);
+                });
+            }
+            
+            aboutData.images = images;
+            console.log('Final images array:', images);
+        } else if (req.body.images) {
+            // If images are sent as JSON string (from frontend form), parse them
+            if (typeof req.body.images === 'string') {
+                try {
+                    aboutData.images = JSON.parse(req.body.images);
+                    console.log('Parsed images from JSON string:', aboutData.images);
+                } catch (e) {
+                    console.log('Failed to parse images JSON string:', e.message);
                 }
-            } catch (e) {
-                // If parsing fails, keep the original value
-                console.log('Failed to parse values, keeping original:', e.message);
+            } else {
+                aboutData.images = req.body.images;
+                console.log('Assigned images directly:', req.body.images);
             }
         }
         
-        // Handle multiple image uploads
-        if (req.files && req.files.length > 0) {
-            // Get the current about section to preserve existing images
-            const currentAbout = await CmsAbout.findOne().sort({ createdAt: -1 });
-            
-            // Initialize images array with existing images
-            const images = [...(currentAbout?.images || [])];
-            
-            // Add new uploaded images
-            req.files.forEach(file => {
-                images.push(`${config.BASE_URL}/uploads/cms-images/${file.filename}`);
-            });
-            
-            aboutData.images = images;
-            
-            // Also update the legacy single image field for backward compatibility
-            if (images.length > 0) {
-                aboutData.image = images[0];
-            }
+        // Handle single image field (for backward compatibility)
+        if (req.file) {
+            aboutData.image = `${config.BASE_URL}/uploads/cms-images/${req.file.filename}`;
+            console.log('Added single image:', aboutData.image);
+        }
+        
+        // Handle main image field separately if uploaded as 'image' field
+        if (req.files && req.files.image && Array.isArray(req.files.image) && req.files.image.length > 0) {
+            aboutData.image = `${config.BASE_URL}/uploads/cms-images/${req.files.image[0].filename}`;
+            console.log('Added main image:', aboutData.image);
         }
         
         let about = await CmsAbout.findOne().sort({ createdAt: -1 });
+        
+        console.log('Existing about found:', about ? 'Yes' : 'No');
+        if (about) {
+            console.log('Existing about data before update:', {
+                id: about._id,
+                title: about.title,
+                image: about.image,
+                images: about.images
+            });
+            
+            // Preserve existing images if not explicitly provided
+            if (!aboutData.images) {
+                aboutData.images = about.images;
+            }
+        }
 
         if (about) {
             Object.assign(about, aboutData);
             await about.save();
+            console.log('About updated successfully');
         } else {
             about = new CmsAbout(aboutData);
             await about.save();
+            console.log('New about created successfully');
         }
+        
+        console.log('Final about data:', {
+            id: about._id,
+            title: about.title,
+            image: about.image,
+            images: about.images,
+            createdAt: about.createdAt,
+            updatedAt: about.updatedAt
+        });
 
         res.json({
             success: true,
             message: 'About section updated successfully',
             data: about
         });
+        
+        console.log('=== UPDATE ABOUT RESPONSE SENT ===');
     } catch (error) {
+        console.error('=== UPDATE ABOUT ERROR ===');
+        console.error('Error details:', error);
+        console.error('Error stack:', error.stack);
         res.status(500).json({
             success: false,
             message: 'Error updating about section',

@@ -10,34 +10,19 @@ const cmsAboutSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    mission: {
+    aboutheadline: {
         type: String,
         required: true
     },
-    vision: {
+    aboutheadlDescription: {
         type: String,
         required: true
     },
-    values: [{
-        type: String,
-        trim: true
-    }],
-    foundingStory: {
-        type: String,
-        required: true
-    },
-    teamInfo: {
-        type: String,
-        required: true
-    },
+ 
     images: [{
         type: String,
         default: ''
     }],
-    image: {
-        type: String,
-        default: ''
-    },
     isPublic: {
         type: Boolean,
         default: true

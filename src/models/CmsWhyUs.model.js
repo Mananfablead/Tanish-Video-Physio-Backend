@@ -29,6 +29,10 @@ const cmsWhyUsSchema = new mongoose.Schema({
         required: true,
         trim: true
     },
+    image: {
+        type: String,
+        trim: true
+    },
     stats: [cmsStatSchema],
     features: [{
         type: String,

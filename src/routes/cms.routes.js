@@ -46,7 +46,7 @@ router.put('/admin/conditions', cmsUpload.any(), cmsController.updateConditions)
 
 // Why Us Section
 router.get('/admin/whyUs', cmsController.getWhyUsAdmin);
-router.put('/admin/whyUs', cmsController.updateWhyUs);
+router.put('/admin/whyUs', cmsUpload.single('image'), cmsController.updateWhyUs);
 
 // FAQ Section
 router.get('/admin/faq', cmsController.getFaqsAdmin);
@@ -68,7 +68,7 @@ router.put('/admin/contact', cmsController.updateContact);
 
 // About Section
 router.get('/admin/about', cmsController.getAboutAdmin);
-router.put('/admin/about', cmsUpload.array('images', 10), cmsController.updateAbout);
+router.put('/admin/about', cmsUpload.fields([{ name: 'images', maxCount: 10 }]), cmsController.updateAbout);
 
 // Contact Messages (admin only)
 router.get('/admin/contact-messages', contactController.getAllContactMessages);
