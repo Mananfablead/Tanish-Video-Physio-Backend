@@ -817,7 +817,119 @@ class EmailTemplates {
         `;
     }
 
-    // Template 10: Admin - Upcoming Session
+    // Template 10: Appointment Rescheduled
+    static appointmentRescheduled(data) {
+        return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Appointment Rescheduled</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #fffbeb;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #fffbeb; padding: 20px 0;">
+        <tr>
+            <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #fed7aa;">
+                    ${EmailTemplates.generateHeader(
+            'Appointment Rescheduled',
+            'Your session has been moved',
+            { start: '#f59e0b', end: '#d97706', text: '#fed7aa' },
+            '📅'
+        )}
+                    
+                    <tr>
+                        <td style="padding: 40px;">
+                            <p style="font-size: 20px; color: #92400e; margin: 0 0 25px 0; font-weight: 600;">
+                                Hello ${data.clientName || 'Valued Patient'},
+                            </p>
+                            
+                            <div style="background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%); border-radius: 12px; padding: 25px; margin: 25px 0; border: 1px solid #fed7aa;">
+                                <h2 style="color: #92400e; margin: 0 0 20px 0; font-size: 24px;">📋 Rescheduled Session Details</h2>
+                                
+                                <div style="display: grid; gap: 20px;">
+                                    <div style="display: flex; align-items: center; gap: 15px; padding: 15px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+                                        <div style="background-color: #f59e0b; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;">
+                                            📋
+                                        </div>
+                                        <div>
+                                            <div style="font-weight: 600; color: #92400e;">${data.serviceName || 'Service'}</div>
+                                            <div style="font-size: 14px; color: #c2410c;">Service</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div style="display: flex; align-items: center; gap: 15px; padding: 15px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+                                        <div style="background-color: #0ea5e9; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;">
+                                            📅
+                                        </div>
+                                        <div>
+                                            <div style="font-weight: 600; color: #92400e;">${data.newDate || 'New Date'}</div>
+                                            <div style="font-size: 14px; color: #c2410c;">New Date</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div style="display: flex; align-items: center; gap: 15px; padding: 15px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+                                        <div style="background-color: #6366f1; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;">
+                                            ⏰
+                                        </div>
+                                        <div>
+                                            <div style="font-weight: 600; color: #92400e;">${data.newTime || 'New Time'}</div>
+                                            <div style="font-size: 14px; color: #c2410c;">New Time</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 25px; margin: 25px 0; border-radius: 0 12px 12px 0;">
+                                <h3 style="color: #1e40af; margin: 0 0 15px 0; font-size: 20px;">💡 What Changed</h3>
+                                <ul style="color: #1e3a8a; margin: 0; padding-left: 20px; line-height: 1.6;">
+                                    <li>Your original appointment on ${data.oldDate || 'previous date'} at ${data.oldTime || 'previous time'} has been moved</li>
+                                    <li>Your new session is scheduled as shown above</li>
+                                    <li>All your session details and therapist remain the same</li>
+                                </ul>
+                            </div>
+                            
+                            ${data.newMeetingLink ? `
+                            <div style="background-color: #f0fdf4; border-left: 4px solid #16a34a; padding: 25px; margin: 25px 0; border-radius: 0 12px 12px 0; text-align: center;">
+                                <h3 style="color: #15803d; margin: 0 0 15px 0; font-size: 20px;">🔗 Updated Session Link</h3>
+                                <p style="color: #16a34a; margin: 0 0 20px 0; font-size: 16px; line-height: 1.6;">
+                                    Your updated virtual session link is ready:
+                                </p>
+                                <a href="${data.newMeetingLink}" style="background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); color: white; text-decoration: none; padding: 12px 25px; border-radius: 8px; font-weight: 600; display: inline-block;">Join Updated Session</a>
+                            </div>
+                            ` : ``}
+                            
+                            <div style="background-color: #fff7ed; border-radius: 12px; padding: 20px; margin: 25px 0; border: 1px solid #fed7aa;">
+                                <h3 style="color: #c2410c; margin: 0 0 15px 0; font-size: 18px;">⚠️ Important Notes</h3>
+                                <ul style="color: #ea580c; margin: 0; padding-left: 20px; line-height: 1.6;">
+                                    <li>Please update your calendar with the new date and time</li>
+                                    <li>Arrive 10-15 minutes early for your rescheduled session</li>
+                                    <li>Contact us if you cannot make the new time slot</li>
+                                </ul>
+                            </div>
+                            
+                            <p style="font-size: 16px; color: #475569; margin: 30px 0 0 0; line-height: 1.6;">
+                                We apologize for any inconvenience this rescheduling may have caused. <strong>Tanish Physio</strong> is committed to providing you with the best possible care and appreciate your understanding.
+                            </p>
+                        </td>
+                    </tr>
+                    
+                    ${EmailTemplates.generateFooter(
+            '#92400e',
+            { light: '#fed7aa', accent: '#fdba74', border: '#c2410c' },
+            'Need to make further changes?'
+        )}
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+        `;
+    }
+
+    // Template 11: Admin - Upcoming Session
     static adminUpcomingSession(data) {
         return `
 <!DOCTYPE html>

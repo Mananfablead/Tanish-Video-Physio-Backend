@@ -8,6 +8,7 @@ const User = require('../models/User.model');
 const ApiResponse = require('../utils/apiResponse');
 const { hashPassword } = require('../utils/auth.utils');
 const { generateToken } = require('../config/jwt');
+const NotificationService = require('../services/notificationService');
 
 // Utility function to calculate end date based on plan validity
 async function calculateEndDate(planId, startDate = new Date()) {
@@ -70,14 +71,22 @@ async function activateSubscription(subscriptionId) {
 async function sendWelcomeEmailWithCredentials(email, name, username, password) {
     const nodemailer = require('nodemailer');
     const { createTransport } = nodemailer;
+    const { getEmailCredentials } = require('../utils/credentialsManager');
+
+    // Get email credentials from database
+    const emailCreds = await getEmailCredentials();
+    if (!emailCreds) {
+        console.error('Email configuration not found for welcome email');
+        return;
+    }
 
     const transporter = createTransport({
         service: 'gmail',
-        host: process.env.EMAIL_HOST,
-        port: process.env.EMAIL_PORT,
+        host: emailCreds.host,
+        port: emailCreds.port,
         auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS
+            user: emailCreds.user,
+            pass: emailCreds.password
         }
     });
 
@@ -169,7 +178,7 @@ async function sendWelcomeEmailWithCredentials(email, name, username, password) 
 
     const mailOptions = {
         to: email,
-        from: process.env.EMAIL_USER,
+        from: emailCreds.user,
         subject: 'Welcome to Tanish Physio - Account Created & Payment Verified',
         html: message
     };
@@ -297,10 +306,14 @@ const createOrder = async (req, res, next) => {
 
         await payment.save();
 
+        // Get Razorpay credentials from database
+        const { getRazorpayCredentials } = require('../utils/credentialsManager');
+        const razorpayCreds = await getRazorpayCredentials();
+
         res.status(200).json(
             ApiResponse.success({
                 orderId: order.id,
-                key: process.env.RAZORPAY_KEY_ID,
+                key: razorpayCreds?.keyId || process.env.RAZORPAY_KEY_ID,
                 amount: order.amount,
                 currency: order.currency
             }, 'Payment order created successfully')
@@ -324,9 +337,10 @@ const verifyPayment = async (req, res, next) => {
         // Verify the payment with Razorpay
         const crypto = require('crypto');
 
-        // Check if the required environment variable is available
-        const config = require('../config/env');
-        const secret = config.RAZORPAY_KEY_SECRET || process.env.RAZORPAY_KEY_SECRET || 'uvPkIj6Wi9gO3WYHqje57gh7';
+        // Get Razorpay credentials from database
+        const { getRazorpayCredentials } = require('../utils/credentialsManager');
+        const razorpayCreds = await getRazorpayCredentials();
+        const secret = razorpayCreds?.keySecret || 'uvPkIj6Wi9gO3WYHqje57gh7';
 
         if (!secret) {
             return res.status(500).json(ApiResponse.error('Server configuration error: Razorpay secret is not set'));
@@ -404,6 +418,46 @@ const verifyPayment = async (req, res, next) => {
                 }
 
                 await booking.save();
+
+                // Send payment success notifications to user and admin
+                try {
+                    // Get user information for notification
+                    const user = await User.findById(booking.userId).select('email phone name');
+
+                    if (user) {
+                        // Send payment success notification to user (email and WhatsApp)
+                        await NotificationService.sendNotification(
+                            { email: user.email, phone: user.phone },
+                            'payment_successful',
+                            {
+                                clientName: user.name,
+                                amount: payment.amount,
+                                serviceName: service?.name || 'Service',
+                                transactionId: paymentId,
+                                orderId: orderId
+                            }
+                        );
+
+                        // Send payment received notification to admin
+                        const admins = await User.find({ role: 'admin' }).select('email phone name');
+                        for (const admin of admins) {
+                            await NotificationService.sendNotification(
+                                { email: admin.email, phone: admin.phone },
+                                'payment_received',
+                                {
+                                    amount: payment.amount,
+                                    serviceName: service?.name || 'Service',
+                                    transactionId: paymentId,
+                                    orderId: orderId,
+                                    clientName: user.name
+                                }
+                            );
+                        }
+                    }
+                } catch (notificationError) {
+                    console.error('Error sending payment notifications:', notificationError);
+                    // Don't fail the payment process if notifications fail
+                }
             }
 
             // Generate JWT token for auto-login
@@ -586,10 +640,14 @@ const createGuestOrder = async (req, res, next) => {
 
         await payment.save();
 
+        // Get Razorpay credentials from database
+        const { getRazorpayCredentials } = require('../utils/credentialsManager');
+        const razorpayCreds = await getRazorpayCredentials();
+
         res.status(200).json(
             ApiResponse.success({
                 orderId: order.id,
-                key: process.env.RAZORPAY_KEY_ID,
+                key: razorpayCreds?.keyId || process.env.RAZORPAY_KEY_ID,
                 amount: order.amount,
                 currency: order.currency,
                 message: 'Payment order created successfully. Account will be created after payment verification.'
@@ -614,9 +672,10 @@ const verifyGuestPayment = async (req, res, next) => {
         // Verify the payment with Razorpay
         const crypto = require('crypto');
 
-        // Check if the required environment variable is available
-        const config = require('../config/env');
-        const secret = config.RAZORPAY_KEY_SECRET || process.env.RAZORPAY_KEY_SECRET || 'uvPkIj6Wi9gO3WYHqje57gh7';
+        // Get Razorpay credentials from database
+        const { getRazorpayCredentials } = require('../utils/credentialsManager');
+        const razorpayCreds = await getRazorpayCredentials();
+        const secret = razorpayCreds?.keySecret || 'uvPkIj6Wi9gO3WYHqje57gh7';
 
         if (!secret) {
             return res.status(500).json(ApiResponse.error('Server configuration error: Razorpay secret is not set'));
@@ -728,6 +787,46 @@ const verifyGuestPayment = async (req, res, next) => {
                 }
 
                 await booking.save();
+
+                // Send payment success notifications to user and admin
+                try {
+                    // Get user information for notification
+                    const user = await User.findById(booking.userId).select('email phone name');
+
+                    if (user) {
+                        // Send payment success notification to user (email and WhatsApp)
+                        await NotificationService.sendNotification(
+                            { email: user.email, phone: user.phone },
+                            'payment_successful',
+                            {
+                                clientName: user.name,
+                                amount: payment.amount,
+                                serviceName: service?.name || 'Service',
+                                transactionId: paymentId,
+                                orderId: orderId
+                            }
+                        );
+
+                        // Send payment received notification to admin
+                        const admins = await User.find({ role: 'admin' }).select('email phone name');
+                        for (const admin of admins) {
+                            await NotificationService.sendNotification(
+                                { email: admin.email, phone: admin.phone },
+                                'payment_received',
+                                {
+                                    amount: payment.amount,
+                                    serviceName: service?.name || 'Service',
+                                    transactionId: paymentId,
+                                    orderId: orderId,
+                                    clientName: user.name
+                                }
+                            );
+                        }
+                    }
+                } catch (notificationError) {
+                    console.error('Error sending payment notifications:', notificationError);
+                    // Don't fail the payment process if notifications fail
+                }
 
                 // Create session if booking has scheduling information
                 if (booking.scheduledDate && booking.scheduledTime) {
@@ -895,6 +994,46 @@ const handleWebhook = async (req, res) => {
                     }
 
                     await booking.save();
+
+                    // Send payment success notifications to user and admin
+                    try {
+                        // Get user information for notification
+                        const user = await User.findById(booking.userId).select('email phone name');
+
+                        if (user) {
+                            // Send payment success notification to user (email and WhatsApp)
+                            await NotificationService.sendNotification(
+                                { email: user.email, phone: user.phone },
+                                'payment_successful',
+                                {
+                                    clientName: user.name,
+                                    amount: payment.amount,
+                                    serviceName: service?.name || 'Service',
+                                    transactionId: paymentId,
+                                    orderId: orderId
+                                }
+                            );
+
+                            // Send payment received notification to admin
+                            const admins = await User.find({ role: 'admin' }).select('email phone name');
+                            for (const admin of admins) {
+                                await NotificationService.sendNotification(
+                                    { email: admin.email, phone: admin.phone },
+                                    'payment_received',
+                                    {
+                                        amount: payment.amount,
+                                        serviceName: service?.name || 'Service',
+                                        transactionId: paymentId,
+                                        orderId: orderId,
+                                        clientName: user.name
+                                    }
+                                );
+                            }
+                        }
+                    } catch (notificationError) {
+                        console.error('Error sending payment notifications:', notificationError);
+                        // Don't fail the payment process if notifications fail
+                    }
                 }
 
                 // If this was a guest booking, send login credentials to the user's email
@@ -1100,10 +1239,14 @@ const createSubscriptionOrder = async (req, res, next) => {
 
         await subscription.save();
 
+        // Get Razorpay credentials from database
+        const { getRazorpayCredentials } = require('../utils/credentialsManager');
+        const razorpayCreds = await getRazorpayCredentials();
+
         res.status(200).json(
             ApiResponse.success({
                 orderId: order.id,
-                key: process.env.RAZORPAY_KEY_ID, // Frontend needs this to initialize Razorpay
+                key: razorpayCreds?.keyId || process.env.RAZORPAY_KEY_ID, // Frontend needs this to initialize Razorpay
                 amount: order.amount,
                 currency: order.currency
             }, 'Subscription order created successfully')
@@ -1251,10 +1394,14 @@ const createGuestSubscriptionOrder = async (req, res, next) => {
 
         await subscription.save();
 
+        // Get Razorpay credentials from database
+        const { getRazorpayCredentials } = require('../utils/credentialsManager');
+        const razorpayCreds = await getRazorpayCredentials();
+
         res.status(200).json(
             ApiResponse.success({
                 orderId: order.id,
-                key: process.env.RAZORPAY_KEY_ID, // Frontend needs this to initialize Razorpay
+                key: razorpayCreds?.keyId || process.env.RAZORPAY_KEY_ID, // Frontend needs this to initialize Razorpay
                 amount: order.amount,
                 currency: order.currency,
                 message: 'Subscription order created successfully. Account will be created after payment verification.'
@@ -1280,9 +1427,10 @@ const verifySubscriptionPayment = async (req, res, next) => {
         // Verify the payment with Razorpay
         const crypto = require('crypto');
 
-        // Check if the required environment variable is available
-        const config = require('../config/env');
-        const secret = config.RAZORPAY_KEY_SECRET || process.env.RAZORPAY_KEY_SECRET || 'uvPkIj6Wi9gO3WYHqje57gh7';
+        // Get Razorpay credentials from database
+        const { getRazorpayCredentials } = require('../utils/credentialsManager');
+        const razorpayCreds = await getRazorpayCredentials();
+        const secret = razorpayCreds?.keySecret || 'uvPkIj6Wi9gO3WYHqje57gh7';
 
         if (!secret) {
             return res.status(500).json(ApiResponse.error('Server configuration error: Razorpay secret is not set'));
@@ -1323,6 +1471,46 @@ const verifySubscriptionPayment = async (req, res, next) => {
 
             // Activate the subscription with calculated end date
             const updatedSubscription = await activateSubscription(subscription._id);
+
+            // Send payment success notifications to user and admin
+            try {
+                // Get user information for notification
+                const user = await User.findById(subscription.userId).select('email phone name');
+
+                if (user) {
+                    // Send payment success notification to user (email and WhatsApp)
+                    await NotificationService.sendNotification(
+                        { email: user.email, phone: user.phone },
+                        'payment_successful',
+                        {
+                            clientName: user.name,
+                            amount: subscription.amount,
+                            serviceName: 'Subscription Plan',
+                            transactionId: paymentId,
+                            orderId: orderId
+                        }
+                    );
+
+                    // Send payment received notification to admin
+                    const admins = await User.find({ role: 'admin' }).select('email phone name');
+                    for (const admin of admins) {
+                        await NotificationService.sendNotification(
+                            { email: admin.email, phone: admin.phone },
+                            'payment_received',
+                            {
+                                amount: subscription.amount,
+                                serviceName: 'Subscription Plan',
+                                transactionId: paymentId,
+                                orderId: orderId,
+                                clientName: user.name
+                            }
+                        );
+                    }
+                }
+            } catch (notificationError) {
+                console.error('Error sending subscription payment notifications:', notificationError);
+                // Don't fail the payment process if notifications fail
+            }
 
             // Check if there's a pending booking that should create a session
             // This would be for cases where user scheduled during the booking process
@@ -1502,9 +1690,10 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
         // Verify the payment with Razorpay
         const crypto = require('crypto');
 
-        // Check if the required environment variable is available
-        const config = require('../config/env');
-        const secret = config.RAZORPAY_KEY_SECRET || process.env.RAZORPAY_KEY_SECRET || 'uvPkIj6Wi9gO3WYHqje57gh7';
+        // Get Razorpay credentials from database
+        const { getRazorpayCredentials } = require('../utils/credentialsManager');
+        const razorpayCreds = await getRazorpayCredentials();
+        const secret = razorpayCreds?.keySecret || 'uvPkIj6Wi9gO3WYHqje57gh7';
 
         if (!secret) {
             return res.status(500).json(ApiResponse.error('Server configuration error: Razorpay secret is not set'));
@@ -1579,6 +1768,47 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
 
             // Activate the subscription with calculated end date
             const updatedSubscription = await activateSubscription(subscription._id);
+
+            // Send payment success notifications to user and admin for guest subscription
+            try {
+                // Get user information for notification
+                const userIdToCheck = subscription.userId || (newUser ? newUser._id : null);
+                const user = await User.findById(userIdToCheck).select('email phone name');
+
+                if (user) {
+                    // Send payment success notification to user (email and WhatsApp)
+                    await NotificationService.sendNotification(
+                        { email: user.email, phone: user.phone },
+                        'payment_successful',
+                        {
+                            clientName: user.name,
+                            amount: subscription.amount,
+                            serviceName: 'Subscription Plan',
+                            transactionId: paymentId,
+                            orderId: orderId
+                        }
+                    );
+
+                    // Send payment received notification to admin
+                    const admins = await User.find({ role: 'admin' }).select('email phone name');
+                    for (const admin of admins) {
+                        await NotificationService.sendNotification(
+                            { email: admin.email, phone: admin.phone },
+                            'payment_received',
+                            {
+                                amount: subscription.amount,
+                                serviceName: 'Subscription Plan',
+                                transactionId: paymentId,
+                                orderId: orderId,
+                                clientName: user.name
+                            }
+                        );
+                    }
+                }
+            } catch (notificationError) {
+                console.error('Error sending guest subscription payment notifications:', notificationError);
+                // Don't fail the payment process if notifications fail
+            }
 
             // If this was a guest subscription and we created a new user, send login credentials
             // This would typically be for cases where account was created during subscription purchase

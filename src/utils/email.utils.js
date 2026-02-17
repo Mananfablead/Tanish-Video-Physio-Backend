@@ -1,22 +1,78 @@
 const nodemailer = require('nodemailer');
-const config = require('../config/env');
+const { getEmailCredentials } = require('../utils/credentialsManager');
 
-// Create transporter
-const transporter = nodemailer.createTransport({
-    host: config.EMAIL_HOST,
-    port: config.EMAIL_PORT,
-    secure: false,
-    auth: {
-        user: config.EMAIL_USER,
-        pass: config.EMAIL_PASS
+// Transporter will be initialized dynamically when sending emails
+let transporter = null;
+
+// Initialize transporter with credentials from database
+const initializeTransporter = async () => {
+    try {
+        const emailCreds = await getEmailCredentials();
+
+        if (!emailCreds) {
+            throw new Error('Email configuration not found in database');
+        }
+
+        // Validate required fields
+        if (!emailCreds.host || !emailCreds.port || !emailCreds.user || !emailCreds.password) {
+            throw new Error('Missing required email configuration fields');
+        }
+
+        transporter = nodemailer.createTransport({
+            host: emailCreds.host,
+            port: emailCreds.port,
+            secure: emailCreds.port === 465, // Use TLS for port 465, STARTTLS for other ports
+            auth: {
+                user: emailCreds.user,
+                pass: emailCreds.password
+            },
+            tls: {
+                rejectUnauthorized: false // Accept self-signed certificates
+            }
+        });
+
+        console.log('🔍 Attempting to verify contact email transporter connection...');
+        // Try to verify transporter configuration
+        try {
+            await transporter.verify();
+            console.log('✅ Contact email transporter verified and ready to send messages');
+        } catch (verifyError) {
+            console.warn('⚠ Contact email transporter verification failed, but continuing anyway:', verifyError.message);
+            // Don't throw error here, just log warning - transporter might still work
+        }
+
+        return transporter;
+    } catch (error) {
+        console.error('❌ Contact email transporter initialization failed:', {
+            message: error.message,
+            stack: error.stack
+        });
+        throw error;
     }
-});
+};
+
+// Function to ensure transporter is ready
+const getTransporter = async () => {
+    if (!transporter) {
+        await initializeTransporter();
+    }
+    return transporter;
+};
 
 // Send contact notification email to admin
 const sendContactNotificationEmail = async (contactMessage) => {
+    // Get fresh email credentials from database
+    const emailCreds = await getEmailCredentials();
+    if (!emailCreds) {
+        throw new Error('Email configuration not found in database');
+    }
+
+    // Get transporter (initialize if needed)
+    const emailTransporter = await getTransporter();
+
     const mailOptions = {
-        from: `"Tanish Physio & Fitness" <${config.EMAIL_USER}>`,
-        to: config.ADMIN_EMAIL || config.EMAIL_USER,
+        from: `"Tanish Physio & Fitness" <${emailCreds.user}>`,
+        to: emailCreds.adminEmail || emailCreds.user,
         subject: `New Contact Message: ${contactMessage.subject}`,
         html: `
             <!DOCTYPE html>
@@ -196,13 +252,22 @@ const sendContactNotificationEmail = async (contactMessage) => {
         `
     };
 
-    return await transporter.sendMail(mailOptions);
+    return await emailTransporter.sendMail(mailOptions);
 };
 
 // Send reply to customer
 const sendContactReplyEmail = async (contactMessage) => {
+    // Get fresh email credentials from database
+    const emailCreds = await getEmailCredentials();
+    if (!emailCreds) {
+        throw new Error('Email configuration not found in database');
+    }
+
+    // Get transporter (initialize if needed)
+    const emailTransporter = await getTransporter();
+
     const mailOptions = {
-        from: `"Tanish Physio & Fitness" <${config.EMAIL_USER}>`,
+        from: `"Tanish Physio & Fitness" <${emailCreds.user}>`,
         to: contactMessage.email,
         subject: `Re: ${contactMessage.subject}`,
         html: `
@@ -411,7 +476,7 @@ const sendContactReplyEmail = async (contactMessage) => {
         `
     };
 
-    return await transporter.sendMail(mailOptions);
+    return await emailTransporter.sendMail(mailOptions);
 };
 
 module.exports = {

@@ -1,31 +1,4 @@
 const mongoose = require("mongoose");
-const crypto = require("crypto");
-
-// AES encryption utility functions
-const cipher_key = process.env.CIPHER_KEY || "your-32-character-secret-key-1234";
-
-const encryptValue = (value) => {
-  if (!value) return null;
-  const algorithm = "aes-256-cbc";
-  const key = crypto.scryptSync(cipher_key, "salt", 32);
-  const iv = crypto.randomBytes(16);
-  const cipher = crypto.createCipheriv(algorithm, key, iv);
-  let encrypted = cipher.update(value, "utf8", "hex");
-  encrypted += cipher.final("hex");
-  return iv.toString("hex") + ":" + encrypted;
-};
-
-const decryptValue = (encryptedValue) => {
-  if (!encryptedValue) return null;
-  const algorithm = "aes-256-cbc";
-  const key = crypto.scryptSync(cipher_key, "salt", 32);
-  const parts = encryptedValue.split(":");
-  const iv = Buffer.from(parts[0], "hex");
-  const decipher = crypto.createDecipheriv(algorithm, key, iv);
-  let decrypted = decipher.update(parts[1], "hex", "utf8");
-  decrypted += decipher.final("utf8");
-  return decrypted;
-};
 
 const credentialsSchema = new mongoose.Schema(
   {
@@ -49,28 +22,20 @@ const credentialsSchema = new mongoose.Schema(
     whatsappAccessToken: {
       type: String,
       default: null,
-      set: (value) => encryptValue(value),
-      get: (value) => decryptValue(value),
     },
     whatsappPhoneNumberId: {
       type: String,
       default: null,
-      set: (value) => encryptValue(value),
-      get: (value) => decryptValue(value),
     },
     whatsappBusinessId: {
       type: String,
       default: null,
-      set: (value) => encryptValue(value),
-      get: (value) => decryptValue(value),
     },
 
     // Email Specific Fields
     emailHost: {
       type: String,
       default: null,
-      set: (value) => encryptValue(value),
-      get: (value) => decryptValue(value),
     },
     emailPort: {
       type: Number,
@@ -79,34 +44,24 @@ const credentialsSchema = new mongoose.Schema(
     emailUser: {
       type: String,
       default: null,
-      set: (value) => encryptValue(value),
-      get: (value) => decryptValue(value),
     },
     emailPassword: {
       type: String,
       default: null,
-      set: (value) => encryptValue(value),
-      get: (value) => decryptValue(value),
     },
     adminEmail: {
       type: String,
       default: null,
-      set: (value) => encryptValue(value),
-      get: (value) => decryptValue(value),
     },
 
     // Razorpay Specific Fields
     razorpayKeyId: {
       type: String,
       default: null,
-      set: (value) => encryptValue(value),
-      get: (value) => decryptValue(value),
     },
     razorpayKeySecret: {
       type: String,
       default: null,
-      set: (value) => encryptValue(value),
-      get: (value) => decryptValue(value),
     },
 
     // Status and Metadata
@@ -131,14 +86,11 @@ const credentialsSchema = new mongoose.Schema(
 
 // Enable getters for sensitive fields
 credentialsSchema.set("toJSON", {
-  getters: true,
   transform: (doc, ret) => {
-    // Remove encrypted raw data, only return decrypted values
+    // Return all fields as stored in database
     return ret;
   },
 });
-
-credentialsSchema.set("toObject", { getters: true });
 
 const Credentials = mongoose.model("Credentials", credentialsSchema);
 

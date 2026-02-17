@@ -19,7 +19,7 @@
 const mongoose = require('mongoose');
 const config = require('./env');
 
-mongoose.set('bufferCommands', false);
+// mongoose.set('bufferCommands', false); // Removed to allow command buffering during connection
 
 const connectDB = async () => {
     try {

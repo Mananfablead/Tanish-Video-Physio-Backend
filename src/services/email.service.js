@@ -1,39 +1,74 @@
 const nodemailer = require('nodemailer');
-const config = require('../config/env');
 const logger = require('../utils/logger');
+const { getEmailCredentials } = require('../utils/credentialsManager');
 
-// Create transporter
-const transporter = nodemailer.createTransporter({
-    host: config.EMAIL_HOST,
-    port: config.EMAIL_PORT,
-    secure: config.EMAIL_PORT === 465, // true for 465, false for other ports
-    auth: {
-        user: config.EMAIL_USER,
-        pass: config.EMAIL_PASS,
-    },
-});
+// Transporter will be initialized dynamically when sending emails
+let transporter = null;
 
-// Verify transporter configuration
-transporter.verify((error, success) => {
-    if (error) {
-        logger.error('Email transporter configuration error:', error);
-    } else {
+// Initialize transporter with credentials
+const initializeTransporter = async () => {
+    try {
+        const emailCreds = await getEmailCredentials();
+        if (!emailCreds) {
+            throw new Error('Email configuration not found in database');
+        }
+
+        transporter = nodemailer.createTransport({
+            host: emailCreds.host,
+            port: emailCreds.port,
+            secure: emailCreds.port === 465, // true for 465, false for other ports
+            auth: {
+                user: emailCreds.user,
+                pass: emailCreds.password,
+            },
+        });
+
+        // Verify transporter configuration
+        await transporter.verify();
         logger.info('Email transporter is ready to send messages');
+
+        return true;
+    } catch (error) {
+        logger.error('Email transporter configuration error:', error.message);
+        return false;
     }
-});
+};
+
+// Function to ensure transporter is ready
+const getTransporter = async () => {
+    if (!transporter) {
+        const initialized = await initializeTransporter();
+        if (!initialized) {
+            throw new Error('Failed to initialize email transporter');
+        }
+    }
+    return transporter;
+};
+
+// Initialize transporter on module load
+initializeTransporter();
 
 // Send email
 const sendEmail = async (options) => {
     try {
+        // Get transporter (initialize if needed)
+        const emailTransporter = await getTransporter();
+
+        // Get fresh credentials for each email send
+        const emailCreds = await getEmailCredentials();
+        if (!emailCreds) {
+            throw new Error('Email configuration not found in database');
+        }
+
         const mailOptions = {
-            from: config.EMAIL_USER,
+            from: emailCreds.user,
             to: options.to,
             subject: options.subject,
             text: options.text,
             html: options.html,
         };
 
-        const result = await transporter.sendMail(mailOptions);
+        const result = await emailTransporter.sendMail(mailOptions);
         logger.info(`Email sent to ${options.to}`);
         return result;
     } catch (error) {
@@ -101,5 +136,6 @@ module.exports = {
     sendEmail,
     sendWelcomeEmail,
     sendBookingConfirmation,
-    sendPaymentConfirmation
+    sendPaymentConfirmation,
+    initializeTransporter
 };

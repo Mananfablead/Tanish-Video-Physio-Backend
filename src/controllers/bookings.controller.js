@@ -189,10 +189,10 @@ const createBooking = async (req, res, next) => {
             time: time
         };
 
-        // Removed booking request submitted notification
-        // Previous code: Notify user (using the booking creator's contact info)
+        // Removed booking request submitted notification (no email or WhatsApp)
+        // Previous code: Notify user about their booking submission
         // await NotificationService.sendNotification(
-        //     { email: req.user.email, phone: req.user.phone },
+        //     { phone: req.user.phone },
         //     'booking_created',
         //     notificationData
         // );
@@ -939,10 +939,10 @@ const createGuestBooking = async (req, res, next) => {
             time: time
         };
 
-        // Removed booking request submitted notification
-        // Previous code: Notify guest user
+        // Removed booking request submitted notification for guest users (no email or WhatsApp)
+        // Previous code: Notify guest user about their booking submission
         // await NotificationService.sendNotification(
-        //     { email: clientEmail, phone: clientPhone },
+        //     { phone: clientPhone },
         //     'booking_created',
         //     notificationData
         // );
@@ -987,118 +987,6 @@ async function calculateServiceExpiryForBooking(bookingId) {
             await booking.save();
         }
     }
-}
-
-// Helper function to send welcome email with credentials
-async function sendWelcomeEmail(email, name, username, password) {
-    const nodemailer = require('nodemailer');
-    const { createTransport } = nodemailer;
-
-    const transporter = createTransport({
-        service: 'gmail',
-        host: process.env.EMAIL_HOST,
-        port: process.env.EMAIL_PORT,
-        auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS
-        }
-    });
-
-    const message = `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Welcome to Tanish Physio</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-
-<body style="margin:0; padding:0; background-color:#f4f6f8; font-family:Arial, Helvetica, sans-serif;">
-
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f6f8; padding:30px 0;">
-    <tr>
-      <td align="center">
-
-        <!-- Main Container -->
-        <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff; border-radius:8px; overflow:hidden; box-shadow:0 6px 18px rgba(0,0,0,0.08);">
-
-          <!-- Header -->
-          <tr>
-            <td style="background:linear-gradient(135deg,#667eea,#764ba2); padding:30px; text-align:center; color:#ffffff;">
-              <h1 style="margin:0; font-size:26px;">Tanish Physio</h1>
-              <p style="margin:8px 0 0; font-size:14px; opacity:0.9;">
-                Physical Therapy & Rehabilitation Center
-              </p>
-            </td>
-          </tr>
-
-          <!-- Content -->
-          <tr>
-            <td style="padding:35px; color:#333333;">
-              <h2 style="margin-top:0; font-size:22px; color:#222;">
-                Welcome to Tanish Physio
-              </h2>
-
-              <p style="font-size:15px; line-height:1.6;">
-                Hello <strong>${name}</strong>,
-              </p>
-
-              <p style="font-size:15px; line-height:1.6;">
-                Thank you for booking a session with us! Your account has been created successfully.
-              </p>
-              
-              <p style="font-size:15px; line-height:1.6;">
-                <strong>Login Credentials:</strong><br>
-                Email: ${username}<br>
-                Temporary Password: ${password}
-              </p>
-              
-              <p style="font-size:15px; line-height:1.6; color: #ff6b6b; font-weight: bold;">
-                IMPORTANT: Please change your password after first login for security.
-              </p>
-
-              <p style="font-size:15px; line-height:1.6;">
-                You can now log in to your account and manage your bookings.
-              </p>
-
-              <p style="font-size:15px; margin-top:30px;">
-                Regards,<br>
-                <strong>Tanish Physio Team</strong>
-              </p>
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td style="background:#f1f3f6; padding:20px; text-align:center; font-size:12px; color:#777;">
-              <p style="margin:0;">
-                © 2024 Tanish Physio. All rights reserved.
-              </p>
-              <p style="margin:6px 0 0;">
-                This is an automated email. Please do not reply.
-              </p>
-            </td>
-          </tr>
-
-        </table>
-
-      </td>
-    </tr>
-  </table>
-
-</body>
-</html>
-`;
-
-    const mailOptions = {
-        to: email,
-        from: process.env.EMAIL_USER,
-        subject: 'Welcome to Tanish Physio - Account Created',
-        html: message
-    };
-
-    // Send email
-    await transporter.sendMail(mailOptions);
 }
 
 // Admin-only: Bulk status update

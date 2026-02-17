@@ -5,24 +5,9 @@ const ApiResponse = require("../utils/apiResponse");
 const getAllCredentials = async (req, res, next) => {
   try {
     const credentials = await Credentials.find().populate("lastUpdatedBy", "name email");
-    
-    // Return credentials without fully decrypting sensitive data in list view
-    const sanitizedCredentials = credentials.map((cred) => {
-      const obj = cred.toObject();
-      return {
-        _id: obj._id,
-        credentialType: obj.credentialType,
-        name: obj.name,
-        description: obj.description,
-        isActive: obj.isActive,
-        lastUpdatedBy: obj.lastUpdatedBy,
-        lastUpdatedAt: obj.lastUpdatedAt,
-        createdAt: obj.createdAt,
-      };
-    });
 
     res.status(200).json(
-      ApiResponse.success(sanitizedCredentials, "Credentials retrieved successfully")
+      ApiResponse.success(credentials, "Credentials retrieved successfully")
     );
   } catch (error) {
     next(error);

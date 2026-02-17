@@ -7,6 +7,7 @@ const ApiResponse = require('../utils/apiResponse');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const { createTransport } = nodemailer;
+const { getEmailCredentials } = require('../utils/credentialsManager');
 
 // Register a new user
 const register = async (req, res, next) => {
@@ -679,14 +680,20 @@ const forgotPassword = async (req, res, next) => {
         user.resetPasswordExpires = resetTokenExpiry;
         await user.save({ validateBeforeSave: false });
 
+        // Get email credentials from database
+        const emailCreds = await getEmailCredentials();
+        if (!emailCreds) {
+            return res.status(500).json(ApiResponse.error('Email configuration not found. Please contact administrator.'));
+        }
+
         // Create transporter for sending email
         const transporter = createTransport({
             service: 'gmail',
-            host: process.env.EMAIL_HOST,
-            port: process.env.EMAIL_PORT,
+            host: emailCreds.host,
+            port: emailCreds.port,
             auth: {
-                user: process.env.EMAIL_USER,
-                pass: process.env.EMAIL_PASS
+                user: emailCreds.user,
+                pass: emailCreds.password
             }
         });
 
@@ -795,7 +802,7 @@ const forgotPassword = async (req, res, next) => {
 
         const mailOptions = {
             to: user.email,
-            from: process.env.EMAIL_USER,
+            from: emailCreds.user,
             subject: 'Password Reset Request - Tanish Physio',
             html: message
         };
