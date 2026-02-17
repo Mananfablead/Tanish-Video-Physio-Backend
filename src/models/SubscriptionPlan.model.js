@@ -27,12 +27,28 @@ const subscriptionPlanSchema = new mongoose.Schema({
     duration: {
         type: String,
         required: [true, 'Duration is required'],
-        enum: ["monthly", "quarterly", "half-yearly", "yearly"]
+        enum: ["one-time", "monthly", "quarterly", "half-yearly", "yearly"]
     },
     sessions: {
         type: Number,
         default: 0,
         required: [true, 'Number of sessions is required']
+    },
+    session_type: {
+        type: String,
+        enum: ['individual', 'group'],
+        default: 'individual',
+        required: [true, 'Session type is required']
+    },
+    price_inr: {
+        type: Number,
+        min: 0,
+        default: 0
+    },
+    price_usd: {
+        type: Number,
+        min: 0,
+        default: 0
     },
     status: {
         type: String,
@@ -48,6 +64,7 @@ const subscriptionPlanSchema = new mongoose.Schema({
         default: function() {
             // Set default validity based on duration
             switch(this.duration) {
+                case 'one-time': return 1; // Valid for 1 day
                 case 'monthly': return 30;
                 case 'quarterly': return 90;
                 case 'half-yearly': return 180;

@@ -7,9 +7,37 @@ const ApiResponse = require('../utils/apiResponse');
 // Get available subscription plans
 const getSubscriptionPlans = async (req, res, next) => {
     try {
-        const plans = await SubscriptionPlan.find({ status: 'active' }).sort({ sortOrder: 1 });
+        const { session_type, country } = req.query;
+        
+        // Build query filter
+        let query = { status: 'active' };
+        if (session_type) {
+            query.session_type = session_type;
+        }
+        
+        const plans = await SubscriptionPlan.find(query).sort({ sortOrder: 1 });
 
-        res.status(200).json(ApiResponse.success({ plans }, 'Subscription plans retrieved successfully'));
+        // Add price based on country
+        const plansWithCountryPrice = plans.map(plan => {
+            let price = plan.price; // fallback to existing price field
+            let currency = '₹'; // default to INR
+            
+            if (country === 'India' && plan.price_inr > 0) {
+                price = plan.price_inr;
+                currency = '₹';
+            } else if (country !== 'India' && plan.price_usd > 0) {
+                price = plan.price_usd;
+                currency = '$';
+            }
+            
+            return {
+                ...plan.toObject(),
+                price: price,
+                currency: currency
+            };
+        });
+
+        res.status(200).json(ApiResponse.success({ plans: plansWithCountryPrice }, 'Subscription plans retrieved successfully'));
     } catch (error) {
         next(error);
     }
@@ -19,7 +47,7 @@ const getSubscriptionPlans = async (req, res, next) => {
 // Create a new subscription plan (admin only)
 const createSubscriptionPlan = async (req, res, next) => {
     try {
-        const { planId, name, price, description, features, duration, sessions, validityDays } = req.body;
+        const { planId, name, price, description, features, duration, sessions, validityDays, session_type, price_inr, price_usd } = req.body;
 
         // Check if plan already exists
         const existingPlan = await SubscriptionPlan.findOne({ planId });
@@ -47,6 +75,9 @@ const createSubscriptionPlan = async (req, res, next) => {
             features,
             duration,
             sessions,
+            session_type: session_type || 'individual',
+            price_inr: price_inr || 0,
+            price_usd: price_usd || 0,
             validityDays: calculatedValidityDays
         });
 
@@ -171,7 +202,7 @@ const getSubscriptionPlan = async (req, res, next) => {
 // Update a subscription plan (admin only)
 const updateSubscriptionPlan = async (req, res, next) => {
     try {
-        const { name, price, description, features, duration, sessions, status, sortOrder, validityDays } = req.body;
+        const { name, price, description, features, duration, sessions, status, sortOrder, validityDays, session_type, price_inr, price_usd } = req.body;
         
         // Check if the plan has any active or past subscriptions
         const existingPlan = await SubscriptionPlan.findById(req.params.id);
@@ -246,6 +277,16 @@ const updateSubscriptionPlan = async (req, res, next) => {
         } else {
             // If no users have purchased this plan, allow all updates
             let updateData = { name, price, description, features, duration, sessions, status, sortOrder };
+            
+            if (session_type !== undefined) {
+                updateData.session_type = session_type;
+            }
+            if (price_inr !== undefined) {
+                updateData.price_inr = price_inr;
+            }
+            if (price_usd !== undefined) {
+                updateData.price_usd = price_usd;
+            }
             
             if (validityDays !== undefined) {
                 updateData.validityDays = validityDays;

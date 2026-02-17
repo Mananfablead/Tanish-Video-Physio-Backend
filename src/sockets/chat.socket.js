@@ -110,8 +110,9 @@ const setupChatHandlers = (io, socket) => {
                 sessionId: isDefaultLive || isSupportRoom ? null : sessionId, // No Session reference for default/support chat
                 senderId: socket.user.userId,
                 senderType: senderType,
-                message: message.content || message.message || message.text || message,
-                messageType: isDefaultLive || isSupportRoom ? 'default-chat' : 'live-chat'
+                message: message.content || message.message || message.text || '', // Ensure message is a string
+                messageType: isDefaultLive || isSupportRoom ? 'default-chat' : 'live-chat',
+                attachments: message.attachments || []
             };
 
             // If this is a support/private chat room, store the chatRoom name for querying
@@ -133,7 +134,8 @@ const setupChatHandlers = (io, socket) => {
                 timestamp: chatMessage.createdAt,
                 messageType: chatMessage.messageType,
                 message: chatMessage, // Include full message object for compatibility
-                sessionId: sessionId
+                sessionId: sessionId,
+                attachments: chatMessage.attachments || []
             };
 
             // Broadcast message to room (real-time) - single source of truth
@@ -146,7 +148,8 @@ const setupChatHandlers = (io, socket) => {
                 sessionId: sessionId,
                 chatRoom: chatMessage.chatRoom || null,
                 senderType: senderType,
-                _id: chatMessage._id
+                _id: chatMessage._id,
+                attachments: chatMessage.attachments || []
             });
 
             // For support rooms, also emit message-received to admin_notifications so admin sees it in real-time
