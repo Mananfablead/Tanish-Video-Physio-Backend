@@ -1671,8 +1671,34 @@ const acceptSession = async (req, res, next) => {
     }
 
     // Generate video call join links for both user and therapist
+    // Check if userId exists before calling toString()
+    if (!session.userId) {
+      return res.status(400).json(ApiResponse.error("Session does not have a valid user ID"));
+    }
+    
+    // Handle case where therapistId might be null
+    // Try to populate it from related booking or subscription if missing
+    let therapistId = session.therapistId;
+    
+    if (!therapistId && session.bookingId) {
+      // If therapistId is null but booking exists, get therapistId from booking
+      const booking = await Booking.findById(session.bookingId);
+      if (booking && booking.therapistId) {
+        therapistId = booking.therapistId;
+      }
+    } else if (!therapistId && session.subscriptionId) {
+      // If therapistId is null but subscription exists, we might need to get it differently
+      // For subscription-based sessions, therapist is typically assigned later
+      // We'll need to get it from the request body or find another way
+      console.log("Session has subscription but no therapistId. This might need manual assignment.");
+    }
+    
+    if (!therapistId) {
+      return res.status(400).json(ApiResponse.error("Session does not have a valid therapist ID and cannot determine it from related records"));
+    }
+    
     const userJoinLink = generateJoinLink(session.sessionId, session.userId.toString(), 'user');
-    const therapistJoinLink = generateJoinLink(session.sessionId, session.therapistId.toString(), 'therapist');
+    const therapistJoinLink = generateJoinLink(session.sessionId, therapistId.toString(), 'therapist');
     
     // Update session with join links and status
     const updatedSession = await Session.findByIdAndUpdate(

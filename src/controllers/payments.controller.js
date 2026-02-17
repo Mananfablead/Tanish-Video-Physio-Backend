@@ -62,7 +62,9 @@ async function activateSubscription(subscriptionId) {
         // Preserve coupon information
         finalAmount: subscription.finalAmount,
         discountAmount: subscription.discountAmount,
-        couponCode: subscription.couponCode
+        couponCode: subscription.couponCode,
+        // Preserve therapistId if it exists
+        therapistId: subscription.therapistId
     });
 
     return await Subscription.findById(subscriptionId);
@@ -322,6 +324,51 @@ const createOrder = async (req, res, next) => {
         next(error);
     }
 };
+// Helper function to create session from booking
+async function createSessionFromBooking(booking, service) {
+    if (booking.scheduledDate && booking.scheduledTime) {
+        const Session = require('../models/Session.model');
+        const existingSession = await Session.findOne({ bookingId: booking._id });
+        
+        if (!existingSession) {
+            try {
+                const session = new Session({
+                    therapistId: booking.therapistId,
+                    userId: booking.userId,
+                    date: booking.scheduledDate,
+                    time: booking.scheduledTime,
+                    startTime: new Date(`${booking.scheduledDate}T${booking.scheduledTime}`),
+                    type: '1-on-1',
+                    status: 'pending',
+                    notes: `Session created automatically from booking #${booking._id}`,
+                    bookingId: booking._id
+                });
+                
+                if (service && service.duration) {
+                    const durationMatch = service.duration.match(/(\d+)/);
+                    if (durationMatch) {
+                        const duration = parseInt(durationMatch[0]);
+                        const endTime = new Date(session.startTime);
+                        endTime.setMinutes(endTime.getMinutes() + duration);
+                        session.endTime = endTime;
+                        session.duration = duration;
+                    }
+                }
+                
+                await session.save();
+                console.log(`✅ Automatic session created for booking ${booking._id}: Session ID ${session._id}`);
+                await Booking.findByIdAndUpdate(booking._id, { status: 'session_created' });
+            } catch (sessionError) {
+                console.error(`❌ Failed to create automatic session for booking ${booking._id}:`, sessionError);
+            }
+        } else {
+            console.log(`ℹ️ Session already exists for booking ${booking._id}: Session ID ${existingSession._id}`);
+        }
+    } else {
+        console.log(`ℹ️ No scheduling information found for booking ${booking._id} - skipping automatic session creation`);
+    }
+}
+
 // Verify payment after successful transaction
 const verifyPayment = async (req, res, next) => {
     try {
@@ -392,7 +439,7 @@ const verifyPayment = async (req, res, next) => {
                     });
 
                     if (availability) {
-                        // Update the specific time slot status to 'booked'
+                        // Find and update the specific time slot
                         const slotIndex = availability.timeSlots.findIndex(slot =>
                             slot.start === booking.timeSlot.start &&
                             slot.end === booking.timeSlot.end
@@ -401,7 +448,12 @@ const verifyPayment = async (req, res, next) => {
                         if (slotIndex !== -1) {
                             availability.timeSlots[slotIndex].status = 'booked';
                             await availability.save();
+                            console.log(`Successfully booked slot ${booking.timeSlot.start}-${booking.timeSlot.end} for therapist ${booking.therapistId} on ${booking.scheduledDate}`);
+                        } else {
+                            console.log(`Time slot ${booking.timeSlot.start}-${booking.timeSlot.end} not found for therapist ${booking.therapistId} on ${booking.scheduledDate}`);
                         }
+                    } else {
+                        console.log(`No availability found for therapist ${booking.therapistId} on date ${booking.scheduledDate}`);
                     }
                 }
 
@@ -418,6 +470,9 @@ const verifyPayment = async (req, res, next) => {
                 }
 
                 await booking.save();
+
+                // Create session from booking for regular users
+                await createSessionFromBooking(booking, service);
 
                 // Send payment success notifications to user and admin
                 try {
@@ -761,7 +816,7 @@ const verifyGuestPayment = async (req, res, next) => {
                     });
 
                     if (availability) {
-                        // Update the specific time slot status to 'booked'
+                        // Find and update the specific time slot
                         const slotIndex = availability.timeSlots.findIndex(slot =>
                             slot.start === booking.timeSlot.start &&
                             slot.end === booking.timeSlot.end
@@ -770,7 +825,12 @@ const verifyGuestPayment = async (req, res, next) => {
                         if (slotIndex !== -1) {
                             availability.timeSlots[slotIndex].status = 'booked';
                             await availability.save();
+                            console.log(`Successfully booked slot ${booking.timeSlot.start}-${booking.timeSlot.end} for therapist ${booking.therapistId} on ${booking.scheduledDate}`);
+                        } else {
+                            console.log(`Time slot ${booking.timeSlot.start}-${booking.timeSlot.end} not found for therapist ${booking.therapistId} on ${booking.scheduledDate}`);
                         }
+                    } else {
+                        console.log(`No availability found for therapist ${booking.therapistId} on date ${booking.scheduledDate}`);
                     }
                 }
 
@@ -847,7 +907,7 @@ const verifyGuestPayment = async (req, res, next) => {
                                 time: booking.scheduledTime,
                                 startTime: new Date(`${booking.scheduledDate}T${booking.scheduledTime}`),
                                 type: '1-on-1',
-                                status: 'scheduled',
+                                status: 'pending',
                                 notes: `Session created automatically from booking #${booking._id}`,
                                 bookingId: booking._id
                             });
@@ -995,6 +1055,9 @@ const handleWebhook = async (req, res) => {
 
                     await booking.save();
 
+                    // Create session from booking for webhook payments
+                    await createSessionFromBooking(booking, service);
+
                     // Send payment success notifications to user and admin
                     try {
                         // Get user information for notification
@@ -1118,9 +1181,9 @@ const handleWebhook = async (req, res) => {
 // Create a subscription payment order for Razorpay
 const createSubscriptionOrder = async (req, res, next) => {
     try {
-        const { planId, amount, currency = 'INR', couponCode } = req.body;
+        const { planId, amount, currency = 'INR', couponCode, scheduleType, scheduledDate, scheduledTime, timeSlot, therapistId } = req.body;
 
-        console.log('🔍 Subscription order request:', { planId, amount, currency, couponCode });
+        console.log('🔍 Subscription order request:', { planId, amount, currency, couponCode, scheduleType, scheduledDate, scheduledTime, timeSlot, therapistId });
 
         // Validate plan exists in the database
         const plan = await SubscriptionPlan.findOne({ planId, status: 'active' });
@@ -1234,7 +1297,13 @@ const createSubscriptionOrder = async (req, res, next) => {
             currency,
             orderId: order.id,
             status: 'created',
-            couponCode: couponCode || null
+            couponCode: couponCode || null,
+            // Add scheduling information
+            scheduleType: scheduleType || 'now',
+            scheduledDate: scheduledDate || null,
+            scheduledTime: scheduledTime || null,
+            timeSlot: timeSlot || null,
+            therapistId: therapistId || null
         });
 
         await subscription.save();
@@ -1259,7 +1328,7 @@ const createSubscriptionOrder = async (req, res, next) => {
 // Create a subscription payment order for Razorpay for guest users
 const createGuestSubscriptionOrder = async (req, res, next) => {
     try {
-        const { planId, amount, currency = 'INR', clientName, clientEmail, clientPhone, couponCode } = req.body;
+        const { planId, amount, currency = 'INR', clientName, clientEmail, clientPhone, couponCode, scheduleType, scheduledDate, scheduledTime, timeSlot, therapistId } = req.body;
 
         // Validate required fields for guest subscription
         if (!clientName || !clientEmail || !clientPhone) {
@@ -1389,7 +1458,13 @@ const createGuestSubscriptionOrder = async (req, res, next) => {
             guestName: clientName,
             guestEmail: clientEmail,
             guestPhone: clientPhone,
-            couponCode: couponCode || null
+            couponCode: couponCode || null,
+            // Add scheduling information
+            scheduleType: scheduleType || 'now',
+            scheduledDate: scheduledDate || null,
+            scheduledTime: scheduledTime || null,
+            timeSlot: timeSlot || null,
+            therapistId: therapistId || null
         });
 
         await subscription.save();
@@ -1454,7 +1529,9 @@ const verifySubscriptionPayment = async (req, res, next) => {
                     // Preserve coupon information
                     finalAmount: subscription.finalAmount,
                     discountAmount: subscription.discountAmount,
-                    couponCode: subscription.couponCode
+                    couponCode: subscription.couponCode,
+                    // Preserve therapistId if it exists
+                    therapistId: subscription.therapistId
                 }
             );
 
@@ -1471,6 +1548,43 @@ const verifySubscriptionPayment = async (req, res, next) => {
 
             // Activate the subscription with calculated end date
             const updatedSubscription = await activateSubscription(subscription._id);
+
+            // If subscription has a therapist assigned, create a booking record
+            if (subscription.therapistId) {
+                try {
+                    // Create a booking to associate the therapist with the subscription
+                    // Use scheduled date/time from subscription if available, otherwise use current time
+                    const bookingDate = subscription.scheduledDate || new Date().toISOString().split('T')[0];
+                    const bookingTime = subscription.timeSlot?.start || subscription.scheduledTime || new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false });
+                    
+                    const booking = new Booking({
+                        serviceId: subscription.planId, // Use planId as serviceId for subscription bookings
+                        serviceName: subscription.planName,
+                        therapistId: subscription.therapistId,
+                        therapistName: '', // We can populate this if needed
+                        userId: subscription.userId,
+                        clientName: user?.name || '',
+                        date: bookingDate,
+                        time: bookingTime,
+                        status: 'confirmed', // Initially confirmed
+                        notes: `Booking created automatically from subscription purchase (Order ID: ${orderId})`,
+                        paymentStatus: 'paid',
+                        amount: subscription.amount,
+                        purchaseDate: new Date(),
+                        serviceExpiryDate: updatedSubscription.endDate,
+                        serviceValidityDays: 30, // Default, can be adjusted based on plan
+                        isServiceExpired: false,
+                        createdAt: new Date(),
+                        updatedAt: new Date()
+                    });
+
+                    await booking.save();
+                    console.log(`✅ Booking created for subscription with therapist: ${subscription.therapistId}, Booking ID: ${booking._id}`);
+                } catch (bookingError) {
+                    console.error('Error creating booking for subscription:', bookingError);
+                    // Don't fail the subscription process if booking creation fails
+                }
+            }
 
             // Send payment success notifications to user and admin
             try {
@@ -1519,7 +1633,7 @@ const verifySubscriptionPayment = async (req, res, next) => {
                 const pendingBookings = await Booking.find({
                     userId: subscription.userId,
                     paymentStatus: 'paid',
-                    status: 'scheduled',
+                    status: 'pending',
                     scheduledDate: { $exists: true, $ne: null },
                     scheduledTime: { $exists: true, $ne: null }
                 }).sort({ createdAt: -1 });
@@ -1538,14 +1652,15 @@ const verifySubscriptionPayment = async (req, res, next) => {
                         if (!existingSession) {
                             try {
                                 // Create a new session based on the booking
+                                // Use therapistId from booking first, fall back to subscription therapistId
                                 const session = new Session({
-                                    therapistId: pendingBooking.therapistId,
+                                    therapistId: pendingBooking.therapistId || subscription.therapistId,
                                     userId: pendingBooking.userId,
                                     date: pendingBooking.scheduledDate,
                                     time: pendingBooking.scheduledTime,
                                     startTime: new Date(`${pendingBooking.scheduledDate}T${pendingBooking.scheduledTime}`),
                                     type: '1-on-1',
-                                    status: 'scheduled',
+                                    status: 'pending',
                                     notes: `Session created automatically from subscription booking #${pendingBooking._id}`,
                                     bookingId: pendingBooking._id,
                                     subscriptionId: subscription._id
@@ -1597,17 +1712,41 @@ const verifySubscriptionPayment = async (req, res, next) => {
 
                         // Create one initial session for demonstration purposes
                         // In a real implementation, this might be configurable per plan
+                        console.log('DEBUG: subscription scheduledDate:', subscription.scheduledDate);
+                        console.log('DEBUG: subscription scheduledTime:', subscription.scheduledTime);
+                        // Determine time to use for session based on available data
+                        const sessionDate = subscription.scheduledDate || new Date().toISOString().split('T')[0];
+                        const sessionTime = subscription.timeSlot?.start || subscription.scheduledTime || '09:00';
+                        
+                        // Calculate start and end times
+                        const startTime = subscription.scheduledDate && (subscription.timeSlot?.start || subscription.scheduledTime)
+                            ? new Date(`${subscription.scheduledDate}T${sessionTime}`)
+                            : new Date(new Date().setHours(9, 0, 0, 0));
+                        
+                        // Calculate end time based on timeSlot or default duration
+                        let endTime = new Date(startTime);
+                        if (subscription.timeSlot?.end) {
+                            // If timeSlot has end time, calculate duration from that
+                            const [endHour, endMinute] = subscription.timeSlot.end.split(':').map(Number);
+                            endTime = new Date(startTime);
+                            endTime.setHours(endHour, endMinute, 0, 0);
+                        } else {
+                            // Use default duration if no end time in timeSlot
+                            endTime.setMinutes(endTime.getMinutes() + (plan.duration ? parseInt(plan.duration.match(/(\d+)/)?.[1] || '60') : 60));
+                        }
+                        
                         const session = new Session({
-                            therapistId: null, // Will be assigned when user schedules
+                            therapistId: subscription.therapistId, // Use therapist from subscription if available
                             userId: subscription.userId,
-                            date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Tomorrow's date
-                            time: '09:00', // Default time
-                            startTime: new Date(new Date(Date.now() + 24 * 60 * 60 * 1000).setHours(9, 0, 0, 0)),
+                            date: sessionDate, // Use scheduled date or today's date
+                            time: sessionTime, // Use timeSlot start or scheduled time or default
+                            startTime: startTime,
+                            endTime: endTime,
                             type: '1-on-1',
-                            status: 'scheduled',
+                            status: 'pending', // Changed from 'scheduled' to 'pending' as requested
                             notes: `Initial session created automatically from subscription plan ${plan.name}`,
                             subscriptionId: subscription._id,
-                            duration: plan.duration ? parseInt(plan.duration.match(/(\d+)/)?.[1] || '60') : 60
+                            duration: Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60)) // Calculate duration in minutes
                         });
 
                         // Set end time based on duration
@@ -1751,7 +1890,9 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
                     // Preserve coupon information
                     finalAmount: subscription.finalAmount,
                     discountAmount: subscription.discountAmount,
-                    couponCode: subscription.couponCode
+                    couponCode: subscription.couponCode,
+                    // Preserve therapistId if it exists
+                    therapistId: subscription.therapistId
                 }
             );
 
@@ -1768,6 +1909,48 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
 
             // Activate the subscription with calculated end date
             const updatedSubscription = await activateSubscription(subscription._id);
+
+            // If subscription has a therapist assigned, create a booking record
+            if (subscription.therapistId) {
+                try {
+                    const userIdToCheck = subscription.userId || (newUser ? newUser._id : null);
+                    const userForBooking = await User.findById(userIdToCheck).select('name');
+
+                    // Create a booking to associate the therapist with the subscription
+                    // Use scheduled date/time from subscription if available, otherwise use current time
+                    const bookingDate = subscription.scheduledDate || new Date().toISOString().split('T')[0];
+                    const bookingTime = subscription.timeSlot?.start || subscription.scheduledTime || new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false });
+                    
+                    const booking = new Booking({
+                        serviceId: subscription.planId, // Use planId as serviceId for subscription bookings
+                        serviceName: subscription.planName,
+                        therapistId: subscription.therapistId,
+                        therapistName: '', // We can populate this if needed
+                        userId: userIdToCheck,
+                        clientName: userForBooking?.name || subscription.guestName || '',
+                        clientEmail: subscription.guestEmail || '',
+                        clientPhone: subscription.guestPhone || '',
+                        date: bookingDate,
+                        time: bookingTime,
+                        status: 'confirmed', // Initially confirmed
+                        notes: `Booking created automatically from guest subscription purchase (Order ID: ${orderId})`,
+                        paymentStatus: 'paid',
+                        amount: subscription.amount,
+                        purchaseDate: new Date(),
+                        serviceExpiryDate: updatedSubscription.endDate,
+                        serviceValidityDays: 30, // Default, can be adjusted based on plan
+                        isServiceExpired: false,
+                        createdAt: new Date(),
+                        updatedAt: new Date()
+                    });
+
+                    await booking.save();
+                    console.log(`✅ Booking created for guest subscription with therapist: ${subscription.therapistId}, Booking ID: ${booking._id}`);
+                } catch (bookingError) {
+                    console.error('Error creating booking for guest subscription:', bookingError);
+                    // Don't fail the subscription process if booking creation fails
+                }
+            }
 
             // Send payment success notifications to user and admin for guest subscription
             try {
@@ -1831,7 +2014,7 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
                 pendingBookings = await Booking.find({
                     userId: userIdToCheck,
                     paymentStatus: 'paid',
-                    status: 'scheduled', // Only process bookings that are still marked as scheduled
+                    status: 'pending', // Only process bookings that are still marked as scheduled
                     scheduledDate: { $exists: true, $ne: null },
                     scheduledTime: { $exists: true, $ne: null }
                 }).sort({ createdAt: -1 });
@@ -1842,7 +2025,7 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
                     const emailBasedBookings = await Booking.find({
                         clientEmail: subscription.guestEmail,
                         paymentStatus: 'paid',
-                        status: 'scheduled',
+                        status: 'pending',
                         scheduledDate: { $exists: true, $ne: null },
                         scheduledTime: { $exists: true, $ne: null }
                     }).sort({ createdAt: -1 });
@@ -1868,14 +2051,17 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
 
                         if (!existingSession) {
                             // Create a new session based on the booking
+                            // Use therapistId from booking first, fall back to subscription therapistId
+                            console.log('DEBUG GUEST: subscription scheduledDate:', subscription.scheduledDate);
+                            console.log('DEBUG GUEST: subscription scheduledTime:', subscription.scheduledTime);
                             const session = new Session({
-                                therapistId: pendingBooking.therapistId,
+                                therapistId: pendingBooking.therapistId || subscription.therapistId,
                                 userId: pendingBooking.userId || userIdToCheck, // Ensure userId is properly set
                                 date: pendingBooking.scheduledDate,
                                 time: pendingBooking.scheduledTime,
                                 startTime: new Date(`${pendingBooking.scheduledDate}T${pendingBooking.scheduledTime}`),
                                 type: '1-on-1',
-                                status: 'scheduled',
+                                status: 'pending',
                                 notes: `Session created from subscription booking #${pendingBooking._id}`,
                                 bookingId: pendingBooking._id,
                                 subscriptionId: subscription._id
@@ -1912,25 +2098,43 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
                 // Get the subscription plan to determine session parameters
                 const plan = await SubscriptionPlan.findOne({ planId: subscription.planId });
                 if (plan) {
-                    // For subscription plans, we can create sessions directly without bookings
-                    // This is for plans where users subscribe directly (like the subscription flow)
-
-                    // Check if we should create initial sessions based on plan configuration
-                    // For example, some plans might include immediate sessions
-
-                    // Create one initial session for demonstration purposes
-                    // In a real implementation, this might be configurable per plan
+                    console.log('DEBUG GUEST FINAL: subscription scheduledDate:', subscription.scheduledDate);
+                    console.log('DEBUG GUEST FINAL: subscription scheduledTime:', subscription.scheduledTime);
+                    console.log('DEBUG GUEST FINAL: subscription timeSlot:', subscription.timeSlot);
+                                        
+                    // Determine time to use for session based on available data
+                    const sessionDate = subscription.scheduledDate || new Date().toISOString().split('T')[0];
+                    const sessionTime = subscription.timeSlot?.start || subscription.scheduledTime || '09:00';
+                                        
+                    // Calculate start and end times
+                    const startTime = subscription.scheduledDate && (subscription.timeSlot?.start || subscription.scheduledTime)
+                        ? new Date(`${subscription.scheduledDate}T${sessionTime}`)
+                        : new Date(new Date().setHours(9, 0, 0, 0));
+                                        
+                    // Calculate end time based on timeSlot or default duration
+                    let endTime = new Date(startTime);
+                    if (subscription.timeSlot?.end) {
+                        // If timeSlot has end time, calculate duration from that
+                        const [endHour, endMinute] = subscription.timeSlot.end.split(':').map(Number);
+                        endTime = new Date(startTime);
+                        endTime.setHours(endHour, endMinute, 0, 0);
+                    } else {
+                        // Use default duration if no end time in timeSlot
+                        endTime.setMinutes(endTime.getMinutes() + (plan.duration ? parseInt(plan.duration.match(/(\d+)/)?.[1] || '60') : 60));
+                    }
+                                        
                     const session = new Session({
-                        therapistId: null, // Will be assigned when user schedules
+                        therapistId: subscription.therapistId, // Use therapist from subscription if available
                         userId: userIdToCheck,
-                        date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Tomorrow's date
-                        time: '09:00', // Default time
-                        startTime: new Date(new Date(Date.now() + 24 * 60 * 60 * 1000).setHours(9, 0, 0, 0)),
+                        date: sessionDate, // Use scheduled date or today's date
+                        time: sessionTime, // Use timeSlot start or scheduled time or default
+                        startTime: startTime,
+                        endTime: endTime,
                         type: '1-on-1',
-                        status: 'scheduled',
+                        status: 'pending', // Changed from 'scheduled' to 'pending' as requested
                         notes: `Initial session created from subscription #${subscription._id}`,
                         subscriptionId: subscription._id,
-                        duration: plan.duration ? parseInt(plan.duration.match(/(\d+)/)?.[1] || '60') : 60
+                        duration: Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60)) // Calculate duration in minutes
                     });
 
                     // Set end time based on duration

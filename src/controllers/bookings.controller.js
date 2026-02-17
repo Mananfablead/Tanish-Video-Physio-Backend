@@ -189,15 +189,7 @@ const createBooking = async (req, res, next) => {
             time: time
         };
 
-        // Removed booking request submitted notification (no email or WhatsApp)
-        // Previous code: Notify user about their booking submission
-        // await NotificationService.sendNotification(
-        //     { phone: req.user.phone },
-        //     'booking_created',
-        //     notificationData
-        // );
-
-        // Notify admin
+        // Notify admins
         const admins = await User.find({ role: 'admin' }).select('email phone name');
         for (const admin of admins) {
             await NotificationService.sendNotification(
@@ -287,26 +279,29 @@ async function updateAvailabilitySlot(therapistId, date, startTime, endTime, sta
     const Availability = require('../models/Availability.model');
 
     try {
-        await Availability.updateOne(
-            {
-                therapistId,
-                date
-            },
-            {
-                $set: {
-                    "timeSlots.$[elem].status": status,
-                },
-            },
-            {
-                arrayFilters: [
-                    {
-                        "elem.start": startTime,
-                        "elem.end": endTime,
-                    },
-                ],
-                upsert: false // Don't create if doesn't exist
-            }
+        // First, find the availability document
+        const availability = await Availability.findOne({
+            therapistId,
+            date
+        });
+
+        if (!availability) {
+            console.log(`No availability found for therapist ${therapistId} on date ${date}`);
+            return;
+        }
+
+        // Find and update the specific time slot
+        const slotIndex = availability.timeSlots.findIndex(slot =>
+            slot.start === startTime && slot.end === endTime
         );
+
+        if (slotIndex !== -1) {
+            availability.timeSlots[slotIndex].status = status;
+            await availability.save();
+            console.log(`Successfully updated slot ${startTime}-${endTime} to ${status} for therapist ${therapistId} on ${date}`);
+        } else {
+            console.log(`Time slot ${startTime}-${endTime} not found for therapist ${therapistId} on ${date}`);
+        }
     } catch (error) {
         console.error("Error updating availability slot:", error);
         // Continue without throwing error as it's not critical to booking
@@ -408,15 +403,26 @@ const updateBookingWithSchedule = async (req, res, next) => {
         if (scheduledDate) updateData.scheduledDate = scheduledDate;
         if (scheduledTime) updateData.scheduledTime = scheduledTime;
         if (timeSlot) updateData.timeSlot = timeSlot;
-        if (status) updateData.status = status;
+        
+        // If status is being updated, validate permissions
+        if (status) {
+            if (req.user.role !== 'admin') {
+                // For regular users, allow certain status transitions
+                const allowedUserTransitions = ['pending', 'scheduled', 'cancelled'];
+                if (!allowedUserTransitions.includes(status)) {
+                    return res.status(403).json(ApiResponse.error('Users can only change status to pending, scheduled, or cancelled')); 
+                }
+            }
+            updateData.status = status;
+        }
         
         // Add coupon information if provided
         if (couponCode !== undefined) updateData.couponCode = couponCode;
         if (discountAmount !== undefined) updateData.discountAmount = discountAmount;
         if (finalAmount !== undefined) updateData.finalAmount = finalAmount;
         
-        // If scheduling now, update status to scheduled
-        if (scheduledDate && scheduledTime) {
+        // If scheduling now, update status to scheduled (unless status was already provided)
+        if (scheduledDate && scheduledTime && !status) {
             updateData.status = 'scheduled';
         }
 
@@ -458,20 +464,32 @@ const updateBooking = async (req, res, next) => {
 
         // Validate status transition for admins
         if (status && status !== currentBooking.status) {
+            // Allow status change for both admins and users (owners of the booking)
+            // Only validate transition rules for admins, but allow users to make reasonable changes
             if (req.user.role !== 'admin') {
-                return res.status(403).json(ApiResponse.error('Only admins can change booking status'));
-            }
+                // For regular users, allow certain status transitions
+                const allowedUserTransitions = ['pending', 'scheduled', 'cancelled'];
+                if (!allowedUserTransitions.includes(status)) {
+                    return res.status(403).json(ApiResponse.error('Users can only change status to pending, scheduled, or cancelled')); 
+                }
+                
+                // Ensure user can only update their own booking
+                if (!query.userId || !currentBooking.userId.equals(req.user.userId)) {
+                    return res.status(403).json(ApiResponse.error('Unauthorized to change this booking status'));
+                }
+            } else {
+                // For admins, validate status transition rules
+                const isValidTransition = BookingStatusHandler.isValidStatusTransition(
+                    currentBooking.status,
+                    status,
+                    req.user.role
+                );
 
-            const isValidTransition = BookingStatusHandler.isValidStatusTransition(
-                currentBooking.status,
-                status,
-                req.user.role
-            );
-
-            if (!isValidTransition) {
-                return res.status(400).json(ApiResponse.error(
-                    `Invalid status transition from ${currentBooking.status} to ${status}`
-                ));
+                if (!isValidTransition) {
+                    return res.status(400).json(ApiResponse.error(
+                        `Invalid status transition from ${currentBooking.status} to ${status}`
+                    ));
+                }
             }
         }
 
@@ -512,7 +530,6 @@ const updateBooking = async (req, res, next) => {
             .populate('serviceId', 'name price duration validity images')
             .populate('therapistId', 'name email role profilePicture');
 
-        // Handle status change notifications
         if (status && status !== currentBooking.status) {
             // Get booking owner's contact information
             const bookingOwner = await User.findById(booking.userId).select('email phone name');
@@ -556,9 +573,9 @@ const updateBookingStatus = async (req, res, next) => {
         const { status, couponCode, discountAmount, finalAmount } = req.body;
 
         // Validate status
-        const validStatuses = ['pending', 'confirmed', 'completed', 'cancelled'];
+        const validStatuses = ['pending', 'confirmed', 'completed', 'cancelled', 'scheduled'];
         if (!validStatuses.includes(status)) {
-            return res.status(400).json(ApiResponse.error('Invalid status. Valid statuses: pending, confirmed, completed, cancelled'));
+            return res.status(400).json(ApiResponse.error('Invalid status. Valid statuses: pending, confirmed, completed, cancelled, scheduled'));
         }
 
         // Build query based on user role
@@ -569,6 +586,12 @@ const updateBookingStatus = async (req, res, next) => {
         } else {
             // Regular user can only update status of their own bookings
             query = { _id: req.params.id, userId: req.user.userId };
+            
+            // For regular users, validate allowed status transitions
+            const allowedUserTransitions = ['pending', 'scheduled', 'cancelled'];
+            if (!allowedUserTransitions.includes(status)) {
+                return res.status(403).json(ApiResponse.error('Users can only change status to pending, scheduled, or cancelled')); 
+            }
         }
 
         // Prepare update data
@@ -938,14 +961,6 @@ const createGuestBooking = async (req, res, next) => {
             date: date,
             time: time
         };
-
-        // Removed booking request submitted notification for guest users (no email or WhatsApp)
-        // Previous code: Notify guest user about their booking submission
-        // await NotificationService.sendNotification(
-        //     { phone: clientPhone },
-        //     'booking_created',
-        //     notificationData
-        // );
 
         // Notify admins
         const admins = await User.find({ role: 'admin' }).select('email phone name');

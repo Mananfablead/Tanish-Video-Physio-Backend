@@ -77,6 +77,27 @@ const subscriptionSchema = new mongoose.Schema({
     discountAmount: {
         type: Number,
         min: 0
+    },
+    therapistId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: false // Therapist ID is optional for general subscriptions
+    },
+    scheduledDate: {
+        type: String, // Store as string in YYYY-MM-DD format
+        required: false
+    },
+    scheduledTime: {
+        type: String, // Store as HH:MM format
+        required: false
+    },
+    timeSlot: {
+        start: String, // Start time in HH:MM format
+        end: String    // End time in HH:MM format
+    },
+    scheduleType: {
+        type: String,
+        default: 'now'
     }
 }, {
     timestamps: true
