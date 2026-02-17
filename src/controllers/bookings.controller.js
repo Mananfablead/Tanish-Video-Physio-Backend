@@ -189,15 +189,7 @@ const createBooking = async (req, res, next) => {
             time: time
         };
 
-        // Removed booking request submitted notification (no email or WhatsApp)
-        // Previous code: Notify user about their booking submission
-        // await NotificationService.sendNotification(
-        //     { phone: req.user.phone },
-        //     'booking_created',
-        //     notificationData
-        // );
-
-        // Notify admin
+        // Notify admins
         const admins = await User.find({ role: 'admin' }).select('email phone name');
         for (const admin of admins) {
             await NotificationService.sendNotification(
@@ -512,7 +504,6 @@ const updateBooking = async (req, res, next) => {
             .populate('serviceId', 'name price duration validity images')
             .populate('therapistId', 'name email role profilePicture');
 
-        // Handle status change notifications
         if (status && status !== currentBooking.status) {
             // Get booking owner's contact information
             const bookingOwner = await User.findById(booking.userId).select('email phone name');
@@ -938,14 +929,6 @@ const createGuestBooking = async (req, res, next) => {
             date: date,
             time: time
         };
-
-        // Removed booking request submitted notification for guest users (no email or WhatsApp)
-        // Previous code: Notify guest user about their booking submission
-        // await NotificationService.sendNotification(
-        //     { phone: clientPhone },
-        //     'booking_created',
-        //     notificationData
-        // );
 
         // Notify admins
         const admins = await User.find({ role: 'admin' }).select('email phone name');

@@ -1,6 +1,7 @@
-// Notification Service - WhatsApp & Email Integration
+// Notification Service - WhatsApp & Email Integration (Modified)
 // Works with existing notification system
 // Uses credentials from database instead of environment variables
+// Removed payment_received and new_booking notifications as requested
 
 const nodemailer = require('nodemailer');
 const axios = require('axios');
@@ -10,8 +11,7 @@ const { getWhatsAppCredentials, getEmailCredentials } = require('../utils/creden
 class NotificationService {
     // WhatsApp Templates (Approved templates from Facebook Business Manager)
     static whatsappTemplates = {
-        // Welcome template - for first contact with new users
-        welcome_template: {
+        welcome_message: {
             name: 'welcome_message',
             language: 'en',
             components: [
@@ -25,8 +25,7 @@ class NotificationService {
             ]
         },
 
-        // Booking confirmation template
-        booking_confirmation_template: {
+        booking_confirmation: {
             name: 'booking_confirmation',
             language: 'en',
             components: [
@@ -37,15 +36,12 @@ class NotificationService {
                         { type: 'text', text: '{{2}}' },  // Service name
                         { type: 'text', text: '{{3}}' },  // Date
                         { type: 'text', text: '{{4}}' },  // Time
-                        { type: 'text', text: '{{5}}' }   // Meeting link
                     ]
-                },
-
+                }
             ]
         },
 
-        // Payment confirmation template
-        payment_confirmation_template: {
+        payment_successful: {
             name: 'payment_successful',
             language: 'en',
             components: [
@@ -61,8 +57,7 @@ class NotificationService {
             ]
         },
 
-        // Payment reminder template
-        payment_reminder_template: {
+        payment_reminder: {
             name: 'payment_reminder',
             language: 'en',
             components: [
@@ -77,8 +72,7 @@ class NotificationService {
             ]
         },
 
-        // Booking cancelled template
-        booking_cancelled_template: {
+        booking_cancelled: {
             name: 'booking_cancelled',
             language: 'en',
             components: [
@@ -93,8 +87,7 @@ class NotificationService {
             ]
         },
 
-        // Session reminder template
-        session_reminder_template: {
+        session_reminder: {
             name: 'session_reminder',
             language: 'en',
             components: [
@@ -110,7 +103,7 @@ class NotificationService {
                 {
                     type: 'button',
                     sub_type: 'url',
-                    index: 0,
+                    index: '0',
                     parameters: [
                         { type: 'text', text: '{{4}}' }  // Meeting link
                     ]
@@ -118,8 +111,7 @@ class NotificationService {
             ]
         },
 
-        // Appointment rescheduled template
-        appointment_rescheduled_template: {
+        appointment_rescheduled: {
             name: 'appointment_rescheduled',
             language: 'en',
             components: [
@@ -136,6 +128,22 @@ class NotificationService {
                 },
 
             ]
+        },
+
+        payment_received: {
+            name: 'payment_received',
+            language: 'en',
+            components: [
+                {
+                    type: 'body',
+                    parameters: [
+                        { type: 'text', text: '{{1}}' },  // Amount
+                        { type: 'text', text: '{{2}}' },  // Service name
+                        { type: 'text', text: '{{3}}' },  // Transaction ID
+                        { type: 'text', text: '{{4}}' }   // Client name
+                    ]
+                }
+            ]
         }
     };
 
@@ -148,7 +156,7 @@ class NotificationService {
         let preparedTemplate = { ...template };
 
         switch (templateName) {
-            case 'welcome_template':
+            case 'welcome_message':
                 preparedTemplate.components = [
                     {
                         type: 'body',
@@ -160,27 +168,55 @@ class NotificationService {
                 break;
 
             case 'booking_confirmation':
+                // Ensure we have all required data - template expects exactly 4 parameters
+                const clientName = data.clientName || 'Valued Customer';
+                const serviceName = data.serviceName || 'Physiotherapy Session';
+                const date = data.date || 'TBD';
+                const time = data.time || 'TBD';
+
+                console.log('📋 Booking Confirmation Data:', {
+                    clientName,
+                    serviceName,
+                    date,
+                    time,
+                    originalData: data,
+                    parameterCount: 4
+                });
+
+                // Ensure we provide exactly 4 parameters as expected by the template
                 preparedTemplate.components = [
                     {
                         type: 'body',
                         parameters: [
-                            { type: 'text', text: data.clientName || 'Customer' },
-                            { type: 'text', text: data.serviceName || 'Service' },
-                            { type: 'text', text: data.date || 'TBD' },
-                            { type: 'text', text: data.time || 'TBD' },
+                            { type: 'text', text: clientName },      // Parameter 1
+                            { type: 'text', text: serviceName },     // Parameter 2
+                            { type: 'text', text: date },            // Parameter 3
+                            { type: 'text', text: time }             // Parameter 4
                         ]
                     }
                 ];
                 break;
 
             case 'booking_cancelled':
+                // Ensure we have all required data - template expects exactly 3 parameters
+                const cancelClientName = data.clientName || 'Customer';
+                const cancelServiceName = data.serviceName || 'Physiotherapy Session';
+                const cancelReason = data.reason || data.cancellationReason || 'No reason provided';
+
+                console.log('📋 Booking Cancelled Data:', {
+                    clientName: cancelClientName,
+                    serviceName: cancelServiceName,
+                    reason: cancelReason,
+                    originalData: data
+                });
+
                 preparedTemplate.components = [
                     {
                         type: 'body',
                         parameters: [
-                            { type: 'text', text: data.clientName || 'Customer' },
-                            { type: 'text', text: data.serviceName || 'Service' },
-                            { type: 'text', text: data.reason || 'No reason provided' }
+                            { type: 'text', text: cancelClientName },
+                            { type: 'text', text: cancelServiceName },
+                            { type: 'text', text: cancelReason }
                         ]
                     }
                 ];
@@ -214,13 +250,39 @@ class NotificationService {
                 break;
 
             case 'session_reminder':
+                // Ensure we have all required data
+                const sessionServiceName = data.serviceName || 'Physiotherapy Session';
+                const sessionDate = data.date || 'TBD';
+                const sessionTime = data.time || 'TBD';
+                const sessionMeetingLink = data.meetingLink || 'Meeting Link TBD';
+
+                console.log('📋 Session Reminder Data:', {
+                    serviceName: sessionServiceName,
+                    date: sessionDate,
+                    time: sessionTime,
+                    meetingLink: sessionMeetingLink,
+                    originalData: data
+                });
+
                 preparedTemplate.components = [
                     {
                         type: 'body',
                         parameters: [
-                            { type: 'text', text: data.serviceName || 'Service' },
-                            { type: 'text', text: data.date || 'TBD' },
-                            { type: 'text', text: data.time || 'TBD' },
+                            { type: 'text', text: sessionServiceName },
+                            { type: 'text', text: sessionDate },
+                            { type: 'text', text: sessionTime },
+                            { type: 'text', text: sessionMeetingLink }
+                        ]
+                    },
+                    {
+                        type: 'button',
+                        sub_type: 'url',
+                        index: '0',
+                        parameters: [
+                            {
+                                type: 'text',
+                                text: sessionMeetingLink
+                            }
                         ]
                     }
                 ];
@@ -236,6 +298,20 @@ class NotificationService {
                             { type: 'text', text: data.oldTime || 'TBD' },
                             { type: 'text', text: data.newDate || 'TBD' },
                             { type: 'text', text: data.newTime || 'TBD' },
+                            { type: 'text', text: data.clientName || 'Customer' }
+                        ]
+                    }
+                ];
+                break;
+
+            case 'payment_received':
+                preparedTemplate.components = [
+                    {
+                        type: 'body',
+                        parameters: [
+                            { type: 'text', text: data.amount || '0' },
+                            { type: 'text', text: data.serviceName || 'Service' },
+                            { type: 'text', text: data.transactionId || 'N/A' },
                             { type: 'text', text: data.clientName || 'Customer' }
                         ]
                     }
@@ -288,7 +364,7 @@ class NotificationService {
                 this.emailEnabled = !!(emailCreds.user && emailCreds.password);
             }
 
-            // Initialize notification templates
+            // Initialize notification templates (without payment_received and new_booking)
             this.templates = {
             // User notifications
                 booking_confirmation: {
@@ -296,7 +372,7 @@ class NotificationService {
                         subject: 'Booking Confirmed - Tanish Physio',
                         template: EmailTemplates.bookingConfirmed
                     },
-                    whatsapp: (data) => `✅ Booking confirmed!\n\nHello ${data.clientName},\nYour booking for ${data.serviceName} on ${data.date} at ${data.time} has been confirmed.\n\nMeeting Link: ${data.meetingLink}\n\nThank you for choosing Tanish Physio!`
+                    whatsapp: 'booking_confirmation'
                 },
 
                 booking_cancelled: {
@@ -304,7 +380,7 @@ class NotificationService {
                         subject: 'Booking Cancelled - Tanish Physio',
                         template: EmailTemplates.bookingCancelled
                     },
-                    whatsapp: (data) => `❌ Booking Cancelled\n\nHello ${data.clientName},\nWe regret to inform you that your booking for ${data.serviceName} has been cancelled.\n\nReason: ${data.reason || 'No reason provided'}\n\nWe apologize for any inconvenience.`
+                    whatsapp: 'booking_cancelled'
                 },
 
                 payment_successful: {
@@ -312,7 +388,7 @@ class NotificationService {
                         subject: 'Payment Successful - Tanish Physio',
                         template: EmailTemplates.paymentSuccess
                     },
-                    whatsapp: (data) => `💰 Payment Confirmed!\n\nDear ${data.clientName},\nWe've received your payment of ₹${data.amount} for ${data.serviceName}.\n\nTransaction ID: ${data.transactionId}\n\nThank you for your payment!`
+                    whatsapp: 'payment_successful'
                 },
 
                 payment_reminder: {
@@ -320,7 +396,7 @@ class NotificationService {
                         subject: 'Payment Reminder - Tanish Physio',
                         template: EmailTemplates.paymentReminder
                     },
-                    whatsapp: (data) => `🔔 Payment Reminder\n\nHello ${data.clientName},\nThis is a reminder to complete your payment of ₹${data.amount} for ${data.serviceName}.\n\nPlease complete your payment to secure your booking.\n\nThank you!`
+                    whatsapp: 'payment_reminder'
                 },
 
                 session_reminder: {
@@ -328,26 +404,16 @@ class NotificationService {
                         subject: 'Session Reminder - Tanish Physio',
                         template: EmailTemplates.sessionReminder
                     },
-                    whatsapp: (data) => `⏰ Session Reminder\n\nHello ${data.clientName},\nThis is a reminder for your ${data.serviceName} session today at ${data.time}.\n\nMeeting Link: ${data.meetingLink}\n\nPlease join on time!`
+                    whatsapp: 'session_reminder'
                 },
 
-
-
-                // Admin notifications
+                // Admin notifications (without payment_received and new_booking)
                 new_booking: {
                     email: {
                         subject: 'New Booking Request - Admin',
                         template: EmailTemplates.adminNewBooking
                     },
-                    whatsapp: (data) => `📋 New Booking Request\n\nClient: ${data.clientName}\nService: ${data.serviceName}\nDate: ${data.date}\nTime: ${data.time}\nStatus: ${data.status}\n\nPlease review and confirm.`
-                },
-
-                payment_received: {
-                    email: {
-                        subject: 'Payment Received - Admin',
-                        template: EmailTemplates.adminPaymentReceived
-                    },
-                    whatsapp: (data) => `💰 Payment received: ₹${data.amount} for ${data.serviceName}. Transaction ID: ${data.transactionId}.`
+                    whatsapp: 'new_booking'
                 },
 
                 upcoming_session: {
@@ -355,7 +421,15 @@ class NotificationService {
                         subject: 'Upcoming Session - Admin',
                         template: EmailTemplates.adminUpcomingSession
                     },
-                    whatsapp: (data) => `Upcoming session reminder: ${data.clientName} (${data.serviceName}) at ${data.time} with ${data.therapistName}.`
+                    whatsapp: 'upcoming_session'
+                },
+
+                payment_received: {
+                    email: {
+                        subject: 'Payment Received - Admin',
+                        template: EmailTemplates.adminPaymentReceived
+                    },
+                    whatsapp: 'payment_received'
                 }
             };
         } catch (error) {
@@ -383,7 +457,19 @@ class NotificationService {
 
             // Send WhatsApp if configured
             if (this.whatsappEnabled && recipient.phone && template.whatsapp) {
-                results.whatsapp = await this.sendWhatsApp(recipient.phone, template.whatsapp, data);
+                // Log the data being sent to the template
+                console.log('📤 Sending WhatsApp template:', {
+                    templateName: template.whatsapp,
+                    recipientPhone: recipient.phone,
+                    dataKeys: Object.keys(data || {}),
+                    data: data
+                });
+
+                results.whatsapp = await this.sendWhatsAppTemplate(
+                    recipient.phone,
+                    template.whatsapp,
+                    data
+                );
             }
 
             return results;
@@ -403,8 +489,7 @@ class NotificationService {
             'payment_successful': `Payment Successful - ${data.serviceName || 'Your Service'}`,
             'session_reminder': `Session Reminder - ${data.serviceName || 'Your Appointment'}`,
             'appointment_rescheduled': `Appointment Rescheduled - ${data.serviceName || 'Your Session'}`,
-            'new_booking': `New Booking Request - ${data.clientName || 'Client'}`,
-            'payment_received': `Payment Received - ₹${data.amount || '0'}`,
+            'new_booking': `New Booking Request - ${data.serviceName || 'Service'}`,
             'upcoming_session': `Upcoming Session - ${data.serviceName || 'Tomorrow'}`,
             'custom_notification': data.title || 'Notification from Tanish Physio'
         };
@@ -437,7 +522,7 @@ class NotificationService {
             let subject;
 
             if (typeof template === 'string') {
-                // Map template names to EmailTemplates functions
+                // Map template names to EmailTemplates functions (without payment_received and new_booking)
                 const templateMap = {
                     'booking_confirmation': EmailTemplates.bookingConfirmed,
                     'booking_cancelled': EmailTemplates.bookingCancelled,
@@ -445,8 +530,6 @@ class NotificationService {
                     'payment_successful': EmailTemplates.paymentSuccess,
                     'session_reminder': EmailTemplates.sessionReminder,
                     'appointment_rescheduled': EmailTemplates.appointmentRescheduled,
-                    'new_booking': EmailTemplates.adminNewBooking,
-                    'payment_received': EmailTemplates.adminPaymentReceived,
                     'upcoming_session': EmailTemplates.adminUpcomingSession,
                     'custom_notification': EmailTemplates.customNotification
                 };
@@ -626,19 +709,59 @@ class NotificationService {
 
     // Send WhatsApp template message (for approved templates)
     async sendWhatsAppTemplate(to, templateName, data) {
+        // Declare variables at method scope to be accessible in catch block
+        let formattedPhone = '';
+        let response = null;
+
         try {
             if (!this.whatsappEnabled) {
                 throw new Error('WhatsApp not configured');
             }
 
             // Format phone number
-            const formattedPhone = to.replace(/[\s\+]/g, '');
+            formattedPhone = to.replace(/[\s\+]/g, '');
 
             // Prepare template
+            console.log('🔧 Preparing template:', templateName, 'with data:', data);
             const preparedTemplate = NotificationService.prepareWhatsAppTemplate(templateName, data);
             if (!preparedTemplate) {
                 throw new Error(`Template ${templateName} not found`);
             }
+
+            console.log('✅ Prepared template result:', {
+                name: preparedTemplate.name,
+                language: preparedTemplate.language,
+                components: preparedTemplate.components,
+                componentCount: preparedTemplate.components?.length,
+                parameterCount: preparedTemplate.components?.[0]?.parameters?.length
+            });
+
+            // Log the prepared template structure for debugging
+            console.log('🔍 Prepared Template Structure:', {
+                templateName: templateName,
+                preparedTemplate: preparedTemplate,
+                hasName: !!preparedTemplate.name,
+                hasLanguage: !!preparedTemplate.language,
+                hasComponents: !!preparedTemplate.components,
+                templateKeys: Object.keys(preparedTemplate)
+            });
+
+            // Restructure template for Facebook API - proper format required by Meta
+            const templateNameToUse = preparedTemplate.name || templateName;
+            console.log('🏷️ Template Name Analysis:', {
+                requestedTemplateName: templateName,
+                preparedTemplateName: preparedTemplate.name,
+                finalTemplateName: templateNameToUse,
+                availableTemplates: Object.keys(NotificationService.whatsappTemplates)
+            });
+
+            const facebookTemplate = {
+                name: templateNameToUse,
+                language: {
+                    code: preparedTemplate.language || 'en'
+                },
+                components: preparedTemplate.components || []
+            };
 
             // Log the complete template message being sent
             console.log('📱 WhatsApp Template Message Being Sent:', {
@@ -646,7 +769,20 @@ class NotificationService {
                 template_name: templateName,
                 template_data: data,
                 prepared_template: preparedTemplate,
+                facebook_template: facebookTemplate,
                 type: 'template',
+                parameter_count: facebookTemplate.components?.[0]?.parameters?.length || 0,
+                expected_parameters: [
+                    'Client Name',
+                    'Service Name',
+                    'Date',
+                    'Time'
+                ],
+                actual_parameters: facebookTemplate.components?.[0]?.parameters?.map((p, i) => ({
+                    index: i + 1,
+                    value: p.text,
+                    type: p.type
+                })) || [],
                 timestamp: new Date().toISOString()
             });
 
@@ -655,7 +791,7 @@ class NotificationService {
                 messaging_product: 'whatsapp',
                 to: formattedPhone,
                 type: 'template',
-                template: preparedTemplate
+                template: facebookTemplate
             };
             this.logWhatsAppApiRequest(templateRequestData, `${this.whatsappConfig.apiUrl}/${this.whatsappConfig.phoneNumberId}/messages`);
 
@@ -666,7 +802,11 @@ class NotificationService {
                 messaging_product: 'whatsapp',
                 to: formattedPhone,
                 type: 'template',
-                template: preparedTemplate
+                template: {
+                    name: facebookTemplate.name,
+                    language: facebookTemplate.language,
+                    components: facebookTemplate.components
+                }
             }, {
                 headers: {
                     'Authorization': `Bearer ${this.whatsappConfig.accessToken}`,
