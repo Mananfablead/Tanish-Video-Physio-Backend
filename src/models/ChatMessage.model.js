@@ -54,7 +54,30 @@ const chatMessageSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'ChatMessage',
         default: null
-    }
+    },
+    attachments: [{
+        type: {
+            type: String,
+            required: true,
+            enum: ['image', 'video', 'document']
+        },
+        url: {
+            type: String,
+            required: true
+        },
+        originalName: {
+            type: String,
+            required: true
+        },
+        size: {
+            type: Number, // Size in bytes
+            required: true
+        },
+        mimeType: {
+            type: String,
+            required: true
+        }
+    }]
 }, {
     timestamps: true
 });
