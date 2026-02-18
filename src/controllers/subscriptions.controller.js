@@ -49,10 +49,12 @@ const createSubscriptionPlan = async (req, res, next) => {
     try {
         const { planId, name, price, description, features, duration, sessions, validityDays, session_type, price_inr, price_usd } = req.body;
 
-        // Check if plan already exists
-        const existingPlan = await SubscriptionPlan.findOne({ planId });
-        if (existingPlan) {
-            return res.status(400).json(ApiResponse.error('Plan with this ID already exists'));
+        // If planId is provided, check if it already exists
+        if (planId) {
+            const existingPlan = await SubscriptionPlan.findOne({ planId });
+            if (existingPlan) {
+                return res.status(400).json(ApiResponse.error('Plan with this ID already exists'));
+            }
         }
 
         // Calculate validityDays based on duration if not provided
@@ -67,8 +69,7 @@ const createSubscriptionPlan = async (req, res, next) => {
             }
         }
 
-        const plan = new SubscriptionPlan({
-            planId,
+        const planData = {
             name,
             price,
             description,
@@ -79,7 +80,14 @@ const createSubscriptionPlan = async (req, res, next) => {
             price_inr: price_inr || 0,
             price_usd: price_usd || 0,
             validityDays: calculatedValidityDays
-        });
+        };
+        
+        // Only add planId if provided
+        if (planId) {
+            planData.planId = planId;
+        }
+        
+        const plan = new SubscriptionPlan(planData);
 
         await plan.save();
 
@@ -103,7 +111,9 @@ const getAllSubscriptionPlans = async (req, res, next) => {
             
             return {
                 ...plan.toObject(),
-                subscriberCount
+                subscriberCount,
+                // Add display name for better UI
+                displayName: `${plan.name} (${plan.planId})`
             };
         }));
 

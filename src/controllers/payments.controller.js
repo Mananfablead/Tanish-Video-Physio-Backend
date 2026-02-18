@@ -1351,16 +1351,42 @@ const createSubscriptionOrder = async (req, res, next) => {
         }
 
         // Create order in Razorpay
+        // Sanitize planId for receipt (remove spaces and special characters)
+        const sanitizedPlanId = planId.replace(/[^a-zA-Z0-9]/g, '_');
+        console.log('📋 Original planId:', planId);
+        console.log('📋 Sanitized planId:', sanitizedPlanId);
+        
+        // Create receipt with max 40 characters
+        let receipt = `sub_${sanitizedPlanId}_${req.user.userId}`;
+        if (receipt.length > 40) {
+            // Truncate to fit within 40 characters
+            const maxPlanIdLength = 40 - 4 - req.user.userId.length - 1; // 4 for 'sub_', 1 for '_'
+            const truncatedPlanId = sanitizedPlanId.substring(0, maxPlanIdLength);
+            receipt = `sub_${truncatedPlanId}_${req.user.userId}`;
+        }
+        
         const options = {
             amount: validatedAmount * 100, // Razorpay expects amount in paise
             currency: currency,
-            receipt: `sub_${planId}_${req.user.userId}`,
+            receipt: receipt,
             payment_capture: 1 // Auto-capture payment
         };
 
         console.log('💳 Razorpay order options:', options);
-        const order = await razorpay.orders.create(options);
-        console.log('💳 Razorpay order created:', { orderId: order.id, amount: order.amount, currency: order.currency });
+        let order;
+        try {
+            order = await razorpay.orders.create(options);
+            console.log('💳 Razorpay order created:', { orderId: order.id, amount: order.amount, currency: order.currency });
+        } catch (razorpayError) {
+            console.error('❌ Razorpay API Error:', razorpayError);
+            console.error('❌ Razorpay Error Details:', {
+                message: razorpayError.message,
+                code: razorpayError.code,
+                statusCode: razorpayError.statusCode,
+                error: razorpayError.error
+            });
+            throw razorpayError;
+        }
 
         // Calculate discount amount
         const discountAmount = planAmount - validatedAmount;
