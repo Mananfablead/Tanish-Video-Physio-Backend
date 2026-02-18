@@ -366,7 +366,16 @@ class NotificationService {
 
             // Initialize notification templates (without payment_received and new_booking)
             this.templates = {
-            // User notifications
+                // User notifications
+                welcome_message: {
+                    email: {
+                        subject: (data) => `Welcome to Tanish Physio, ${data.clientName || 'there'}!`,
+                        template: EmailTemplates.welcome
+                    },
+                    whatsapp: 'welcome_message'
+                },
+
+                // Booking notifications
                 booking_confirmation: {
                     email: {
                         subject: 'Booking Confirmed - Tanish Physio',
@@ -482,6 +491,7 @@ class NotificationService {
     // Generate subject line based on template type
     generateSubjectFromTemplate(templateName, data) {
         const subjectMap = {
+            'welcome_message': `Welcome to Tanish Physio, ${data.clientName || 'there'}!`,
             'booking_created': `Booking Request Submitted - ${data.serviceName || 'Your Service'}`,
             'booking_confirmation': `Booking Confirmed - ${data.serviceName || 'Your Appointment'}`,
             'booking_cancelled': `Booking Cancelled - ${data.serviceName || 'Your Appointment'}`,
@@ -524,6 +534,7 @@ class NotificationService {
             if (typeof template === 'string') {
                 // Map template names to EmailTemplates functions (without payment_received and new_booking)
                 const templateMap = {
+                    'welcome_message': EmailTemplates.welcome,
                     'booking_confirmation': EmailTemplates.bookingConfirmed,
                     'booking_cancelled': EmailTemplates.bookingCancelled,
                     'payment_reminder': EmailTemplates.paymentReminder,

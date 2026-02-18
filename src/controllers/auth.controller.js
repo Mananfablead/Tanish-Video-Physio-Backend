@@ -8,6 +8,7 @@ const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const { createTransport } = nodemailer;
 const { getEmailCredentials } = require('../utils/credentialsManager');
+const NotificationService = require('../services/notificationService');
 
 // Register a new user
 const register = async (req, res, next) => {
@@ -34,6 +35,15 @@ const register = async (req, res, next) => {
 
         // Generate token with explicit userId string conversion
         const token = generateToken({ userId: user._id.toString(), role: user.role });
+
+        // Send welcome notifications (email + WhatsApp) without blocking the response
+        NotificationService.sendNotification(
+            { email: user.email, phone: user.phone },
+            'welcome_message',
+            { clientName: user.name }
+        ).catch(err => {
+            console.error('Welcome notification failed:', err.message);
+        });
 
         res.status(201).json(
             ApiResponse.success({

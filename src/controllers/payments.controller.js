@@ -9,6 +9,7 @@ const ApiResponse = require('../utils/apiResponse');
 const { hashPassword } = require('../utils/auth.utils');
 const { generateToken } = require('../config/jwt');
 const NotificationService = require('../services/notificationService');
+const { sendWelcomeEmail } = require('../services/email.service');
 
 // Utility function to calculate end date based on plan validity
 async function calculateEndDate(planId, startDate = new Date()) {
@@ -75,24 +76,42 @@ async function sendWelcomeEmailWithCredentials(email, name, username, password) 
     const { createTransport } = nodemailer;
     const { getEmailCredentials } = require('../utils/credentialsManager');
 
-    // Get email credentials from database
-    const emailCreds = await getEmailCredentials();
-    if (!emailCreds) {
-        console.error('Email configuration not found for welcome email');
-        return;
-    }
+    try {
+        console.log('📧 sendWelcomeEmailWithCredentials called', {
+            email,
+            name,
+            username
+        });
 
-    const transporter = createTransport({
-        service: 'gmail',
-        host: emailCreds.host,
-        port: emailCreds.port,
-        auth: {
-            user: emailCreds.user,
-            pass: emailCreds.password
+        // Get email credentials from database
+        const emailCreds = await getEmailCredentials();
+        if (!emailCreds) {
+            console.error('Email configuration not found for welcome email');
+            return;
         }
-    });
 
-    const message = `
+        console.log('📧 Email creds loaded', {
+            host: emailCreds.host,
+            port: emailCreds.port,
+            user: emailCreds.user ? emailCreds.user.slice(0, 3) + '***' : null
+        });
+
+        // Use host/port config (works for Gmail/SMTP) with correct TLS flag
+        const transporter = createTransport({
+            host: emailCreds.host,
+            port: emailCreds.port,
+            secure: emailCreds.port === 465, // true for SMTPS
+            auth: {
+                user: emailCreds.user,
+                pass: emailCreds.password
+            }
+        });
+
+        // Ensure transporter is valid before attempting send
+        await transporter.verify();
+        console.log('✅ Transporter verified for welcome email');
+
+        const message = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -178,15 +197,30 @@ async function sendWelcomeEmailWithCredentials(email, name, username, password) 
 </html>
 `;
 
-    const mailOptions = {
-        to: email,
-        from: emailCreds.user,
-        subject: 'Welcome to Tanish Physio - Account Created & Payment Verified',
-        html: message
-    };
+        const mailOptions = {
+            to: email,
+            from: emailCreds.user,
+            subject: 'Welcome to Tanish Physio - Account Created & Payment Verified',
+            html: message
+        };
 
-    // Send email
-    await transporter.sendMail(mailOptions);
+        // Send email
+        const info = await transporter.sendMail(mailOptions);
+        console.log('✅ Welcome email sent', {
+            messageId: info.messageId,
+            response: info.response,
+            accepted: info.accepted,
+            rejected: info.rejected
+        });
+    } catch (error) {
+        console.error('❌ Error sending welcome email', {
+            message: error.message,
+            code: error.code,
+            command: error.command,
+            response: error.response,
+            stack: error.stack
+        });
+    }
 }
 
 // Create a payment order for Razorpay
@@ -329,7 +363,7 @@ async function createSessionFromBooking(booking, service) {
     if (booking.scheduledDate && booking.scheduledTime) {
         const Session = require('../models/Session.model');
         const existingSession = await Session.findOne({ bookingId: booking._id });
-        
+
         if (!existingSession) {
             try {
                 const session = new Session({
@@ -343,7 +377,7 @@ async function createSessionFromBooking(booking, service) {
                     notes: `Session created automatically from booking #${booking._id}`,
                     bookingId: booking._id
                 });
-                
+
                 if (service && service.duration) {
                     const durationMatch = service.duration.match(/(\d+)/);
                     if (durationMatch) {
@@ -354,7 +388,7 @@ async function createSessionFromBooking(booking, service) {
                         session.duration = duration;
                     }
                 }
-                
+
                 await session.save();
                 console.log(`✅ Automatic session created for booking ${booking._id}: Session ID ${session._id}`);
                 await Booking.findByIdAndUpdate(booking._id, { status: 'session_created' });
@@ -718,8 +752,16 @@ const verifyGuestPayment = async (req, res, next) => {
     try {
         const { paymentId, orderId, signature } = req.body;
 
+
         // Fetch payment details from our database
         const payment = await Payment.findOne({ orderId });
+        console.log('🔍 Payment lookup', {
+            found: !!payment,
+            status: payment?.status,
+            amount: payment?.amount,
+            guestEmail: payment?.guestEmail,
+            bookingId: payment?.bookingId
+        });
         if (!payment) {
             return res.status(404).json(ApiResponse.error('Payment not found'));
         }
@@ -742,6 +784,12 @@ const verifyGuestPayment = async (req, res, next) => {
             .update(orderId + '|' + paymentId)
             .digest('hex');
 
+        console.log('✍️ Signature compare', {
+            expectedSignature,
+            receivedSignature: signature,
+            match: expectedSignature === signature
+        });
+
         // Compare signatures
         if (expectedSignature === signature) {
             // Payment verified successfully
@@ -752,6 +800,11 @@ const verifyGuestPayment = async (req, res, next) => {
             if (payment.guestName && payment.guestEmail && payment.guestPhone) {
                 // Check if user already exists (shouldn't happen, but just in case)
                 const existingUser = await User.findOne({ email: payment.guestEmail });
+                console.log('👤 Guest user check', {
+                    email: payment.guestEmail,
+                    exists: !!existingUser
+                });
+
                 if (!existingUser) {
                     // Create the user account with temporary password
                     tempPassword = Math.random().toString(36).slice(-8) + 'Temp1!';
@@ -773,8 +826,25 @@ const verifyGuestPayment = async (req, res, next) => {
                     // Update the booking to assign the new user
                     await Booking.findByIdAndUpdate(payment.bookingId, { userId: newUser._id });
 
+                    console.log('📧 Sending welcome email to guest user (new account)', {
+                        email: payment.guestEmail,
+                        name: payment.guestName
+                    });
                     await sendWelcomeEmailWithCredentials(payment.guestEmail, payment.guestName, payment.guestEmail, tempPassword);
-
+                } else {
+                    console.log('ℹ️ Guest email already has an account; sending standard welcome email only', {
+                        email: payment.guestEmail,
+                        userId: existingUser._id
+                    });
+                    await sendWelcomeEmail({
+                        email: payment.guestEmail,
+                        name: payment.guestName
+                    });
+                    NotificationService.sendNotification(
+                        { email: payment.guestEmail, phone: payment.guestPhone },
+                        'welcome_message',
+                        { clientName: payment.guestName }
+                    ).catch(err => console.error('Welcome notification (existing user) failed:', err.message));
                 }
             }
 
@@ -955,6 +1025,12 @@ const verifyGuestPayment = async (req, res, next) => {
                 }
             }
 
+            console.log('📧 Sending welcome email to guest user', {
+                email: payment.guestEmail,
+                name: payment.guestName
+            });
+            await sendWelcomeEmailWithCredentials(payment.guestEmail, payment.guestName, payment.guestEmail, tempPassword);
+
             res.status(200).json(
                 ApiResponse.success({
                     paymentId,
@@ -978,6 +1054,10 @@ const verifyGuestPayment = async (req, res, next) => {
             return res.status(400).json(ApiResponse.error('Payment verification failed'));
         }
     } catch (error) {
+        console.error('❌ verifyGuestPayment error', {
+            message: error.message,
+            stack: error.stack
+        });
         next(error);
     }
 };
@@ -1271,16 +1351,42 @@ const createSubscriptionOrder = async (req, res, next) => {
         }
 
         // Create order in Razorpay
+        // Sanitize planId for receipt (remove spaces and special characters)
+        const sanitizedPlanId = planId.replace(/[^a-zA-Z0-9]/g, '_');
+        console.log('📋 Original planId:', planId);
+        console.log('📋 Sanitized planId:', sanitizedPlanId);
+        
+        // Create receipt with max 40 characters
+        let receipt = `sub_${sanitizedPlanId}_${req.user.userId}`;
+        if (receipt.length > 40) {
+            // Truncate to fit within 40 characters
+            const maxPlanIdLength = 40 - 4 - req.user.userId.length - 1; // 4 for 'sub_', 1 for '_'
+            const truncatedPlanId = sanitizedPlanId.substring(0, maxPlanIdLength);
+            receipt = `sub_${truncatedPlanId}_${req.user.userId}`;
+        }
+        
         const options = {
             amount: validatedAmount * 100, // Razorpay expects amount in paise
             currency: currency,
-            receipt: `sub_${planId}_${req.user.userId}`,
+            receipt: receipt,
             payment_capture: 1 // Auto-capture payment
         };
 
         console.log('💳 Razorpay order options:', options);
-        const order = await razorpay.orders.create(options);
-        console.log('💳 Razorpay order created:', { orderId: order.id, amount: order.amount, currency: order.currency });
+        let order;
+        try {
+            order = await razorpay.orders.create(options);
+            console.log('💳 Razorpay order created:', { orderId: order.id, amount: order.amount, currency: order.currency });
+        } catch (razorpayError) {
+            console.error('❌ Razorpay API Error:', razorpayError);
+            console.error('❌ Razorpay Error Details:', {
+                message: razorpayError.message,
+                code: razorpayError.code,
+                statusCode: razorpayError.statusCode,
+                error: razorpayError.error
+            });
+            throw razorpayError;
+        }
 
         // Calculate discount amount
         const discountAmount = planAmount - validatedAmount;
@@ -1556,7 +1662,7 @@ const verifySubscriptionPayment = async (req, res, next) => {
                     // Use scheduled date/time from subscription if available, otherwise use current time
                     const bookingDate = subscription.scheduledDate || new Date().toISOString().split('T')[0];
                     const bookingTime = subscription.timeSlot?.start || subscription.scheduledTime || new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false });
-                    
+
                     const booking = new Booking({
                         serviceId: subscription.planId, // Use planId as serviceId for subscription bookings
                         serviceName: subscription.planName,
@@ -1717,12 +1823,12 @@ const verifySubscriptionPayment = async (req, res, next) => {
                         // Determine time to use for session based on available data
                         const sessionDate = subscription.scheduledDate || new Date().toISOString().split('T')[0];
                         const sessionTime = subscription.timeSlot?.start || subscription.scheduledTime || '09:00';
-                        
+
                         // Calculate start and end times
                         const startTime = subscription.scheduledDate && (subscription.timeSlot?.start || subscription.scheduledTime)
                             ? new Date(`${subscription.scheduledDate}T${sessionTime}`)
                             : new Date(new Date().setHours(9, 0, 0, 0));
-                        
+
                         // Calculate end time based on timeSlot or default duration
                         let endTime = new Date(startTime);
                         if (subscription.timeSlot?.end) {
@@ -1734,7 +1840,7 @@ const verifySubscriptionPayment = async (req, res, next) => {
                             // Use default duration if no end time in timeSlot
                             endTime.setMinutes(endTime.getMinutes() + (plan.duration ? parseInt(plan.duration.match(/(\d+)/)?.[1] || '60') : 60));
                         }
-                        
+
                         const session = new Session({
                             therapistId: subscription.therapistId, // Use therapist from subscription if available
                             userId: subscription.userId,
@@ -1920,7 +2026,7 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
                     // Use scheduled date/time from subscription if available, otherwise use current time
                     const bookingDate = subscription.scheduledDate || new Date().toISOString().split('T')[0];
                     const bookingTime = subscription.timeSlot?.start || subscription.scheduledTime || new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false });
-                    
+
                     const booking = new Booking({
                         serviceId: subscription.planId, // Use planId as serviceId for subscription bookings
                         serviceName: subscription.planName,
@@ -2101,16 +2207,16 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
                     console.log('DEBUG GUEST FINAL: subscription scheduledDate:', subscription.scheduledDate);
                     console.log('DEBUG GUEST FINAL: subscription scheduledTime:', subscription.scheduledTime);
                     console.log('DEBUG GUEST FINAL: subscription timeSlot:', subscription.timeSlot);
-                                        
+
                     // Determine time to use for session based on available data
                     const sessionDate = subscription.scheduledDate || new Date().toISOString().split('T')[0];
                     const sessionTime = subscription.timeSlot?.start || subscription.scheduledTime || '09:00';
-                                        
+
                     // Calculate start and end times
                     const startTime = subscription.scheduledDate && (subscription.timeSlot?.start || subscription.scheduledTime)
                         ? new Date(`${subscription.scheduledDate}T${sessionTime}`)
                         : new Date(new Date().setHours(9, 0, 0, 0));
-                                        
+
                     // Calculate end time based on timeSlot or default duration
                     let endTime = new Date(startTime);
                     if (subscription.timeSlot?.end) {
@@ -2122,7 +2228,7 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
                         // Use default duration if no end time in timeSlot
                         endTime.setMinutes(endTime.getMinutes() + (plan.duration ? parseInt(plan.duration.match(/(\d+)/)?.[1] || '60') : 60));
                     }
-                                        
+
                     const session = new Session({
                         therapistId: subscription.therapistId, // Use therapist from subscription if available
                         userId: userIdToCheck,

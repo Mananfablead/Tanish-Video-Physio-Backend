@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const subscriptionPlanSchema = new mongoose.Schema({
     planId: {
         type: String,
-        required: [true, 'Plan ID is required'],
+        // Will be auto-generated if not provided
         unique: true,
         trim: true
     },
@@ -75,6 +75,54 @@ const subscriptionPlanSchema = new mongoose.Schema({
     }
 }, {
     timestamps: true
+});
+
+// Helper function to generate slug from plan name
+const generatePlanSlug = (name) => {
+    return name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+};
+
+// Pre-save middleware to auto-generate planId if not provided
+subscriptionPlanSchema.pre('save', async function(next) {
+    if (!this.planId) {
+        // Option 1: Generate slug-based ID from plan name
+        if (this.name) {
+            const baseSlug = generatePlanSlug(this.name);
+            let slug = baseSlug;
+            let counter = 1;
+            
+            // Ensure uniqueness
+            while (await mongoose.model('SubscriptionPlan').findOne({ planId: slug })) {
+                slug = `${baseSlug}-${counter}`;
+                counter++;
+            }
+            this.planId = slug;
+        } else {
+            // Option 2: Fallback to numeric ID
+            const prefix = 'PLAN';
+            const count = await mongoose.model('SubscriptionPlan').countDocuments();
+            const paddedNumber = (count + 1).toString().padStart(3, '0');
+            this.planId = `${prefix}_${paddedNumber}`;
+            
+            // Ensure uniqueness (in case of concurrent saves)
+            let isUnique = false;
+            let attempt = 1;
+            while (!isUnique && attempt <= 10) {
+                const existingPlan = await mongoose.model('SubscriptionPlan').findOne({ planId: this.planId });
+                if (!existingPlan) {
+                    isUnique = true;
+                } else {
+                    // Generate new ID with attempt number
+                    this.planId = `${prefix}_${paddedNumber}_${attempt}`;
+                    attempt++;
+                }
+            }
+        }
+    }
+    next();
 });
 
 module.exports = mongoose.model('SubscriptionPlan', subscriptionPlanSchema);

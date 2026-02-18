@@ -86,6 +86,9 @@ const sendWelcomeEmail = async (user) => {
       <h1>Welcome to Tanish Physio, ${user.name}!</h1>
       <p>Thank you for registering with us. We're excited to have you on board.</p>
       <p>Your account has been created successfully.</p>
+        <p>If you have any questions or need assistance, feel free to contact our support team.</p>
+        <p>Best regards,<br>Tanish Physio Team</p>
+        
     `,
     };
 
