@@ -50,12 +50,12 @@ exports.updateHero = async (req, res) => {
         const heroData = { ...req.body };
         delete heroData._id;
         delete heroData.id;
-        
+
         // If there's an uploaded file, update the image field with the full URL
         if (req.file) {
             heroData.image = `${config.BASE_URL}/uploads/cms-images/${req.file.filename}`;
         }
-        
+
         // Check if hero exists
         let hero = await CmsHero.findOne().sort({ createdAt: -1 });
 
@@ -117,64 +117,64 @@ exports.getStepsAdmin = async (req, res) => {
 };
 
 exports.createStep = async (req, res) => {
-  try {
-    let { heading, subHeading } = req.body;
+    try {
+        let { heading, subHeading } = req.body;
 
-    // 🔁 If heading/subHeading present → replace in ALL steps
-    if (heading || subHeading) {
-      const updateFields = {};
-      if (heading) updateFields.heading = heading;
-      if (subHeading) updateFields.subHeading = subHeading;
+        // 🔁 If heading/subHeading present → replace in ALL steps
+        if (heading || subHeading) {
+            const updateFields = {};
+            if (heading) updateFields.heading = heading;
+            if (subHeading) updateFields.subHeading = subHeading;
 
-      await CmsStep.updateMany({}, { $set: updateFields });
-    }
+            await CmsStep.updateMany({}, { $set: updateFields });
+        }
 
-    // MULTIPLE STEPS
-    if (Array.isArray(req.body)) {
-      const createdSteps = [];
+        // MULTIPLE STEPS
+        if (Array.isArray(req.body)) {
+            const createdSteps = [];
 
-      for (const stepData of req.body) {
-        const cleanedStepData = { ...stepData };
-        delete cleanedStepData._id;
-        delete cleanedStepData.id;
+            for (const stepData of req.body) {
+                const cleanedStepData = { ...stepData };
+                delete cleanedStepData._id;
+                delete cleanedStepData.id;
 
-        const step = new CmsStep(cleanedStepData);
+                const step = new CmsStep(cleanedStepData);
+                await step.save();
+                createdSteps.push(step);
+            }
+
+            return res.status(201).json({
+                success: true,
+                message: `${createdSteps.length} step(s) created successfully`,
+                data: createdSteps
+            });
+        }
+
+        // SINGLE STEP
+        const stepData = { ...req.body };
+        delete stepData._id;
+        delete stepData.id;
+
+        if (req.file) {
+            stepData.image = `${config.BASE_URL}/uploads/cms-images/${req.file.filename}`;
+        }
+
+        const step = new CmsStep(stepData);
         await step.save();
-        createdSteps.push(step);
-      }
 
-      return res.status(201).json({
-        success: true,
-        message: `${createdSteps.length} step(s) created successfully`,
-        data: createdSteps
-      });
+        res.status(201).json({
+            success: true,
+            message: 'Step created successfully',
+            data: step
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Error creating step',
+            error: error.message
+        });
     }
-
-    // SINGLE STEP
-    const stepData = { ...req.body };
-    delete stepData._id;
-    delete stepData.id;
-
-    if (req.file) {
-      stepData.image = `${config.BASE_URL}/uploads/cms-images/${req.file.filename}`;
-    }
-
-    const step = new CmsStep(stepData);
-    await step.save();
-
-    res.status(201).json({
-      success: true,
-      message: 'Step created successfully',
-      data: step
-    });
-
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error creating step',
-      error: error.message
-    });
-  }
 };
 
 
@@ -185,12 +185,12 @@ exports.updateStep = async (req, res) => {
         const stepData = { ...req.body };
         delete stepData._id;
         delete stepData.id;
-        
+
         // If there's an uploaded file, update the image field with the full URL
         if (req.file) {
             stepData.image = `${config.BASE_URL}/uploads/cms-images/${req.file.filename}`;
         }
-        
+
         const step = await CmsStep.findByIdAndUpdate(id, stepData, { new: true });
 
         if (!step) {
@@ -281,18 +281,18 @@ exports.updateConditions = async (req, res) => {
         console.log('Files keys:', req.files ? Object.keys(req.files) : 'No files');
         console.log('Conditions data from body:', req.body.conditions);
         console.log('Conditions type:', typeof req.body.conditions);
-        
+
         if (req.files) {
             Object.keys(req.files).forEach(key => {
                 console.log(`File ${key}:`, req.files[key][0]?.filename);
             });
         }
-        
+
         // Clean up the request body to remove any problematic id fields
         const conditionsData = { ...req.body };
         delete conditionsData._id;
         delete conditionsData.id;
-        
+
         // Handle conditions data - works with indexed fields, JSON string, or array
         let conditionsArray = [];
 
@@ -345,7 +345,7 @@ exports.updateConditions = async (req, res) => {
             if (req.files['image'] && req.files['image'].length > 0) {
                 conditionsData.image = `${config.BASE_URL}/uploads/cms-condition-images/${req.files['image'][0].filename}`;
             }
-            
+
             // Process condition images - enhanced debugging
             console.log('=== FILE UPLOAD DEBUG ===');
             console.log('All received files:', req.files);
@@ -355,7 +355,7 @@ exports.updateConditions = async (req, res) => {
                 Object.keys(req.files).forEach(fieldKey => {
                     console.log(`Processing file field: ${fieldKey}`);
                     const uploadedFile = Array.isArray(req.files[fieldKey]) ? req.files[fieldKey][0] : req.files[fieldKey];
-                    
+
                     if (uploadedFile && uploadedFile.filename) {
                         console.log(`File details:`, {
                             field: fieldKey,
@@ -365,7 +365,7 @@ exports.updateConditions = async (req, res) => {
                         });
 
                         let conditionIndex = null;
-                        
+
                         // Enhanced pattern matching for condition images
                         // Try multiple patterns to catch different field name formats
                         const patterns = [
@@ -375,7 +375,7 @@ exports.updateConditions = async (req, res) => {
                             /^(\d+)$/,                       // Just the index number
                             /^conditions\[(\d+)\]$/          // conditions[0] (if image is separate)
                         ];
-                        
+
                         for (const pattern of patterns) {
                             const match = fieldKey.match(pattern);
                             if (match) {
@@ -384,7 +384,7 @@ exports.updateConditions = async (req, res) => {
                                 break;
                             }
                         }
-                                                
+
                         // Alternative pattern matching for bracket notation
                         if (conditionIndex === null) {
                             // Try matching conditions[0] or conditions[0][any_field] formats
@@ -395,12 +395,12 @@ exports.updateConditions = async (req, res) => {
                                 console.log(`Matched bracket pattern ${bracketPattern} with index: ${conditionIndex}`);
                             }
                         }
-                                                
+
                         if (conditionIndex !== null && conditionIndex < conditionsArray.length) {
                             const imageUrl = `${config.BASE_URL}/uploads/cms-condition-images/${uploadedFile.filename}`;
                             console.log(`Setting image for condition ${conditionIndex}: ${imageUrl}`);
                             conditionsArray[conditionIndex].image = imageUrl;
-                                                    
+
                             // Also update the conditionsData to ensure it's preserved
                             if (conditionsData.conditions && conditionsData.conditions[conditionIndex]) {
                                 conditionsData.conditions[conditionIndex].image = imageUrl;
@@ -415,18 +415,18 @@ exports.updateConditions = async (req, res) => {
             }
             console.log('=== END FILE UPLOAD DEBUG ===');
         }
-        
+
         // First, get the existing conditions from database to preserve existing image URLs
         const existingConditionsDoc = await CmsConditionsSection.findOne().sort({ createdAt: -1 });
         const existingConditions = existingConditionsDoc?.conditions || [];
-        
+
         // Process conditions array to properly handle image updates
         if (conditionsArray && Array.isArray(conditionsArray)) {
             // Create a copy of conditionsArray with image URLs preserved
             const processedConditions = conditionsArray.map((condition, index) => {
                 // Check if this condition already has an image URL from file upload
                 const hasUploadedImage = condition.image && typeof condition.image === 'string' && condition.image.startsWith('http');
-                
+
                 if (hasUploadedImage) {
                     // Keep the uploaded image URL
                     return condition;
@@ -449,7 +449,7 @@ exports.updateConditions = async (req, res) => {
 
             conditionsData.conditions = processedConditions;
         }
-        
+
         let conditions = await CmsConditionsSection.findOne().sort({ createdAt: -1 });
 
         if (conditions) {
@@ -488,18 +488,18 @@ exports.createConditions = async (req, res) => {
         console.log('Files keys:', req.files ? Object.keys(req.files) : 'No files');
         console.log('Conditions data from body:', req.body.conditions);
         console.log('Conditions type:', typeof req.body.conditions);
-        
+
         if (req.files) {
             Object.keys(req.files).forEach(key => {
                 console.log(`File ${key}:`, req.files[key][0]?.filename);
             });
         }
-        
+
         // Clean up the request body to remove any problematic id fields
         const conditionsData = { ...req.body };
         delete conditionsData._id;
         delete conditionsData.id;
-        
+
         // Handle conditions data - works with indexed fields, JSON string, or array
         let conditionsArray = [];
 
@@ -552,7 +552,7 @@ exports.createConditions = async (req, res) => {
             if (req.files['image'] && req.files['image'].length > 0) {
                 conditionsData.image = `${config.BASE_URL}/uploads/cms-condition-images/${req.files['image'][0].filename}`;
             }
-            
+
             // Process condition images - enhanced debugging
             console.log('=== FILE UPLOAD DEBUG ===');
             console.log('All received files:', req.files);
@@ -562,7 +562,7 @@ exports.createConditions = async (req, res) => {
                 Object.keys(req.files).forEach(fieldKey => {
                     console.log(`Processing file field: ${fieldKey}`);
                     const uploadedFile = Array.isArray(req.files[fieldKey]) ? req.files[fieldKey][0] : req.files[fieldKey];
-                    
+
                     if (uploadedFile && uploadedFile.filename) {
                         console.log(`File details:`, {
                             field: fieldKey,
@@ -572,7 +572,7 @@ exports.createConditions = async (req, res) => {
                         });
 
                         let conditionIndex = null;
-                        
+
                         // Enhanced pattern matching for condition images
                         // Try multiple patterns to catch different field name formats
                         const patterns = [
@@ -582,7 +582,7 @@ exports.createConditions = async (req, res) => {
                             /^(\d+)$/,                       // Just the index number
                             /^conditions\[(\d+)\]$/          // conditions[0] (if image is separate)
                         ];
-                        
+
                         for (const pattern of patterns) {
                             const match = fieldKey.match(pattern);
                             if (match) {
@@ -591,7 +591,7 @@ exports.createConditions = async (req, res) => {
                                 break;
                             }
                         }
-                                                
+
                         // Alternative pattern matching for bracket notation
                         if (conditionIndex === null) {
                             // Try matching conditions[0] or conditions[0][any_field] formats
@@ -602,12 +602,12 @@ exports.createConditions = async (req, res) => {
                                 console.log(`Matched bracket pattern ${bracketPattern} with index: ${conditionIndex}`);
                             }
                         }
-                                                
+
                         if (conditionIndex !== null && conditionIndex < conditionsArray.length) {
                             const imageUrl = `${config.BASE_URL}/uploads/cms-condition-images/${uploadedFile.filename}`;
                             console.log(`Setting image for condition ${conditionIndex}: ${imageUrl}`);
                             conditionsArray[conditionIndex].image = imageUrl;
-                                                    
+
                             // Also update the conditionsData to ensure it's preserved
                             if (conditionsData.conditions && conditionsData.conditions[conditionIndex]) {
                                 conditionsData.conditions[conditionIndex].image = imageUrl;
@@ -622,7 +622,7 @@ exports.createConditions = async (req, res) => {
             }
             console.log('=== END FILE UPLOAD DEBUG ===');
         }
-        
+
         // Create new conditions section
         const conditions = new CmsConditionsSection(conditionsData);
         await conditions.save();
@@ -650,10 +650,10 @@ exports.addSingleCondition = async (req, res) => {
         console.log('Raw body:', req.body);
         console.log('Body keys:', Object.keys(req.body));
         console.log('Files keys:', req.files ? Object.keys(req.files) : 'No files');
-        
+
         // Get the current conditions document
         let conditions = await CmsConditionsSection.findOne().sort({ createdAt: -1 });
-        
+
         if (!conditions) {
             // If no conditions exist, create a new one with default values
             conditions = new CmsConditionsSection({
@@ -663,14 +663,14 @@ exports.addSingleCondition = async (req, res) => {
                 isPublic: true
             });
         }
-        
+
         // Prepare the new condition
         const newCondition = {
             title: req.body.title || req.body.name || '',
             content: req.body.content || '',
             image: null
         };
-        
+
         // Handle image upload if present
         if (req.files && req.files.length > 0) {
             const imageFile = req.files.find(file => file.fieldname === 'image' || file.originalname);
@@ -678,7 +678,7 @@ exports.addSingleCondition = async (req, res) => {
                 newCondition.image = `${config.BASE_URL}/uploads/cms-condition-images/${imageFile.filename}`;
             }
         }
-        
+
         // Validate required fields
         if (!newCondition.title.trim()) {
             return res.status(400).json({
@@ -686,13 +686,13 @@ exports.addSingleCondition = async (req, res) => {
                 message: 'Condition title is required'
             });
         }
-        
+
         // Add the new condition to the array
         conditions.conditions.push(newCondition);
-        
+
         // Save the updated conditions
         await conditions.save();
-        
+
         res.json({
             success: true,
             message: 'Condition added successfully',
@@ -713,24 +713,24 @@ exports.updateSingleCondition = async (req, res) => {
     try {
         const { index } = req.params;
         const conditionIndex = parseInt(index);
-        
+
         // DEBUG: Log incoming data
         console.log('=== UPDATE SINGLE CONDITION DEBUG ===');
         console.log('Index:', index);
         console.log('Raw body:', req.body);
         console.log('Body keys:', Object.keys(req.body));
         console.log('Files keys:', req.files ? Object.keys(req.files) : 'No files');
-        
+
         // Get the current conditions document
         let conditions = await CmsConditionsSection.findOne().sort({ createdAt: -1 });
-        
+
         if (!conditions) {
             return res.status(404).json({
                 success: false,
                 message: 'Conditions section not found'
             });
         }
-        
+
         // Check if index is valid
         if (conditionIndex < 0 || conditionIndex >= conditions.conditions.length) {
             return res.status(404).json({
@@ -738,14 +738,14 @@ exports.updateSingleCondition = async (req, res) => {
                 message: 'Condition not found at the specified index'
             });
         }
-        
+
         // Update the condition at the specified index
         const updatedCondition = {
             title: req.body.title || req.body.name || conditions.conditions[conditionIndex].title,
             content: req.body.content || conditions.conditions[conditionIndex].content,
             image: conditions.conditions[conditionIndex].image // Preserve existing image initially
         };
-        
+
         // Handle image upload if present
         if (req.files && req.files.length > 0) {
             const imageFile = req.files.find(file => file.fieldname === 'image' || file.originalname);
@@ -753,7 +753,7 @@ exports.updateSingleCondition = async (req, res) => {
                 updatedCondition.image = `${config.BASE_URL}/uploads/cms-condition-images/${imageFile.filename}`;
             }
         }
-        
+
         // Validate required fields
         if (!updatedCondition.title.trim()) {
             return res.status(400).json({
@@ -761,13 +761,13 @@ exports.updateSingleCondition = async (req, res) => {
                 message: 'Condition title is required'
             });
         }
-        
+
         // Update the condition in the array
         conditions.conditions[conditionIndex] = updatedCondition;
-        
+
         // Save the updated conditions
         await conditions.save();
-        
+
         res.json({
             success: true,
             message: 'Condition updated successfully',
@@ -788,21 +788,21 @@ exports.deleteSingleCondition = async (req, res) => {
     try {
         const { index } = req.params;
         const conditionIndex = parseInt(index);
-        
+
         // DEBUG: Log incoming data
         console.log('=== DELETE SINGLE CONDITION DEBUG ===');
         console.log('Index:', index);
-        
+
         // Get the current conditions document
         let conditions = await CmsConditionsSection.findOne().sort({ createdAt: -1 });
-        
+
         if (!conditions) {
             return res.status(404).json({
                 success: false,
                 message: 'Conditions section not found'
             });
         }
-        
+
         // Check if index is valid
         if (conditionIndex < 0 || conditionIndex >= conditions.conditions.length) {
             return res.status(404).json({
@@ -810,13 +810,13 @@ exports.deleteSingleCondition = async (req, res) => {
                 message: 'Condition not found at the specified index'
             });
         }
-        
+
         // Remove the condition at the specified index
         conditions.conditions.splice(conditionIndex, 1);
-        
+
         // Save the updated conditions
         await conditions.save();
-        
+
         res.json({
             success: true,
             message: 'Condition deleted successfully',
@@ -836,7 +836,7 @@ exports.deleteSingleCondition = async (req, res) => {
 exports.updateConditionsById = async (req, res) => {
     try {
         const { id } = req.params;
-        
+
         // DEBUG: Log incoming data
         console.log('=== CONDITIONS UPDATE BY ID DEBUG ===');
         console.log('ID:', id);
@@ -845,18 +845,18 @@ exports.updateConditionsById = async (req, res) => {
         console.log('Files keys:', req.files ? Object.keys(req.files) : 'No files');
         console.log('Conditions data from body:', req.body.conditions);
         console.log('Conditions type:', typeof req.body.conditions);
-        
+
         if (req.files) {
             Object.keys(req.files).forEach(key => {
                 console.log(`File ${key}:`, req.files[key][0]?.filename);
             });
         }
-        
+
         // Clean up the request body to remove any problematic id fields
         const conditionsData = { ...req.body };
         delete conditionsData._id;
         delete conditionsData.id;
-        
+
         // Handle conditions data - works with indexed fields, JSON string, or array
         let conditionsArray = [];
 
@@ -909,7 +909,7 @@ exports.updateConditionsById = async (req, res) => {
             if (req.files['image'] && req.files['image'].length > 0) {
                 conditionsData.image = `${config.BASE_URL}/uploads/cms-condition-images/${req.files['image'][0].filename}`;
             }
-            
+
             // Process condition images - enhanced debugging
             console.log('=== FILE UPLOAD DEBUG ===');
             console.log('All received files:', req.files);
@@ -919,7 +919,7 @@ exports.updateConditionsById = async (req, res) => {
                 Object.keys(req.files).forEach(fieldKey => {
                     console.log(`Processing file field: ${fieldKey}`);
                     const uploadedFile = Array.isArray(req.files[fieldKey]) ? req.files[fieldKey][0] : req.files[fieldKey];
-                    
+
                     if (uploadedFile && uploadedFile.filename) {
                         console.log(`File details:`, {
                             field: fieldKey,
@@ -929,7 +929,7 @@ exports.updateConditionsById = async (req, res) => {
                         });
 
                         let conditionIndex = null;
-                        
+
                         // Enhanced pattern matching for condition images
                         // Try multiple patterns to catch different field name formats
                         const patterns = [
@@ -939,7 +939,7 @@ exports.updateConditionsById = async (req, res) => {
                             /^(\d+)$/,                       // Just the index number
                             /^conditions\[(\d+)\]$/          // conditions[0] (if image is separate)
                         ];
-                        
+
                         for (const pattern of patterns) {
                             const match = fieldKey.match(pattern);
                             if (match) {
@@ -948,7 +948,7 @@ exports.updateConditionsById = async (req, res) => {
                                 break;
                             }
                         }
-                        
+
                         // Alternative pattern matching for bracket notation
                         if (conditionIndex === null) {
                             // Try matching conditions[0] or conditions[0][any_field] formats
@@ -959,12 +959,12 @@ exports.updateConditionsById = async (req, res) => {
                                 console.log(`Matched bracket pattern ${bracketPattern} with index: ${conditionIndex}`);
                             }
                         }
-                        
+
                         if (conditionIndex !== null && conditionIndex < conditionsArray.length) {
                             const imageUrl = `${config.BASE_URL}/uploads/cms-condition-images/${uploadedFile.filename}`;
                             console.log(`Setting image for condition ${conditionIndex}: ${imageUrl}`);
                             conditionsArray[conditionIndex].image = imageUrl;
-                            
+
                             // Also update the conditionsData to ensure it's preserved
                             if (conditionsData.conditions && conditionsData.conditions[conditionIndex]) {
                                 conditionsData.conditions[conditionIndex].image = imageUrl;
@@ -979,7 +979,7 @@ exports.updateConditionsById = async (req, res) => {
             }
             console.log('=== END FILE UPLOAD DEBUG ===');
         }
-        
+
         // First, get the existing conditions from database to preserve existing image URLs
         const existingConditionsDoc = await CmsConditionsSection.findById(id);
         if (!existingConditionsDoc) {
@@ -988,16 +988,16 @@ exports.updateConditionsById = async (req, res) => {
                 message: 'Conditions section not found'
             });
         }
-        
+
         const existingConditions = existingConditionsDoc?.conditions || [];
-        
+
         // Process conditions array to properly handle image updates
         if (conditionsArray && Array.isArray(conditionsArray)) {
             // Create a copy of conditionsArray with image URLs preserved
             const processedConditions = conditionsArray.map((condition, index) => {
                 // Check if this condition already has an image URL from file upload
                 const hasUploadedImage = condition.image && typeof condition.image === 'string' && condition.image.startsWith('http');
-                
+
                 if (hasUploadedImage) {
                     // Keep the uploaded image URL
                     return condition;
@@ -1020,7 +1020,7 @@ exports.updateConditionsById = async (req, res) => {
 
             conditionsData.conditions = processedConditions;
         }
-        
+
         // Update the conditions section by ID
         const conditions = await CmsConditionsSection.findByIdAndUpdate(
             id,
@@ -1104,7 +1104,7 @@ exports.updateWhyUs = async (req, res) => {
 
         // ❗ IMPORTANT FIX
         if (!req.file) {
-            delete whyUsData.image; 
+            delete whyUsData.image;
         }
 
         let whyUs = await CmsWhyUs.findOne().sort({ createdAt: -1 });
@@ -1118,7 +1118,7 @@ exports.updateWhyUs = async (req, res) => {
                 }
             }
 
-            whyUsData.image = `${config.BASE_URL}/uploads/${req.file.filename}`;
+            whyUsData.image = `${config.BASE_URL}/uploads/cms-images/${req.file.filename}`;
         }
 
         if (whyUs) {
@@ -1184,7 +1184,7 @@ exports.createFaq = async (req, res) => {
         const faqData = { ...req.body };
         delete faqData._id;
         delete faqData.id;
-        
+
         const faq = new CmsFaq(faqData);
         await faq.save();
         res.status(201).json({
@@ -1208,7 +1208,7 @@ exports.updateFaq = async (req, res) => {
         const faqData = { ...req.body };
         delete faqData._id;
         delete faqData.id;
-        
+
         const faq = await CmsFaq.findByIdAndUpdate(id, faqData, { new: true });
 
         if (!faq) {
@@ -1296,7 +1296,7 @@ exports.updateTerms = async (req, res) => {
         const termsData = { ...req.body };
         delete termsData._id;
         delete termsData.id;
-        
+
         let terms = await CmsTerms.findOne().sort({ createdAt: -1 });
 
         if (terms) {
@@ -1360,12 +1360,12 @@ exports.updateFeaturedTherapist = async (req, res) => {
         const therapistData = { ...req.body };
         delete therapistData._id;
         delete therapistData.id;
-        
+
         // If there's an uploaded file, update the image field with the full URL
         if (req.file) {
             therapistData.image = `${config.BASE_URL}/uploads/cms-images/${req.file.filename}`;
         }
-        
+
         let therapist = await CmsFeaturedTherapist.findOne().sort({ createdAt: -1 });
 
         if (therapist) {
@@ -1462,7 +1462,7 @@ exports.updateContact = async (req, res) => {
         const contactData = { ...req.body };
         delete contactData._id;
         delete contactData.id;
-        
+
         console.log('Cleaned contact data:', contactData);
 
         let contact = await CmsContact.findOne().sort({ createdAt: -1 });
@@ -1559,23 +1559,23 @@ exports.updateAbout = async (req, res) => {
         console.log('Request body:', req.body);
         console.log('Request files:', req.files);
         console.log('Files keys:', req.files ? Object.keys(req.files) : 'No files');
-        
+
         // Clean up the request body to remove any problematic id fields
         const aboutData = { ...req.body };
         delete aboutData._id;
         delete aboutData.id;
-        
+
         // Get the current about section to preserve existing images if not overridden
         const currentAbout = await CmsAbout.findOne().sort({ createdAt: -1 });
-        
+
         // Handle images upload - support both adding new images and replacing all images
         // When using multer.fields([{ name: 'images', maxCount: 10 }]), files are stored in req.files.images
         if (req.files && req.files.images && Array.isArray(req.files.images)) {
             console.log('Multiple images found:', req.files.images.length);
-            
+
             // Initialize images array - either use existing or start fresh
             let images = [];
-            
+
             // Check if we should replace all images or add to existing ones
             if (req.body.replaceImages === 'true' || req.body.replaceImages === true) {
                 // Replace all images with newly uploaded ones
@@ -1587,14 +1587,14 @@ exports.updateAbout = async (req, res) => {
             } else {
                 // Preserve existing images and add new ones
                 images = [...(currentAbout?.images || [])];
-                
+
                 req.files.images.forEach(file => {
                     const imageUrl = `${config.BASE_URL}/uploads/cms-images/${file.filename}`;
                     images.push(imageUrl);
                     console.log('Added image (appending):', imageUrl);
                 });
             }
-            
+
             aboutData.images = images;
             console.log('Final images array:', images);
         } else if (req.body.images) {
@@ -1611,21 +1611,21 @@ exports.updateAbout = async (req, res) => {
                 console.log('Assigned images directly:', req.body.images);
             }
         }
-        
+
         // Handle single image field (for backward compatibility)
         if (req.file) {
             aboutData.image = `${config.BASE_URL}/uploads/cms-images/${req.file.filename}`;
             console.log('Added single image:', aboutData.image);
         }
-        
+
         // Handle main image field separately if uploaded as 'image' field
         if (req.files && req.files.image && Array.isArray(req.files.image) && req.files.image.length > 0) {
             aboutData.image = `${config.BASE_URL}/uploads/cms-images/${req.files.image[0].filename}`;
             console.log('Added main image:', aboutData.image);
         }
-        
+
         let about = await CmsAbout.findOne().sort({ createdAt: -1 });
-        
+
         console.log('Existing about found:', about ? 'Yes' : 'No');
         if (about) {
             console.log('Existing about data before update:', {
@@ -1634,7 +1634,7 @@ exports.updateAbout = async (req, res) => {
                 image: about.image,
                 images: about.images
             });
-            
+
             // Preserve existing images if not explicitly provided
             if (!aboutData.images) {
                 aboutData.images = about.images;
@@ -1650,7 +1650,7 @@ exports.updateAbout = async (req, res) => {
             await about.save();
             console.log('New about created successfully');
         }
-        
+
         console.log('Final about data:', {
             id: about._id,
             title: about.title,
@@ -1665,7 +1665,7 @@ exports.updateAbout = async (req, res) => {
             message: 'About section updated successfully',
             data: about
         });
-        
+
         console.log('=== UPDATE ABOUT RESPONSE SENT ===');
     } catch (error) {
         console.error('=== UPDATE ABOUT ERROR ===');
