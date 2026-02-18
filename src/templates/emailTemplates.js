@@ -92,6 +92,69 @@ class EmailTemplates {
         `;
     }
 
+    // Template: Welcome Email for new users
+    static welcome(data) {
+        const userName = data.clientName || data.userName || 'Valued User';
+
+        return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to Tanish Physio</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #eef2ff;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #eef2ff; padding: 20px 0;">
+        <tr>
+            <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 20px rgba(0,0,0,0.08); overflow: hidden; border: 1px solid #e0e7ff;">
+                    ${EmailTemplates.generateHeader(
+                        'Welcome to Tanish Physio',
+                        'Your recovery journey starts here',
+                        { start: '#4f46e5', end: '#6366f1', text: '#e0e7ff' },
+                        '✨'
+                    )}
+                    
+                    <tr>
+                        <td style="padding: 40px;">
+                            <p style="font-size: 20px; color: #312e81; margin: 0 0 20px 0; font-weight: 600;">
+                                Hi ${userName},
+                            </p>
+
+                            <p style="font-size: 16px; color: #4338ca; margin: 0 0 18px 0; line-height: 1.7;">
+                                Thanks for creating your account with <strong>Tanish Physio</strong>! We're excited to support your wellness goals.
+                            </p>
+
+                            <div style="background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%); border-radius: 12px; padding: 20px 24px; margin: 20px 0; border: 1px solid #c7d2fe;">
+                                <h3 style="color: #312e81; margin: 0 0 12px 0; font-size: 18px;">Here's what you can do next:</h3>
+                                <ul style="color: #4338ca; margin: 0; padding-left: 18px; line-height: 1.6;">
+                                    <li>Book a physiotherapy session that fits your schedule</li>
+                                    <li>Explore personalized programs crafted by our experts</li>
+                                    <li>Get reminders and updates right on WhatsApp and email</li>
+                                </ul>
+                            </div>
+
+                            <p style="font-size: 16px; color: #4338ca; margin: 22px 0 0 0; line-height: 1.6;">
+                                Need help? Just reply to this email or message us on WhatsApp—our team is here for you.
+                            </p>
+                        </td>
+                    </tr>
+
+                    ${EmailTemplates.generateFooter(
+                        '#312e81',
+                        { light: '#c7d2fe', accent: '#a5b4fc', border: '#4338ca' },
+                        'Warm regards, Team Tanish Physio'
+                    )}
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+        `;
+    }
+
     // Template 2: Booking Created
     static bookingCreated(data) {
         return `
