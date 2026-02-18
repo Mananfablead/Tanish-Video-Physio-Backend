@@ -17,16 +17,16 @@ db.once('open', async () => {
   
   try {
     // Find all subscription plans
-    const plans = await SubscriptionPlan.find({}).select('planId name price duration status');
+    const plans = await SubscriptionPlan.find({}).select('planId name price price_inr price_usd duration status session_type');
     console.log('All subscription plans:');
     plans.forEach(plan => {
-      console.log(`- ${plan.planId}: ${plan.name} - ₹${plan.price} (${plan.duration}) [${plan.status}]`);
+      console.log(`- ${plan.planId}: ${plan.name} - Base:₹${plan.price}, INR:₹${plan.price_inr}, USD:$${plan.price_usd} (${plan.duration}) [${plan.status}] session_type:${plan.session_type}`);
     });
     
     console.log('\nActive subscription plans:');
-    const activePlans = await SubscriptionPlan.find({ status: 'active' }).select('planId name price duration');
+    const activePlans = await SubscriptionPlan.find({ status: 'active' }).select('planId name price price_inr price_usd duration session_type');
     activePlans.forEach(plan => {
-      console.log(`- ${plan.planId}: ${plan.name} - ₹${plan.price} (${plan.duration})`);
+      console.log(`- ${plan.planId}: ${plan.name} - Base:₹${plan.price}, INR:₹${plan.price_inr}, USD:$${plan.price_usd} (${plan.duration}) session_type:${plan.session_type}`);
     });
     
     process.exit(0);
