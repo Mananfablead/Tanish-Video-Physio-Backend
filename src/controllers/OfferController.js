@@ -253,11 +253,11 @@ exports.deleteOffer = async (req, res, next) => {
       );
     }
 
-    await offer.remove();
+    await Offer.deleteOne({ _id: req.params.id });
 
     res.status(200).json({
       success: true,
-      message: "Offer remo                                  ved",
+      message: "Offer removed successfully",
     });
   } catch (error) {
     next(error);

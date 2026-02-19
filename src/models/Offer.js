@@ -23,7 +23,8 @@ const offerSchema = new mongoose.Schema({
   },
   description: {
     type: String,
-    required: true
+    required: false,
+    default: ""
   },
   isActive: {
     type: Boolean,
@@ -31,15 +32,18 @@ const offerSchema = new mongoose.Schema({
   },
   minimumAmount: {
     type: Number,
-    default: 0
+    default: 0,
+    required: false
   },
   maxDiscountAmount: {
     type: Number,
-    default: null
+    default: null,
+    required: false
   },
   usageLimit: {
     type: Number,
-    default: null
+    default: null,
+    required: false
   },
   usedCount: {
     type: Number,

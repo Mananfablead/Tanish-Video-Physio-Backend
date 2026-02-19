@@ -109,18 +109,46 @@ const getBookingDetails = async (req, res, next) => {
 // Create a new booking with notification triggers
 const createBooking = async (req, res, next) => {
     try {
-        const { serviceId, date, time, notes, clientName, scheduleType, scheduledDate, scheduledTime, timeSlot, couponCode, discountAmount, finalAmount } = req.body;
-
-        // Validate required fields
-        if (!serviceId) {
-            return res.status(400).json(ApiResponse.error('Service ID is required'));
+        // Check if user is authenticated
+        if (!req.user || !req.user.userId) {
+            return res.status(401).json(ApiResponse.error('Authentication required'));
         }
 
-        // Validate service exists
-        const service = await Service.findById(serviceId);
+        const { serviceId, date, time, notes, clientName, scheduleType, scheduledDate, scheduledTime, timeSlot, couponCode, discountAmount, finalAmount, bookingType } = req.body;
 
-        if (!service || service.status !== 'active') {
-            return res.status(404).json(ApiResponse.error('Service not found or not active'));
+        // Check for duplicate booking to prevent multiple submissions
+        const existingBooking = await Booking.findOne({
+            userId: req.user.userId,
+            date: date,
+            time: time,
+            bookingType: bookingType || 'regular',
+            status: { $in: ['pending', 'confirmed', 'scheduled'] } // Don't allow duplicates for active bookings
+        });
+
+        if (existingBooking) {
+            return res.status(409).json(ApiResponse.error('You already have a booking for this date and time'));
+        }
+
+        let service = null;
+        let serviceName = "Free Consultation";
+        let amount = 0;
+
+        if (bookingType === 'free-consultation') {
+            // For free consultations, no service validation needed
+        } else {
+            // Validate required fields
+            if (!serviceId) {
+                return res.status(400).json(ApiResponse.error('Service ID is required'));
+            }
+
+            // Validate service exists
+            service = await Service.findById(serviceId);
+
+            if (!service || service.status !== 'active') {
+                return res.status(404).json(ApiResponse.error('Service not found or not active'));
+            }
+            serviceName = service.name;
+            amount = service.price;
         }
 
         // Automatically assign an available therapist (admin user)
@@ -145,28 +173,29 @@ const createBooking = async (req, res, next) => {
 
         // Create booking with default status values
         const booking = new Booking({
-            serviceId,
-            serviceName: service.name,
+            serviceId: bookingType === 'free-consultation' ? null : serviceId,
+            serviceName: serviceName,
             therapistId: therapist._id,
-            therapistName: therapist.name,
+            therapistName: therapist?.name || 'Admin',
             userId: req.user.userId,
-            clientName: clientName || req.user.name,
+            clientName: clientName || req.user?.name || 'Unknown User',
             date,
             time,
             notes,
-            amount: service.price,
-            originalAmount: service.price, // Store original price for discount calculations
-            finalAmount: finalAmount || service.price,
+            amount: amount,
+            originalAmount: amount,
+            finalAmount: finalAmount || amount,
             couponCode: couponCode || null,
             discountAmount: discountAmount || 0,
-            paymentStatus: 'pending', // Default from existing enum
-            status: (scheduledDate && scheduledTime) ? 'scheduled' : (scheduleType === 'later' ? 'pending' : 'scheduled'), // Scheduled when time is selected, otherwise based on scheduleType
-            serviceValidityDays: service.validity,
+            paymentStatus: bookingType === 'free-consultation' ? 'verified' : 'pending',
+            status: bookingType === 'free-consultation' ? 'pending' : ((scheduledDate && scheduledTime) ? 'scheduled' : (scheduleType === 'later' ? 'pending' : 'scheduled')),
+            serviceValidityDays: bookingType === 'free-consultation' ? null : service?.validity,
             purchaseDate: new Date(),
             scheduleType: scheduleType || 'now',
             scheduledDate: scheduledDate || null,
             scheduledTime: scheduledTime || null,
-            timeSlot: timeSlot || null
+            timeSlot: timeSlot || null,
+            bookingType: bookingType || 'regular'
         });
 
         await booking.save();
@@ -182,8 +211,8 @@ const createBooking = async (req, res, next) => {
 
         // Send notifications
         const notificationData = {
-            clientName: req.user.name,
-            serviceName: service.name,
+            clientName: req.user?.name || 'Unknown User',
+            serviceName: serviceName,
             bookingId: booking._id,
             date: date,
             time: time
@@ -195,7 +224,7 @@ const createBooking = async (req, res, next) => {
             await NotificationService.sendNotification(
                 { email: admin.email, phone: admin.phone },
                 'new_booking',
-                { ...notificationData, clientName: req.user.name }
+                { ...notificationData, clientName: req.user?.name || 'Unknown User' }
             );
         }
 
@@ -509,14 +538,58 @@ const updateBooking = async (req, res, next) => {
                 updateData.cancellationReason = cancellationReason;
             }
 
-            // Handle confirmation - calculate expiry date
+            // Handle confirmation - calculate expiry date or create session for free consultation
             if (status === 'confirmed') {
-                const service = await Service.findById(currentBooking.serviceId);
-                if (service && service.validity) {
-                    const purchaseDate = currentBooking.purchaseDate || currentBooking.createdAt;
-                    const expiryDate = new Date(purchaseDate);
-                    expiryDate.setDate(purchaseDate.getDate() + service.validity);
-                    updateData.serviceExpiryDate = expiryDate;
+                if (currentBooking.bookingType === 'free-consultation') {
+                    // For free consultations, create a session immediately
+                    const Session = require('../models/Session.model');
+                    
+                    // Calculate session time (15 minutes from booking time)
+                    const sessionStartTime = new Date(`${currentBooking.date}T${currentBooking.timeSlot.start}:00`);
+                    const sessionEndTime = new Date(sessionStartTime.getTime() + 15 * 60000); // 15 minutes
+                    
+                    const sessionData = {
+                        bookingId: currentBooking._id,
+                        therapistId: currentBooking.therapistId,
+                        userId: currentBooking.userId,
+                        date: currentBooking.date,
+                        time: currentBooking.timeSlot.start,
+                        startTime: sessionStartTime,
+                        endTime: sessionEndTime,
+                        type: "1-on-1",
+                        status: "scheduled", // Schedule the session immediately
+                        duration: 15,
+                    };
+                    
+                    await Session.create(sessionData);
+                    
+                    // Update availability to mark slot as booked
+                    const Availability = require('../models/Availability.model');
+                    await Availability.updateOne(
+                        { therapistId: currentBooking.therapistId, date: currentBooking.date },
+                        {
+                            $set: {
+                                "timeSlots.$[slot].status": "booked",
+                            },
+                        },
+                        {
+                            arrayFilters: [
+                                {
+                                    "slot.start": currentBooking.timeSlot.start,
+                                    "slot.status": "available",
+                                },
+                            ],
+                        }
+                    );
+                } else {
+                    // For regular bookings, calculate expiry date
+                    const service = await Service.findById(currentBooking.serviceId);
+                    if (service && service.validity) {
+                        const purchaseDate = currentBooking.purchaseDate || currentBooking.createdAt;
+                        const expiryDate = new Date(purchaseDate);
+                        expiryDate.setDate(purchaseDate.getDate() + service.validity);
+                        updateData.serviceExpiryDate = expiryDate;
+                    }
                 }
             }
         }
@@ -842,7 +915,7 @@ const getBookingsByStatus = async (req, res, next) => {
 // Create a new booking for guest users
 const createGuestBooking = async (req, res, next) => {
     try {
-        const { serviceId, date, time, notes, clientName, clientEmail, clientPhone, scheduleType, scheduledDate, scheduledTime, timeSlot, couponCode, discountAmount, finalAmount } = req.body;
+        const { serviceId, date, time, notes, clientName, clientEmail, clientPhone, scheduleType, scheduledDate, scheduledTime, timeSlot, couponCode, discountAmount, finalAmount, bookingType } = req.body;
 
         // Validate required fields for guest booking
         if (!clientName || !clientEmail || !clientPhone) {
@@ -855,11 +928,36 @@ const createGuestBooking = async (req, res, next) => {
             return res.status(400).json(ApiResponse.error("Invalid email format"));
         }
 
-        // Validate service exists
-        const service = await Service.findById(serviceId);
+        // Check for duplicate booking to prevent multiple submissions
+        const existingUser = await User.findOne({ email: clientEmail });
+        if (existingUser) {
+            const existingBooking = await Booking.findOne({
+                userId: existingUser._id,
+                date: date,
+                time: time,
+                bookingType: bookingType || 'regular',
+                status: { $in: ['pending', 'confirmed', 'scheduled'] }
+            });
 
-        if (!service || service.status !== 'active') {
-            return res.status(404).json(ApiResponse.error('Service not found or not active'));
+            if (existingBooking) {
+                return res.status(409).json(ApiResponse.error('You already have a booking for this date and time'));
+            }
+        }
+
+        let service = null;
+        let serviceName = "Free Consultation";
+        let amount = 0;
+
+        if (bookingType === 'free-consultation') {
+            // For free consultations, no service validation needed
+        } else {
+            // Validate service exists for regular bookings
+            service = await Service.findById(serviceId);
+            if (!service || service.status !== 'active') {
+                return res.status(404).json(ApiResponse.error('Service not found or not active'));
+            }
+            serviceName = service.name;
+            amount = service.price;
         }
 
         // Check if user already exists
@@ -919,27 +1017,28 @@ const createGuestBooking = async (req, res, next) => {
         }
 
         const booking = new Booking({
-            serviceId,
-            serviceName: service.name, // Get from service model
+            serviceId: bookingType === 'free-consultation' ? null : serviceId,
+            serviceName: serviceName,
             therapistId: therapist._id,
-            therapistName: therapist.name, // Get from therapist model
-            userId: user._id, // Assign the newly created user
+            therapistName: therapist?.name || 'Admin',
+            userId: user._id,
             clientName: clientName,
             date,
             time,
             notes,
-            amount: service.price, // Get from service model
-            originalAmount: service.price, // Store original price for discount calculations
-            finalAmount: finalAmount || service.price,
+            amount: amount,
+            originalAmount: amount,
+            finalAmount: finalAmount || amount,
             couponCode: couponCode || null,
             discountAmount: discountAmount || 0,
-            paymentStatus: 'pending', // Initially pending until payment is made
-            purchaseDate: new Date(), // Set purchase date when booking is created
+            paymentStatus: bookingType === 'free-consultation' ? 'verified' : 'pending',
+            purchaseDate: new Date(),
             scheduleType: scheduleType || 'now',
             scheduledDate: scheduledDate || null,
             scheduledTime: scheduledTime || null,
             timeSlot: timeSlot || null,
-            status: (scheduledDate && scheduledTime) ? 'scheduled' : (scheduleType === 'later' ? 'pending' : 'scheduled') // Scheduled when time is selected, otherwise based on scheduleType
+            bookingType: bookingType || 'regular',
+            status: bookingType === 'free-consultation' ? 'pending' : ((scheduledDate && scheduledTime) ? 'scheduled' : (scheduleType === 'later' ? 'pending' : 'scheduled'))
         });
 
         await booking.save();
@@ -956,7 +1055,7 @@ const createGuestBooking = async (req, res, next) => {
         // Send notifications to guest user
         const notificationData = {
             clientName: clientName,
-            serviceName: service.name,
+            serviceName: serviceName,
             bookingId: booking._id,
             date: date,
             time: time

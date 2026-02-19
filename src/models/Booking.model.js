@@ -4,7 +4,9 @@ const bookingSchema = new mongoose.Schema({
     serviceId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Service',
-        required: [true, 'Service ID is required']
+        required: function() {
+            return this.bookingType !== 'free-consultation';
+        }
     },
     serviceName: {
         type: String,
@@ -96,6 +98,11 @@ const bookingSchema = new mongoose.Schema({
     timeSlot: {
         start: String,
         end: String
+    },
+    bookingType: {
+        type: String,
+        enum: ['regular', 'free-consultation'],
+        default: 'regular'
     },
     finalAmount: {
         type: Number,
