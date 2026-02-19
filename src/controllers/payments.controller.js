@@ -464,6 +464,33 @@ const verifyPayment = async (req, res, next) => {
 
                 // If booking has a scheduled date and time slot, update the availability status to 'booked'
                 if (booking.scheduledDate && booking.timeSlot && booking.timeSlot.start && booking.timeSlot.end) {
+                    // First, check if another booking has already been paid for this same slot
+                    const conflictingBooking = await Booking.findOne({
+                        _id: { $ne: booking._id }, // Exclude current booking
+                        therapistId: booking.therapistId,
+                        scheduledDate: booking.scheduledDate,
+                        'timeSlot.start': booking.timeSlot.start,
+                        'timeSlot.end': booking.timeSlot.end,
+                        paymentStatus: 'paid' // Only check for other PAID bookings
+                    });
+
+                    if (conflictingBooking) {
+                        // Another booking has already been paid for this slot
+                        // Reject this payment and mark it as failed
+                        await Payment.findOneAndUpdate(
+                            { orderId },
+                            {
+                                paymentId,
+                                status: 'failed',
+                                failureReason: 'Time slot already booked by another user'
+                            }
+                        );
+                        
+                        return res.status(409).json(
+                            ApiResponse.error('Time slot already booked by another user')
+                        );
+                    }
+
                     const Availability = require('../models/Availability.model');
 
                     // Find the availability record for this therapist and date
@@ -877,6 +904,33 @@ const verifyGuestPayment = async (req, res, next) => {
 
                 // If booking has a scheduled date and time slot, update the availability status to 'booked'
                 if (booking.scheduledDate && booking.timeSlot && booking.timeSlot.start && booking.timeSlot.end) {
+                    // First, check if another booking has already been paid for this same slot
+                    const conflictingBooking = await Booking.findOne({
+                        _id: { $ne: booking._id }, // Exclude current booking
+                        therapistId: booking.therapistId,
+                        scheduledDate: booking.scheduledDate,
+                        'timeSlot.start': booking.timeSlot.start,
+                        'timeSlot.end': booking.timeSlot.end,
+                        paymentStatus: 'paid' // Only check for other PAID bookings
+                    });
+
+                    if (conflictingBooking) {
+                        // Another booking has already been paid for this slot
+                        // Reject this payment and mark it as failed
+                        await Payment.findOneAndUpdate(
+                            { orderId },
+                            {
+                                paymentId,
+                                status: 'failed',
+                                failureReason: 'Time slot already booked by another user'
+                            }
+                        );
+                        
+                        return res.status(409).json(
+                            ApiResponse.error('Time slot already booked by another user')
+                        );
+                    }
+
                     const Availability = require('../models/Availability.model');
 
                     // Find the availability record for this therapist and date
@@ -1686,6 +1740,61 @@ const verifySubscriptionPayment = async (req, res, next) => {
 
                     await booking.save();
                     console.log(`✅ Booking created for subscription with therapist: ${subscription.therapistId}, Booking ID: ${booking._id}`);
+
+                    // If the subscription has scheduled date and time slot, update the availability status to 'booked'
+                    if (subscription.scheduledDate && subscription.timeSlot && subscription.timeSlot.start && subscription.timeSlot.end) {
+                        // First, check if another booking has already been paid for this same slot
+                        const conflictingBooking = await Booking.findOne({
+                            therapistId: subscription.therapistId,
+                            scheduledDate: subscription.scheduledDate,
+                            'timeSlot.start': subscription.timeSlot.start,
+                            'timeSlot.end': subscription.timeSlot.end,
+                            paymentStatus: 'paid' // Only check for other PAID bookings
+                        });
+
+                        if (conflictingBooking) {
+                            // Another booking has already been paid for this slot
+                            // Reject this subscription payment and mark it as failed
+                            await Subscription.findOneAndUpdate(
+                                { orderId },
+                                {
+                                    paymentId,
+                                    status: 'failed',
+                                    failureReason: 'Time slot already booked by another user'
+                                }
+                            );
+                            
+                            return res.status(409).json(
+                                ApiResponse.error('Time slot already booked by another user')
+                            );
+                        }
+
+                        const Availability = require('../models/Availability.model');
+
+                        // Find the availability record for this therapist and date
+                        const availability = await Availability.findOne({
+                            therapistId: subscription.therapistId,
+                            date: subscription.scheduledDate
+                        });
+
+                        if (availability) {
+                            // Find and update the specific time slot from 'tentative' to 'booked'
+                            const slotIndex = availability.timeSlots.findIndex(slot =>
+                                slot.start === subscription.timeSlot.start &&
+                                slot.end === subscription.timeSlot.end
+                            );
+
+                            if (slotIndex !== -1) {
+                                availability.timeSlots[slotIndex].status = 'booked';
+                                await availability.save();
+                                console.log(`Successfully booked slot ${subscription.timeSlot.start}-${subscription.timeSlot.end} for therapist ${subscription.therapistId} on ${subscription.scheduledDate}`);
+                            } else {
+                                console.log(`Time slot ${subscription.timeSlot.start}-${subscription.timeSlot.end} not found for therapist ${subscription.therapistId} on ${subscription.scheduledDate}`);
+                            }
+                        } else {
+                            console.log(`No availability found for therapist ${subscription.therapistId} on date ${subscription.scheduledDate}`);
+                        }
+                    }
                 } catch (bookingError) {
                     console.error('Error creating booking for subscription:', bookingError);
                     // Don't fail the subscription process if booking creation fails

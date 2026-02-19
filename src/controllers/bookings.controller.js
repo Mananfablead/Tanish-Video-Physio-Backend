@@ -9,7 +9,10 @@ const NotificationService = require('../services/notificationService');
 // Get all bookings for authenticated user
 const getAllBookings = async (req, res, next) => {
     try {
-        const bookings = await Booking.find({ userId: req.user.userId })
+        const bookings = await Booking.find({ 
+            userId: req.user.userId,
+            paymentStatus: 'paid' // Only show bookings where payment has been completed
+        })
             .sort({ createdAt: -1 }) // Sort by createdAt descending
             .populate('serviceId', 'name price duration validity images')
             .populate('therapistId', 'name email role profilePicture');
@@ -171,12 +174,14 @@ const createBooking = async (req, res, next) => {
 
         await booking.save();
 
-        // If scheduling now, update availability to mark the slot as booked
+        // If scheduling now, update availability to mark the slot as tentative until payment is confirmed
         if (scheduleType === 'now' && scheduledDate && scheduledTime && timeSlot) {
-            await updateAvailabilitySlot(therapist._id, scheduledDate, timeSlot.start, timeSlot.end, 'booked');
+            // Mark slot as tentative if payment is pending, booked if payment is confirmed
+            const slotStatus = booking.paymentStatus === 'paid' ? 'booked' : 'tentative';
+            await updateAvailabilitySlot(therapist._id, scheduledDate, timeSlot.start, timeSlot.end, slotStatus);
         }
 
-        // Populate for response
+        // Populate the response
         await booking.populate('serviceId', 'name price duration validity images');
         await booking.populate('therapistId', 'name email role profilePicture');
 
@@ -256,18 +261,19 @@ async function checkTimeSlotAvailability(therapistId, date, time, timeSlot) {
         return { available: false, message: 'No availability found for the selected date' };
     }
 
-    // Check if there's already a booking for this therapist at the same time
+    // Check if there's already a PAID booking for this therapist at the same time
     const Booking = require('../models/Booking.model');
-    const existingBooking = await Booking.findOne({
+    const existingPaidBooking = await Booking.findOne({
         therapistId,
         scheduledDate: date,
+        paymentStatus: 'paid', // Only consider paid bookings as blocking
         $or: [
             { 'timeSlot.start': timeSlot ? timeSlot.start : time },
             { scheduledTime: time }
         ]
     });
 
-    if (existingBooking) {
+    if (existingPaidBooking) {
         return { available: false, message: 'A booking already exists for this time slot' };
     }
 
@@ -356,17 +362,18 @@ const checkSlotAvailability = async (req, res, next) => {
             return res.status(409).json(ApiResponse.error('No availability found for the selected date')); 
         }
 
-        // Check if there's already a booking for this therapist at the same time
-        const existingBooking = await Booking.findOne({
+        // Check if there's already a PAID booking for this therapist at the same time
+        const existingPaidBooking = await Booking.findOne({
             therapistId,
             date,
+            paymentStatus: 'paid', // Only consider paid bookings as blocking
             $or: [
                 { scheduledDate: date, 'timeSlot.start': start, 'timeSlot.end': end },
                 { scheduledDate: date, time: { $regex: `^${start.substring(0, 5)}.*` } } // Match if time starts with the same hour
             ]
         });
 
-        if (existingBooking) {
+        if (existingPaidBooking) {
             return res.status(409).json(ApiResponse.error('A booking already exists for this time slot')); 
         }
 
@@ -530,6 +537,37 @@ const updateBooking = async (req, res, next) => {
             .populate('serviceId', 'name price duration validity images')
             .populate('therapistId', 'name email role profilePicture');
 
+        // If payment status changed to 'paid', update the availability slot from 'tentative' to 'booked'
+        if (updateData.paymentStatus === 'paid' && currentBooking.paymentStatus !== 'paid') {
+            if (booking.scheduledDate && booking.timeSlot && booking.timeSlot.start && booking.timeSlot.end) {
+                const Availability = require('../models/Availability.model');
+
+                // Find the availability record for this therapist and date
+                const availability = await Availability.findOne({
+                    therapistId: booking.therapistId,
+                    date: booking.scheduledDate
+                });
+
+                if (availability) {
+                    // Find and update the specific time slot from 'tentative' to 'booked'
+                    const slotIndex = availability.timeSlots.findIndex(slot =>
+                        slot.start === booking.timeSlot.start &&
+                        slot.end === booking.timeSlot.end
+                    );
+
+                    if (slotIndex !== -1) {
+                        availability.timeSlots[slotIndex].status = 'booked';
+                        await availability.save();
+                        console.log(`Successfully booked slot ${booking.timeSlot.start}-${booking.timeSlot.end} for therapist ${booking.therapistId} on ${booking.scheduledDate}`);
+                    } else {
+                        console.log(`Time slot ${booking.timeSlot.start}-${booking.timeSlot.end} not found for therapist ${booking.therapistId} on ${booking.scheduledDate}`);
+                    }
+                } else {
+                    console.log(`No availability found for therapist ${booking.therapistId} on date ${booking.scheduledDate}`);
+                }
+            }
+        }
+
         if (status && status !== currentBooking.status) {
             // Get booking owner's contact information
             const bookingOwner = await User.findById(booking.userId).select('email phone name');
@@ -594,6 +632,12 @@ const updateBookingStatus = async (req, res, next) => {
             }
         }
 
+        // Get current booking for comparison
+        const currentBooking = await Booking.findOne(query);
+        if (!currentBooking) {
+            return res.status(404).json(ApiResponse.error('Booking not found or unauthorized'));
+        }
+        
         // Prepare update data
         const updateData = { status };
         if (couponCode !== undefined) updateData.couponCode = couponCode;
@@ -607,6 +651,38 @@ const updateBookingStatus = async (req, res, next) => {
         )
             .populate('serviceId', 'name price duration validity images')
             .populate('therapistId', 'name email role profilePicture');
+
+        // If payment status changed to 'paid', update the availability slot from 'tentative' to 'booked'
+        if (updateData.finalAmount && booking.paymentStatus !== 'paid') {
+            // Check if this was a payment confirmation (amount changed and booking wasn't already paid)
+            if (booking.scheduledDate && booking.timeSlot && booking.timeSlot.start && booking.timeSlot.end) {
+                const Availability = require('../models/Availability.model');
+
+                // Find the availability record for this therapist and date
+                const availability = await Availability.findOne({
+                    therapistId: booking.therapistId,
+                    date: booking.scheduledDate
+                });
+
+                if (availability) {
+                    // Find and update the specific time slot from 'tentative' to 'booked'
+                    const slotIndex = availability.timeSlots.findIndex(slot =>
+                        slot.start === booking.timeSlot.start &&
+                        slot.end === booking.timeSlot.end
+                    );
+
+                    if (slotIndex !== -1) {
+                        availability.timeSlots[slotIndex].status = 'booked';
+                        await availability.save();
+                        console.log(`Successfully booked slot ${booking.timeSlot.start}-${booking.timeSlot.end} for therapist ${booking.therapistId} on ${booking.scheduledDate}`);
+                    } else {
+                        console.log(`Time slot ${booking.timeSlot.start}-${booking.timeSlot.end} not found for therapist ${booking.therapistId} on ${booking.scheduledDate}`);
+                    }
+                } else {
+                    console.log(`No availability found for therapist ${booking.therapistId} on date ${booking.scheduledDate}`);
+                }
+            }
+        }
 
         if (!booking) {
             return res.status(404).json(ApiResponse.error('Booking not found or unauthorized'));
@@ -757,8 +833,11 @@ const getAllBookingsForAdmin = async (req, res, next) => {
         // Build query
         let query = {};
 
+        // Only show bookings where payment has been completed
+        query.paymentStatus = 'paid';
+        
         if (status) query.status = status;
-        if (paymentStatus) query.paymentStatus = paymentStatus;
+        if (paymentStatus) query.paymentStatus = paymentStatus; // Override with specific paymentStatus if provided
 
         if (dateFrom || dateTo) {
             query.date = {};
@@ -776,7 +855,7 @@ const getAllBookingsForAdmin = async (req, res, next) => {
             .skip(skip)
             .limit(limit);
 
-        const total = await Booking.countDocuments(query);
+        const total = await Booking.countDocuments({ ...query, paymentStatus: 'paid' }); // Count only paid bookings
 
         // Add status evaluation to each booking
         const bookingsWithStatus = bookings.map(booking => ({
@@ -944,9 +1023,11 @@ const createGuestBooking = async (req, res, next) => {
 
         await booking.save();
 
-        // If scheduling now, update availability to mark the slot as booked
+        // If scheduling now, update availability to mark the slot as tentative until payment is confirmed
         if (scheduleType === 'now' && scheduledDate && scheduledTime && timeSlot) {
-            await updateAvailabilitySlot(therapist._id, scheduledDate, timeSlot.start, timeSlot.end, 'booked');
+            // Mark slot as tentative if payment is pending, booked if payment is confirmed
+            const slotStatus = booking.paymentStatus === 'paid' ? 'booked' : 'tentative';
+            await updateAvailabilitySlot(therapist._id, scheduledDate, timeSlot.start, timeSlot.end, slotStatus);
         }
 
         // Populate the response
