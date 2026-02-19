@@ -45,6 +45,18 @@ const createAvailability = async (req, res, next) => {
             return res.status(404).json(ApiResponse.error('Therapist not found'));
         }
 
+        // Validate time slots format and add default duration/bookingType if not provided
+        const validatedTimeSlots = timeSlots.map(slot => {
+            // Set default duration to 45 min and bookingType to regular if not provided
+            return {
+                start: slot.start,
+                end: slot.end,
+                status: slot.status || 'available',
+                duration: slot.duration || 45, // Default to 45 min
+                bookingType: slot.bookingType || 'regular' // Default to regular
+            };
+        });
+
         // Check if availability already exists for the same therapist and date
         const existingAvailability = await Availability.findOne({ therapistId, date });
         if (existingAvailability) {
@@ -54,7 +66,7 @@ const createAvailability = async (req, res, next) => {
         const availability = new Availability({
             therapistId,
             date,
-            timeSlots
+            timeSlots: validatedTimeSlots
         });
 
         await availability.save();
@@ -72,9 +84,21 @@ const updateAvailability = async (req, res, next) => {
     try {
         const { timeSlots } = req.body;
 
+        // Validate time slots format and add default duration/bookingType if not provided
+        const validatedTimeSlots = timeSlots.map(slot => {
+            // Set default duration to 45 min and bookingType to regular if not provided
+            return {
+                start: slot.start,
+                end: slot.end,
+                status: slot.status || 'available',
+                duration: slot.duration || 45, // Default to 45 min
+                bookingType: slot.bookingType || 'regular' // Default to regular
+            };
+        });
+
         const availability = await Availability.findByIdAndUpdate(
             req.params.id,
-            { timeSlots },
+            { timeSlots: validatedTimeSlots },
             { new: true, runValidators: true }
         )
             .populate('therapistId', 'name email role')
@@ -156,14 +180,41 @@ const bulkUpdateAvailability = async (req, res, next) => {
 
             if (availability) {
                 // Update existing availability
-                availability.timeSlots = timeSlots !== undefined ? timeSlots : availability.timeSlots;
+                if (timeSlots !== undefined) {
+                    // Validate time slots format and add default duration/bookingType if not provided
+                    const validatedTimeSlots = timeSlots.map(slot => {
+                        // Set default duration to 45 min and bookingType to regular if not provided
+                        return {
+                            start: slot.start,
+                            end: slot.end,
+                            status: slot.status || 'available',
+                            duration: slot.duration || 45, // Default to 45 min
+                            bookingType: slot.bookingType || 'regular' // Default to regular
+                        };
+                    });
+                    availability.timeSlots = validatedTimeSlots;
+                }
                 await availability.save();
             } else {
                 // Create new availability
+                let validatedTimeSlots = [];
+                if (timeSlots && Array.isArray(timeSlots)) {
+                    // Validate time slots format and add default duration/bookingType if not provided
+                    validatedTimeSlots = timeSlots.map(slot => {
+                        // Set default duration to 45 min and bookingType to regular if not provided
+                        return {
+                            start: slot.start,
+                            end: slot.end,
+                            status: slot.status || 'available',
+                            duration: slot.duration || 45, // Default to 45 min
+                            bookingType: slot.bookingType || 'regular' // Default to regular
+                        };
+                    });
+                }
                 availability = new Availability({
                     therapistId,
                     date,
-                    timeSlots: timeSlots || []
+                    timeSlots: validatedTimeSlots
                 });
                 await availability.save();
             }

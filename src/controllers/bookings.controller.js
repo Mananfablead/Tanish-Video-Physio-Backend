@@ -5,6 +5,7 @@ const Payment = require('../models/Payment.model');
 const ApiResponse = require('../utils/apiResponse');
 const BookingStatusHandler = require('../services/bookingStatusHandler');
 const NotificationService = require('../services/notificationService');
+const { generateToken } = require('../config/jwt');
 
 // Get all bookings for authenticated user
 const getAllBookings = async (req, res, next) => {
@@ -167,7 +168,7 @@ const createBooking = async (req, res, next) => {
         // If scheduling now, validate the scheduled date and time
         if (scheduleType === 'now' && scheduledDate && scheduledTime) {
             // Check if the requested time slot is available
-            const slotAvailability = await checkTimeSlotAvailability(therapist._id, scheduledDate, scheduledTime, timeSlot);
+            const slotAvailability = await checkTimeSlotAvailability(therapist._id, scheduledDate, scheduledTime, timeSlot, bookingType);
 
             if (!slotAvailability.available) {
                 return res.status(409).json(ApiResponse.error(slotAvailability.message));
@@ -190,7 +191,7 @@ const createBooking = async (req, res, next) => {
             finalAmount: finalAmount || amount,
             couponCode: couponCode || null,
             discountAmount: discountAmount || 0,
-            paymentStatus: bookingType === 'free-consultation' ? 'verified' : 'pending',
+            paymentStatus: bookingType === 'free-consultation' ? 'paid' : 'pending',
             status: bookingType === 'free-consultation' ? 'pending' : ((scheduledDate && scheduledTime) ? 'scheduled' : (scheduleType === 'later' ? 'pending' : 'scheduled')),
             serviceValidityDays: bookingType === 'free-consultation' ? null : service?.validity,
             purchaseDate: new Date(),
@@ -240,7 +241,7 @@ const createBooking = async (req, res, next) => {
 };
 
 // Helper function to check time slot availability
-async function checkTimeSlotAvailability(therapistId, date, time, timeSlot) {
+async function checkTimeSlotAvailability(therapistId, date, time, timeSlot, bookingType) {
     const mongoose = require('mongoose');
 
     // Validate inputs
@@ -268,12 +269,22 @@ async function checkTimeSlotAvailability(therapistId, date, time, timeSlot) {
     if (availability) {
         // Check if the requested time slot exists in availability
         if (timeSlot) {
+            // For booking type validation, we need to check if the slot duration matches the booking type
             const requestedSlot = availability.timeSlots.find(slot =>
-                slot.start === timeSlot.start && slot.end === timeSlot.end && slot.status !== 'booked'
+                slot.start === timeSlot.start && 
+                slot.end === timeSlot.end && 
+                slot.status !== 'booked'
             );
 
             if (!requestedSlot) {
                 return { available: false, message: 'Requested time slot is not available' };
+            }
+            
+            // Validate that the slot duration matches the expected duration for the booking type
+            if (bookingType === 'free-consultation' && requestedSlot.duration !== 15) {
+                return { available: false, message: 'Free consultation requires 15-minute time slots' };
+            } else if (bookingType === 'regular' && requestedSlot.duration !== 45) {
+                return { available: false, message: 'Regular sessions require 45-minute time slots' };
             }
         } else {
             // If no specific timeSlot provided, just check if the time exists and is available
@@ -331,6 +342,7 @@ async function updateAvailabilitySlot(therapistId, date, startTime, endTime, sta
         );
 
         if (slotIndex !== -1) {
+            // Preserve the duration and bookingType while updating the status
             availability.timeSlots[slotIndex].status = status;
             await availability.save();
             console.log(`Successfully updated slot ${startTime}-${endTime} to ${status} for therapist ${therapistId} on ${date}`);
@@ -1088,7 +1100,7 @@ const createGuestBooking = async (req, res, next) => {
         // If scheduling now, validate the scheduled date and time
         if (scheduleType === 'now' && scheduledDate && scheduledTime) {
             // Check if the requested time slot is available
-            const slotAvailability = await checkTimeSlotAvailability(therapist._id, scheduledDate, scheduledTime, timeSlot);
+            const slotAvailability = await checkTimeSlotAvailability(therapist._id, scheduledDate, scheduledTime, timeSlot, bookingType);
 
             if (!slotAvailability.available) {
                 return res.status(409).json(ApiResponse.error(slotAvailability.message));
@@ -1110,7 +1122,7 @@ const createGuestBooking = async (req, res, next) => {
             finalAmount: finalAmount || amount,
             couponCode: couponCode || null,
             discountAmount: discountAmount || 0,
-            paymentStatus: bookingType === 'free-consultation' ? 'verified' : 'pending',
+            paymentStatus: bookingType === 'free-consultation' ? 'paid' : 'pending',
             purchaseDate: new Date(),
             scheduleType: scheduleType || 'now',
             scheduledDate: scheduledDate || null,
@@ -1152,10 +1164,21 @@ const createGuestBooking = async (req, res, next) => {
             );
         }
 
+        // Generate JWT token for auto-login
+        const token = generateToken({ userId: user._id.toString(), role: user.role });
+
         res.status(201).json(ApiResponse.success({
             booking,
-            message: 'Account created and booking made successfully. Login credentials will be sent after payment verification.'
-        }, 'Account created and booking made successfully. Login credentials will be sent after payment verification.'));
+            token,
+            user: {
+                id: user._id,
+                email: user.email,
+                name: user.name,
+                role: user.role,
+                phone: user.phone
+            },
+            message: 'Account created and booking made successfully. You are now logged in.'
+        }, 'Account created and booking made successfully. You are now logged in.'));
     } catch (error) {
         next(error);
     }

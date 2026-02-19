@@ -26,6 +26,17 @@ const availabilitySchema = new mongoose.Schema({
             type: String,
             enum: ['available', 'unavailable', 'booked'],
             default: 'available'
+        },
+        duration: {
+            type: Number, // Duration in minutes
+            required: true,
+            default: 45, // Default to 45 minutes for regular sessions
+            enum: [15, 45] // Allow 15 min for free consultation, 45 min for regular
+        },
+        bookingType: {
+            type: String,
+            enum: ['regular', 'free-consultation'],
+            default: 'regular'
         }
     }]
 }, {
