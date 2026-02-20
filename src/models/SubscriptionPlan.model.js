@@ -34,6 +34,11 @@ const subscriptionPlanSchema = new mongoose.Schema({
         default: 0,
         required: [true, 'Number of sessions is required']
     },
+    totalService: {
+        type: Number,
+        default: 0,
+        required: [true, 'Total service count is required']
+    },
     session_type: {
         type: String,
         enum: ['individual', 'group'],
