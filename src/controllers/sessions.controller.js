@@ -1240,6 +1240,8 @@ const createAdminSession = async (req, res, next) => {
     // Add bookingId or subscriptionId depending on the session type
     if (bookingId) {
       sessionData.bookingId = bookingId;
+      // Update booking status to confirmed when session is created
+      await Booking.findByIdAndUpdate(bookingId, { status: 'confirmed' });
     }
 
     if (subscriptionId) {
@@ -1701,19 +1703,32 @@ const acceptSession = async (req, res, next) => {
     const therapistJoinLink = generateJoinLink(session.sessionId, therapistId.toString(), 'therapist');
     
     // Update session with join links and status
-    const updatedSession = await Session.findByIdAndUpdate(
-      req.params.id,
-      { 
-        status: "scheduled",
+    // Only update status if it's not already 'scheduled'
+    const updateData = {
         joinLink: userJoinLink, // Store user join link in the main field
         therapistJoinLink: therapistJoinLink // Store therapist link separately
-      },
+    };
+    
+    // Always set status to 'scheduled' when accepting
+    updateData.status = 'scheduled';
+    
+    const updatedSession = await Session.findByIdAndUpdate(
+      req.params.id,
+      updateData,
       { new: true, runValidators: true }
     )
       .populate("bookingId", "serviceName therapistName date time")
       .populate("subscriptionId", "planId planName startDate endDate status")
       .populate("therapistId", "name email role")
       .populate("userId", "name email");
+
+    // Update associated booking status to 'confirmed' if it exists
+    if (updatedSession.bookingId) {
+      await Booking.findByIdAndUpdate(updatedSession.bookingId, { 
+        status: 'confirmed',
+        updatedAt: new Date()
+      });
+    }
 
     // Update availability status to 'booked' if therapistId exists
     if (updatedSession.therapistId) {

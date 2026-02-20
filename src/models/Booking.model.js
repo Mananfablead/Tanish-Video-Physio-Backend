@@ -101,7 +101,7 @@ const bookingSchema = new mongoose.Schema({
     },
     bookingType: {
         type: String,
-        enum: ['regular', 'free-consultation'],
+        enum: ['regular', 'free-consultation', 'subscription-covered'],
         default: 'regular'
     },
     finalAmount: {

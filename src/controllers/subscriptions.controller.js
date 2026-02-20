@@ -47,7 +47,7 @@ const getSubscriptionPlans = async (req, res, next) => {
 // Create a new subscription plan (admin only)
 const createSubscriptionPlan = async (req, res, next) => {
     try {
-        const { planId, name, price, description, features, duration, sessions, validityDays, session_type, price_inr, price_usd } = req.body;
+        const { planId, name, price, description, features, duration, sessions, totalService, validityDays, session_type, price_inr, price_usd } = req.body;
 
         // If planId is provided, check if it already exists
         if (planId) {
@@ -76,6 +76,7 @@ const createSubscriptionPlan = async (req, res, next) => {
             features,
             duration,
             sessions,
+            totalService,
             session_type: session_type || 'individual',
             price_inr: price_inr || 0,
             price_usd: price_usd || 0,
@@ -212,7 +213,7 @@ const getSubscriptionPlan = async (req, res, next) => {
 // Update a subscription plan (admin only)
 const updateSubscriptionPlan = async (req, res, next) => {
     try {
-        const { name, price, description, features, duration, sessions, status, sortOrder, validityDays, session_type, price_inr, price_usd } = req.body;
+        const { name, price, description, features, duration, sessions, totalService, status, sortOrder, validityDays, session_type, price_inr, price_usd } = req.body;
         
         // Check if the plan has any active or past subscriptions
         const existingPlan = await SubscriptionPlan.findById(req.params.id);
@@ -235,6 +236,7 @@ const updateSubscriptionPlan = async (req, res, next) => {
             if (features !== undefined) updateData.features = features;
             if (status !== undefined) updateData.status = status;
             if (sortOrder !== undefined) updateData.sortOrder = sortOrder;
+            if (totalService !== undefined) updateData.totalService = totalService;
             
             // Calculate validityDays based on duration if provided
             if (validityDays !== undefined) {
@@ -271,6 +273,11 @@ const updateSubscriptionPlan = async (req, res, next) => {
                     ApiResponse.error('Cannot update session count for a plan that has been purchased by users. Create a new plan instead.')
                 );
             }
+            if (totalService !== undefined) {
+                return res.status(400).json(
+                    ApiResponse.error('Cannot update total service count for a plan that has been purchased by users. Create a new plan instead.')
+                );
+            }
             
             // Update the plan with only allowed fields
             const plan = await SubscriptionPlan.findByIdAndUpdate(
@@ -286,7 +293,7 @@ const updateSubscriptionPlan = async (req, res, next) => {
             return res.status(200).json(ApiResponse.success({ plan }, 'Subscription plan updated successfully with limited fields'));            
         } else {
             // If no users have purchased this plan, allow all updates
-            let updateData = { name, price, description, features, duration, sessions, status, sortOrder };
+            let updateData = { name, price, description, features, duration, sessions, totalService, status, sortOrder };
             
             if (session_type !== undefined) {
                 updateData.session_type = session_type;
@@ -768,6 +775,259 @@ const getExpiredServices = async (req, res, next) => {
     }
 };
 
+// Check if user can book service for free with subscription
+const checkSubscriptionEligibility = async (req, res, next) => {
+    try {
+        const userId = req.user.userId;
+        
+        // Find user's active subscription
+        const subscription = await Subscription.findOne({ 
+            userId, 
+            status: 'active' 
+        }).populate('planId');
+        
+        if (!subscription) {
+            return res.status(200).json(ApiResponse.success({
+                eligible: false,
+                message: "No active subscription found",
+                reason: "USER_NO_SUBSCRIPTION"
+            }));
+        }
+        
+        // Check if subscription is expired
+        if (subscription.isExpired) {
+            return res.status(200).json(ApiResponse.success({
+                eligible: false,
+                message: "Subscription has expired",
+                reason: "SUBSCRIPTION_EXPIRED"
+            }));
+        }
+        
+        // Check if subscription has plan
+        if (!subscription.planId) {
+            return res.status(200).json(ApiResponse.success({
+                eligible: false,
+                message: "Subscription plan not found",
+                reason: "PLAN_NOT_FOUND"
+            }));
+        }
+        
+        const plan = subscription.planId;
+        
+        // Check session limits (0 means unlimited)
+        if (plan.sessions === 0) {
+            return res.status(200).json(ApiResponse.success({
+                eligible: true,
+                message: "Unlimited sessions available",
+                subscriptionId: subscription._id,
+                planName: plan.name,
+                totalSessions: 'unlimited',
+                usedSessions: 0,
+                remainingSessions: 'unlimited'
+            }));
+        }
+        
+        // Count used sessions for this subscription
+        const usedSessions = await Session.countDocuments({
+            subscriptionId: subscription._id,
+            status: { $ne: "cancelled" }
+        });
+        
+        const remainingSessions = plan.sessions - usedSessions;
+        
+        if (remainingSessions <= 0) {
+            return res.status(200).json(ApiResponse.success({
+                eligible: false,
+                message: `All ${plan.sessions} sessions have been used`,
+                reason: "SESSION_LIMIT_REACHED",
+                subscriptionId: subscription._id,
+                planName: plan.name,
+                totalSessions: plan.sessions,
+                usedSessions: usedSessions,
+                remainingSessions: 0
+            }));
+        }
+        
+        // User is eligible for free booking
+        return res.status(200).json(ApiResponse.success({
+            eligible: true,
+            message: `You have ${remainingSessions} sessions remaining`,
+            subscriptionId: subscription._id,
+            planName: plan.name,
+            totalSessions: plan.sessions,
+            usedSessions: usedSessions,
+            remainingSessions: remainingSessions
+        }));
+        
+    } catch (error) {
+        console.error("Error checking subscription eligibility:", error);
+        next(error);
+    }
+};
+
+// Get available services that can be booked with subscription
+const getSubscriptionServices = async (req, res, next) => {
+    try {
+        const userId = req.user.userId;
+        
+        // Find user's active subscription
+        const subscription = await Subscription.findOne({ 
+            userId, 
+            status: 'active' 
+        }).populate('planId');
+        
+        if (!subscription || !subscription.planId) {
+            return res.status(404).json(ApiResponse.error("No active subscription found"));
+        }
+        
+        const plan = subscription.planId;
+        
+        // For subscription plans, all services are typically available
+        const availableServices = [
+            {
+                id: 'general-physio',
+                name: 'General Physiotherapy',
+                description: 'Comprehensive physiotherapy consultation and treatment',
+                duration: '45 minutes',
+                category: 'consultation'
+            },
+            {
+                id: 'sports-injury',
+                name: 'Sports Injury Treatment',
+                description: 'Specialized treatment for sports-related injuries',
+                duration: '60 minutes',
+                category: 'treatment'
+            },
+            {
+                id: 'post-surgery',
+                name: 'Post-Surgery Rehabilitation',
+                description: 'Recovery and rehabilitation after surgical procedures',
+                duration: '60 minutes',
+                category: 'rehabilitation'
+            },
+            {
+                id: 'back-pain',
+                name: 'Back Pain Management',
+                description: 'Specialized treatment for back and spine issues',
+                duration: '45 minutes',
+                category: 'treatment'
+            },
+            {
+                id: 'neck-shoulder',
+                name: 'Neck & Shoulder Therapy',
+                description: 'Targeted therapy for neck and shoulder problems',
+                duration: '45 minutes',
+                category: 'treatment'
+            }
+        ];
+        
+        // Count used sessions
+        const usedSessions = await Session.countDocuments({
+            subscriptionId: subscription._id,
+            status: { $ne: "cancelled" }
+        });
+        
+        const remainingSessions = plan.sessions === 0 ? 'unlimited' : plan.sessions - usedSessions;
+        
+        res.status(200).json(ApiResponse.success({
+            services: availableServices,
+            subscriptionInfo: {
+                planName: plan.name,
+                totalSessions: plan.sessions === 0 ? 'unlimited' : plan.sessions,
+                usedSessions: usedSessions,
+                remainingSessions: remainingSessions,
+                endDate: subscription.endDate
+            }
+        }));
+        
+    } catch (error) {
+        console.error("Error getting subscription services:", error);
+        next(error);
+    }
+};
+
+// Create free session with subscription
+const createFreeSessionWithSubscription = async (req, res, next) => {
+    try {
+        const userId = req.user.userId;
+        const { date, time, therapistId, serviceType, notes } = req.body;
+        
+        // Validate required fields
+        if (!date || !time || !therapistId) {
+            return res.status(400).json(ApiResponse.error("Date, time, and therapistId are required"));
+        }
+        
+        // Find user's active subscription
+        const subscription = await Subscription.findOne({ 
+            userId, 
+            status: 'active' 
+        }).populate('planId');
+        
+        if (!subscription) {
+            return res.status(400).json(ApiResponse.error("No active subscription found"));
+        }
+        
+        if (subscription.isExpired) {
+            return res.status(400).json(ApiResponse.error("Subscription has expired"));
+        }
+        
+        const plan = subscription.planId;
+        
+        // Check session limits for limited plans
+        if (plan.sessions > 0) {
+            const usedSessions = await Session.countDocuments({
+                subscriptionId: subscription._id,
+                status: { $ne: "cancelled" }
+            });
+            
+            if (usedSessions >= plan.sessions) {
+                return res.status(400).json(ApiResponse.error(
+                    `Session limit reached. You have used all ${plan.sessions} sessions in your plan.`
+                ));
+            }
+        }
+        
+        // Create session without payment
+        const startTime = new Date(`${date}T${time}:00`);
+        const endTime = new Date(startTime.getTime() + 45 * 60000); // Default 45 minutes
+        
+        const session = new Session({
+            subscriptionId: subscription._id,
+            therapistId,
+            userId,
+            date,
+            time,
+            startTime,
+            endTime,
+            type: serviceType || '1-on-1',
+            status: 'scheduled',
+            duration: 45,
+            notes: notes || `Free session booked with ${plan.name} subscription`,
+            sessionId: `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        });
+        
+        await session.save();
+        
+        // Return success response
+        res.status(201).json(ApiResponse.success({
+            session: session,
+            message: "Session booked successfully with your subscription",
+            subscriptionInfo: {
+                planName: plan.name,
+                remainingSessions: plan.sessions === 0 ? 'unlimited' : 
+                    plan.sessions - (await Session.countDocuments({
+                        subscriptionId: subscription._id,
+                        status: { $ne: "cancelled" }
+                    }))
+            }
+        }, "Session booked successfully"));
+        
+    } catch (error) {
+        console.error("Error creating free session with subscription:", error);
+        next(error);
+    }
+};
+
 module.exports = {
     getSubscriptionPlans,
     createSubscriptionPlan,
@@ -779,5 +1039,8 @@ module.exports = {
     getUserSubscriptions,
     getAllSubscriptions,
     getExpiredSubscriptions,
-    getExpiredServices
+    getExpiredServices,
+    checkSubscriptionEligibility,
+    getSubscriptionServices,
+    createFreeSessionWithSubscription
 };
