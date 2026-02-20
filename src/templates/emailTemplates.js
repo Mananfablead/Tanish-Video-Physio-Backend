@@ -537,15 +537,7 @@ class EmailTemplates {
                                     <li>Arrive 10-15 minutes early for your appointment</li>
                                 </ul>
                             </div>
-                            
-                            <div style="background-color: #fff7ed; border-radius: 12px; padding: 20px; margin: 25px 0; border: 1px solid #fed7aa; text-align: center;">
-                                <h3 style="color: #c2410c; margin: 0 0 15px 0; font-size: 18px;">📄 Receipt Available</h3>
-                                <p style="color: #ea580c; margin: 0 0 15px 0; font-size: 16px; line-height: 1.6;">
-                                    Your payment receipt has been sent to your email. Keep it for your records.
-                                </p>
-                                <a href="#" style="background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); color: white; text-decoration: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; font-size: 14px; display: inline-block;">View Receipt</a>
-                            </div>
-                            
+                        
                             <p style="font-size: 16px; color: #475569; margin: 30px 0 0 0; line-height: 1.6;">
                                 We're grateful for your trust in <strong>Tanish Physio</strong>. Our team is dedicated to providing you with the highest quality healthcare services and personalized attention.
                             </p>
