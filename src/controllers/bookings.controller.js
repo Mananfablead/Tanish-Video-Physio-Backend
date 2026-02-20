@@ -2,6 +2,8 @@ const Booking = require('../models/Booking.model');
 const Service = require('../models/Service.model');
 const User = require('../models/User.model');
 const Payment = require('../models/Payment.model');
+const Subscription = require('../models/Subscription.model');
+const Session = require('../models/Session.model');
 const ApiResponse = require('../utils/apiResponse');
 const BookingStatusHandler = require('../services/bookingStatusHandler');
 const NotificationService = require('../services/notificationService');
@@ -133,13 +135,75 @@ const createBooking = async (req, res, next) => {
             return res.status(409).json(ApiResponse.error('You already have a booking for this date and time'));
         }
 
+        // Check if user has an active subscription with remaining sessions
+        // This allows users with active subscriptions to book services for free
+        const subscription = await Subscription.findOne({ 
+            userId: req.user.userId, 
+            status: 'active' 
+        }).populate('planId');
+        
         let service = null;
         let serviceName = "Free Consultation";
         let amount = 0;
+        let paymentStatus = 'pending'; // Default to pending
+        let bookingTypeFinal = bookingType || 'regular';
 
         if (bookingType === 'free-consultation') {
             // For free consultations, no service validation needed
+        } else if (subscription && !subscription.isExpired) {
+            // Check if subscription has remaining sessions
+            const plan = subscription.planId;
+            
+            // Check session limits (0 means unlimited)
+            if (plan && plan.sessions > 0) {
+                const usedSessions = await Session.countDocuments({
+                    subscriptionId: subscription._id,
+                    status: { $ne: "cancelled" }
+                });
+                
+                if (usedSessions >= plan.sessions) {
+                    // Session limit reached, proceed with regular booking flow
+                    // Validate required fields
+                    if (!serviceId) {
+                        return res.status(400).json(ApiResponse.error('Service ID is required'));
+                    }
+
+                    // Validate service exists
+                    service = await Service.findById(serviceId);
+
+                    if (!service || service.status !== 'active') {
+                        return res.status(404).json(ApiResponse.error('Service not found or not active'));
+                    }
+                    serviceName = service.name;
+                    amount = service.price;
+                } else {
+                    // User has remaining sessions in subscription, make booking free
+                    if (serviceId) {
+                        service = await Service.findById(serviceId);
+                        if (!service || service.status !== 'active') {
+                            return res.status(404).json(ApiResponse.error('Service not found or not active'));
+                        }
+                        serviceName = service.name;
+                    }
+                    amount = 0; // No charge as it's covered by subscription
+                    paymentStatus = 'paid'; // Mark as paid since it's covered by subscription
+                    bookingTypeFinal = 'subscription-covered';
+                }
+            } else {
+                // Unlimited sessions in subscription, make booking free
+                if (serviceId) {
+                    service = await Service.findById(serviceId);
+                    if (!service || service.status !== 'active') {
+                        return res.status(404).json(ApiResponse.error('Service not found or not active'));
+                    }
+                    serviceName = service.name;
+                }
+                amount = 0; // No charge as it's covered by subscription
+                paymentStatus = 'paid'; // Mark as paid since it's covered by subscription
+                bookingTypeFinal = 'subscription-covered';
+            }
         } else {
+            // No active subscription, proceed with regular booking flow
             // Validate required fields
             if (!serviceId) {
                 return res.status(400).json(ApiResponse.error('Service ID is required'));
@@ -191,7 +255,7 @@ const createBooking = async (req, res, next) => {
             finalAmount: finalAmount || amount,
             couponCode: couponCode || null,
             discountAmount: discountAmount || 0,
-            paymentStatus: bookingType === 'free-consultation' ? 'paid' : 'pending',
+            paymentStatus: bookingType === 'free-consultation' ? 'paid' : paymentStatus,
             status: bookingType === 'free-consultation' ? 'pending' : ((scheduledDate && scheduledTime) ? 'scheduled' : (scheduleType === 'later' ? 'pending' : 'scheduled')),
             serviceValidityDays: bookingType === 'free-consultation' ? null : service?.validity,
             purchaseDate: new Date(),
@@ -199,7 +263,7 @@ const createBooking = async (req, res, next) => {
             scheduledDate: scheduledDate || null,
             scheduledTime: scheduledTime || null,
             timeSlot: timeSlot || null,
-            bookingType: bookingType || 'regular'
+            bookingType: bookingTypeFinal
         });
 
         await booking.save();
@@ -737,6 +801,40 @@ const updateBookingStatus = async (req, res, next) => {
             .populate('serviceId', 'name price duration validity images')
             .populate('therapistId', 'name email role profilePicture');
 
+        if (!booking) {
+            return res.status(404).json(ApiResponse.error('Booking not found or unauthorized'));
+        }
+
+        // Automatically create session when booking is confirmed
+        if (status === 'confirmed' && booking.bookingType === 'subscription-covered') {
+            const Session = require('../models/Session.model');
+            
+            // Use scheduled date/time if provided, otherwise use booking date/time
+            const sessionDate = booking.scheduledDate || booking.date;
+            const sessionTime = booking.scheduledTime || booking.time || '09:00';
+            
+            const session = new Session({
+                bookingId: booking._id,
+                therapistId: booking.therapistId,
+                userId: booking.userId,
+                date: sessionDate,
+                time: sessionTime,
+                startTime: new Date(`${sessionDate}T${sessionTime}`),
+                type: '1-on-1',
+                status: 'pending', // Session starts as pending for admin review
+                duration: 45, // Default duration
+                notes: `Session created automatically from confirmed booking #${booking._id}`
+            });
+            
+            // Calculate end time
+            const endTime = new Date(session.startTime);
+            endTime.setMinutes(endTime.getMinutes() + session.duration);
+            session.endTime = endTime;
+            
+            await session.save();
+            console.log(`✅ Automatic session created for confirmed booking ${booking._id}: Session ID ${session._id}`);
+        }
+
         // If payment status changed to 'paid', update the availability slot from 'tentative' to 'booked'
         if (updateData.finalAmount && booking.paymentStatus !== 'paid') {
             // Check if this was a payment confirmation (amount changed and booking wasn't already paid)
@@ -767,10 +865,6 @@ const updateBookingStatus = async (req, res, next) => {
                     console.log(`No availability found for therapist ${booking.therapistId} on date ${booking.scheduledDate}`);
                 }
             }
-        }
-
-        if (!booking) {
-            return res.status(404).json(ApiResponse.error('Booking not found or unauthorized'));
         }
 
         res.status(200).json(ApiResponse.success({ booking }, `Booking status updated to ${status} successfully`));
@@ -1322,3 +1416,130 @@ module.exports = {
     bulkUpdateStatus,
     getBookingStats
 };
+
+// Create a booking that uses subscription session (no payment required)
+const createBookingWithSubscription = async (req, res, next) => {
+    try {
+        // Check if user is authenticated
+        if (!req.user || !req.user.userId) {
+            return res.status(401).json(ApiResponse.error('Authentication required'));
+        }
+
+        const { serviceId, date, time, notes, clientName, scheduleType, scheduledDate, scheduledTime, timeSlot } = req.body;
+
+        // Check if user has an active subscription with remaining sessions
+        const subscription = await Subscription.findOne({ 
+            userId: req.user.userId, 
+            status: 'active' 
+        }).populate('planId');
+        
+        if (!subscription) {
+            return res.status(400).json(ApiResponse.error('No active subscription found'));
+        }
+        
+        if (subscription.isExpired) {
+            return res.status(400).json(ApiResponse.error('Subscription has expired'));
+        }
+        
+        const plan = subscription.planId;
+        
+        // Check session limits (0 means unlimited)
+        if (plan && plan.sessions > 0) {
+            const usedSessions = await Session.countDocuments({
+                subscriptionId: subscription._id,
+                status: { $ne: "cancelled" }
+            });
+            
+            if (usedSessions >= plan.sessions) {
+                return res.status(400).json(ApiResponse.error(
+                    `Session limit reached. You have used all ${plan.sessions} sessions in your plan.`
+                ));
+            }
+        }
+
+        // Validate service exists
+        let service = null;
+        let serviceName = "Service with Subscription";
+        
+        if (serviceId) {
+            service = await Service.findById(serviceId);
+            
+            if (!service || service.status !== 'active') {
+                return res.status(404).json(ApiResponse.error('Service not found or not active'));
+            }
+            
+            serviceName = service.name;
+        }
+
+        // Automatically assign an available therapist (admin user)
+        const therapist = await User.findOne({
+            role: 'admin',
+            status: 'active'
+        });
+
+        if (!therapist) {
+            return res.status(404).json(ApiResponse.error('No active therapists available'));
+        }
+
+        // Create booking with paid status (since it's covered by subscription)
+        const booking = new Booking({
+            serviceId: serviceId || null,
+            serviceName: serviceName,
+            therapistId: therapist._id,
+            therapistName: therapist?.name || 'Admin',
+            userId: req.user.userId,
+            clientName: clientName || req.user?.name || 'Unknown User',
+            date,
+            time,
+            notes,
+            amount: 0, // No charge as it's covered by subscription
+            originalAmount: 0,
+            finalAmount: 0,
+            paymentStatus: 'paid', // Mark as paid since it's covered by subscription
+            status: 'pending', // All subscription bookings start with pending status for admin approval
+            serviceValidityDays: service?.validity,
+            purchaseDate: new Date(),
+            scheduleType: scheduleType || 'now',
+            scheduledDate: scheduledDate || null,
+            scheduledTime: scheduledTime || null,
+            timeSlot: timeSlot || null,
+            bookingType: 'subscription-covered'
+        });
+
+        await booking.save();
+
+        // Don't create sessions automatically for subscription bookings
+        // Sessions will be created by admin after accepting the booking
+        console.log(`Subscription booking created with pending status. Admin will create session after acceptance.`);
+
+        // Populate the response
+        await booking.populate('serviceId', 'name price duration validity images');
+        await booking.populate('therapistId', 'name email role profilePicture');
+
+        // Send notifications
+        const notificationData = {
+            clientName: req.user?.name || 'Unknown User',
+            serviceName: serviceName,
+            bookingId: booking._id,
+            date: date,
+            time: time
+        };
+
+        // Notify admins
+        const admins = await User.find({ role: 'admin' }).select('email phone name');
+        for (const admin of admins) {
+            await NotificationService.sendNotification(
+                { email: admin.email, phone: admin.phone },
+                'new_booking',
+                { ...notificationData, clientName: req.user?.name || 'Unknown User' }
+            );
+        }
+
+        res.status(201).json(ApiResponse.success({ booking }, 'Booking created successfully with subscription'));        
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Adding the new function to the existing module.exports
+module.exports.createBookingWithSubscription = createBookingWithSubscription;

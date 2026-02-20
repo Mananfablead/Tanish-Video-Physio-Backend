@@ -532,8 +532,14 @@ const verifyPayment = async (req, res, next) => {
 
                 await booking.save();
 
-                // Create session from booking for regular users
-                await createSessionFromBooking(booking, service);
+                // Create session from booking for regular users only if scheduleType is 'now'
+                // For 'later' bookings, session will be created when user schedules it later
+                if (booking.scheduleType === 'now') {
+                    await createSessionFromBooking(booking, service);
+                } else {
+                    // For 'later' bookings, just update booking status to 'confirmed' instead of 'session_created'
+                    await Booking.findByIdAndUpdate(booking._id, { status: 'confirmed' });
+                }
 
                 // Send payment success notifications to user and admin
                 try {
@@ -1189,8 +1195,14 @@ const handleWebhook = async (req, res) => {
 
                     await booking.save();
 
-                    // Create session from booking for webhook payments
-                    await createSessionFromBooking(booking, service);
+                    // Create session from booking for webhook payments only if scheduleType is 'now'
+                    // For 'later' bookings, session will be created when user schedules it later
+                    if (booking.scheduleType === 'now') {
+                        await createSessionFromBooking(booking, service);
+                    } else {
+                        // For 'later' bookings, just update booking status to 'confirmed' instead of 'session_created'
+                        await Booking.findByIdAndUpdate(booking._id, { status: 'confirmed' });
+                    }
 
                     // Send payment success notifications to user and admin
                     try {
@@ -1726,6 +1738,7 @@ const verifySubscriptionPayment = async (req, res, next) => {
                         clientName: user?.name || '',
                         date: bookingDate,
                         time: bookingTime,
+                        scheduleType: subscription.scheduleType || 'now', // Set schedule type based on subscription
                         status: 'confirmed', // Initially confirmed
                         notes: `Booking created automatically from subscription purchase (Order ID: ${orderId})`,
                         paymentStatus: 'paid',
@@ -1845,14 +1858,16 @@ const verifySubscriptionPayment = async (req, res, next) => {
             // This would be for cases where user scheduled during the booking process
             if (subscription.userId) {
                 // Find all pending bookings for this user that are scheduled and paid
+                // Only process bookings with scheduleType 'now', skip 'later' bookings
                 const pendingBookings = await Booking.find({
                     userId: subscription.userId,
                     paymentStatus: 'paid',
                     status: 'pending',
+                    scheduleType: { $ne: 'later' }, // Skip 'later' scheduled bookings
                     scheduledDate: { $exists: true, $ne: null },
                     scheduledTime: { $exists: true, $ne: null }
                 }).sort({ createdAt: -1 });
-
+                
                 // Process all pending bookings to create sessions
                 for (const pendingBooking of pendingBookings) {
                     if (pendingBooking.scheduledDate && pendingBooking.scheduledTime) {
@@ -1915,70 +1930,75 @@ const verifySubscriptionPayment = async (req, res, next) => {
 
                 // ALSO create direct subscription sessions for subscription-based plans
                 // This handles the case where users subscribe directly without creating bookings first
-                const Session = require('../models/Session.model');
-                const SubscriptionPlan = require('../models/SubscriptionPlan.model');
+                // ONLY create sessions for 'now' scheduled subscriptions, NOT for 'later' scheduled ones
+                if ((subscription.scheduleType === 'now' || !subscription.scheduleType) && subscription.scheduleType !== 'later') {
+                    const Session = require('../models/Session.model');
+                    const SubscriptionPlan = require('../models/SubscriptionPlan.model');
 
-                // Get the subscription plan to determine session parameters
-                const plan = await SubscriptionPlan.findOne({ planId: subscription.planId });
-                if (plan) {
-                    try {
-                        // For subscription plans, we can create sessions directly without bookings
-                        // This is for plans where users subscribe directly (like the subscription flow)
+                    // Get the subscription plan to determine session parameters
+                    const plan = await SubscriptionPlan.findOne({ planId: subscription.planId });
+                    if (plan) {
+                        try {
+                            // For subscription plans, we can create sessions directly without bookings
+                            // This is for plans where users subscribe directly (like the subscription flow)
 
-                        // Create one initial session for demonstration purposes
-                        // In a real implementation, this might be configurable per plan
-                        console.log('DEBUG: subscription scheduledDate:', subscription.scheduledDate);
-                        console.log('DEBUG: subscription scheduledTime:', subscription.scheduledTime);
-                        // Determine time to use for session based on available data
-                        const sessionDate = subscription.scheduledDate || new Date().toISOString().split('T')[0];
-                        const sessionTime = subscription.timeSlot?.start || subscription.scheduledTime || '09:00';
+                            // Create one initial session for demonstration purposes
+                            // In a real implementation, this might be configurable per plan
+                            console.log('DEBUG: subscription scheduledDate:', subscription.scheduledDate);
+                            console.log('DEBUG: subscription scheduledTime:', subscription.scheduledTime);
+                            // Determine time to use for session based on available data
+                            const sessionDate = subscription.scheduledDate || new Date().toISOString().split('T')[0];
+                            const sessionTime = subscription.timeSlot?.start || subscription.scheduledTime || '09:00';
 
-                        // Calculate start and end times
-                        const startTime = subscription.scheduledDate && (subscription.timeSlot?.start || subscription.scheduledTime)
-                            ? new Date(`${subscription.scheduledDate}T${sessionTime}`)
-                            : new Date(new Date().setHours(9, 0, 0, 0));
+                            // Calculate start and end times
+                            const startTime = subscription.scheduledDate && (subscription.timeSlot?.start || subscription.scheduledTime)
+                                ? new Date(`${subscription.scheduledDate}T${sessionTime}`)
+                                : new Date(new Date().setHours(9, 0, 0, 0));
 
-                        // Calculate end time based on timeSlot or default duration
-                        let endTime = new Date(startTime);
-                        if (subscription.timeSlot?.end) {
-                            // If timeSlot has end time, calculate duration from that
-                            const [endHour, endMinute] = subscription.timeSlot.end.split(':').map(Number);
-                            endTime = new Date(startTime);
-                            endTime.setHours(endHour, endMinute, 0, 0);
-                        } else {
-                            // Use default duration if no end time in timeSlot
-                            endTime.setMinutes(endTime.getMinutes() + (plan.duration ? parseInt(plan.duration.match(/(\d+)/)?.[1] || '60') : 60));
+                            // Calculate end time based on timeSlot or default duration
+                            let endTime = new Date(startTime);
+                            if (subscription.timeSlot?.end) {
+                                // If timeSlot has end time, calculate duration from that
+                                const [endHour, endMinute] = subscription.timeSlot.end.split(':').map(Number);
+                                endTime = new Date(startTime);
+                                endTime.setHours(endHour, endMinute, 0, 0);
+                            } else {
+                                // Use default duration if no end time in timeSlot
+                                endTime.setMinutes(endTime.getMinutes() + (plan.duration ? parseInt(plan.duration.match(/(\d+)/)?.[1] || '60') : 60));
+                            }
+
+                            const session = new Session({
+                                therapistId: subscription.therapistId, // Use therapist from subscription if available
+                                userId: subscription.userId,
+                                date: sessionDate, // Use scheduled date or today's date
+                                time: sessionTime, // Use timeSlot start or scheduled time or default
+                                startTime: startTime,
+                                endTime: endTime,
+                                type: '1-on-1',
+                                status: 'pending', // Changed from 'scheduled' to 'pending' as requested
+                                notes: `Initial session created automatically from subscription plan ${plan.name}`,
+                                subscriptionId: subscription._id,
+                                duration: Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60)) // Calculate duration in minutes
+                            });
+
+                            // Set end time based on duration
+                            if (session.duration > 0) {
+                                const endTime = new Date(session.startTime);
+                                endTime.setMinutes(endTime.getMinutes() + session.duration);
+                                session.endTime = endTime;
+                            }
+
+                            await session.save();
+                            console.log(`✅ Automatic initial session created for subscription ${subscription._id}: Session ID ${session._id}`);
+                        } catch (sessionError) {
+                            console.error(`❌ Failed to create automatic initial session for subscription ${subscription._id}:`, sessionError);
+                            // Don't fail the subscription verification if session creation fails
                         }
-
-                        const session = new Session({
-                            therapistId: subscription.therapistId, // Use therapist from subscription if available
-                            userId: subscription.userId,
-                            date: sessionDate, // Use scheduled date or today's date
-                            time: sessionTime, // Use timeSlot start or scheduled time or default
-                            startTime: startTime,
-                            endTime: endTime,
-                            type: '1-on-1',
-                            status: 'pending', // Changed from 'scheduled' to 'pending' as requested
-                            notes: `Initial session created automatically from subscription plan ${plan.name}`,
-                            subscriptionId: subscription._id,
-                            duration: Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60)) // Calculate duration in minutes
-                        });
-
-                        // Set end time based on duration
-                        if (session.duration > 0) {
-                            const endTime = new Date(session.startTime);
-                            endTime.setMinutes(endTime.getMinutes() + session.duration);
-                            session.endTime = endTime;
-                        }
-
-                        await session.save();
-                        console.log(`✅ Automatic initial session created for subscription ${subscription._id}: Session ID ${session._id}`);
-                    } catch (sessionError) {
-                        console.error(`❌ Failed to create automatic initial session for subscription ${subscription._id}:`, sessionError);
-                        // Don't fail the subscription verification if session creation fails
+                    } else {
+                        console.log(`ℹ️ No subscription plan found for subscription ${subscription._id} - skipping automatic session creation`);
                     }
                 } else {
-                    console.log(`ℹ️ No subscription plan found for subscription ${subscription._id} - skipping automatic session creation`);
+                    console.log(`ℹ️ Skipping automatic session creation for subscription ${subscription._id} with scheduleType '${subscription.scheduleType}'`);
                 }
             }
 
@@ -2226,10 +2246,12 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
                 let pendingBookings = [];
 
                 // First, look for bookings by userId
+                // Only process bookings with scheduleType 'now', skip 'later' bookings
                 pendingBookings = await Booking.find({
                     userId: userIdToCheck,
                     paymentStatus: 'paid',
                     status: 'pending', // Only process bookings that are still marked as scheduled
+                    scheduleType: 'now', // Only process 'now' scheduled bookings
                     scheduledDate: { $exists: true, $ne: null },
                     scheduledTime: { $exists: true, $ne: null }
                 }).sort({ createdAt: -1 });
@@ -2241,6 +2263,7 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
                         clientEmail: subscription.guestEmail,
                         paymentStatus: 'paid',
                         status: 'pending',
+                        scheduleType: 'now', // Only process 'now' scheduled bookings
                         scheduledDate: { $exists: true, $ne: null },
                         scheduledTime: { $exists: true, $ne: null }
                     }).sort({ createdAt: -1 });
