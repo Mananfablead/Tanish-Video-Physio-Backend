@@ -47,7 +47,7 @@ const getSubscriptionPlans = async (req, res, next) => {
 // Create a new subscription plan (admin only)
 const createSubscriptionPlan = async (req, res, next) => {
     try {
-        const { planId, name, price, description, features, duration, sessions, validityDays, session_type, price_inr, price_usd } = req.body;
+        const { planId, name, price, description, features, duration, sessions, totalService, validityDays, session_type, price_inr, price_usd } = req.body;
 
         // If planId is provided, check if it already exists
         if (planId) {
@@ -76,6 +76,7 @@ const createSubscriptionPlan = async (req, res, next) => {
             features,
             duration,
             sessions,
+            totalService,
             session_type: session_type || 'individual',
             price_inr: price_inr || 0,
             price_usd: price_usd || 0,
@@ -212,7 +213,7 @@ const getSubscriptionPlan = async (req, res, next) => {
 // Update a subscription plan (admin only)
 const updateSubscriptionPlan = async (req, res, next) => {
     try {
-        const { name, price, description, features, duration, sessions, status, sortOrder, validityDays, session_type, price_inr, price_usd } = req.body;
+        const { name, price, description, features, duration, sessions, totalService, status, sortOrder, validityDays, session_type, price_inr, price_usd } = req.body;
         
         // Check if the plan has any active or past subscriptions
         const existingPlan = await SubscriptionPlan.findById(req.params.id);
@@ -235,6 +236,7 @@ const updateSubscriptionPlan = async (req, res, next) => {
             if (features !== undefined) updateData.features = features;
             if (status !== undefined) updateData.status = status;
             if (sortOrder !== undefined) updateData.sortOrder = sortOrder;
+            if (totalService !== undefined) updateData.totalService = totalService;
             
             // Calculate validityDays based on duration if provided
             if (validityDays !== undefined) {
@@ -271,6 +273,11 @@ const updateSubscriptionPlan = async (req, res, next) => {
                     ApiResponse.error('Cannot update session count for a plan that has been purchased by users. Create a new plan instead.')
                 );
             }
+            if (totalService !== undefined) {
+                return res.status(400).json(
+                    ApiResponse.error('Cannot update total service count for a plan that has been purchased by users. Create a new plan instead.')
+                );
+            }
             
             // Update the plan with only allowed fields
             const plan = await SubscriptionPlan.findByIdAndUpdate(
@@ -286,7 +293,7 @@ const updateSubscriptionPlan = async (req, res, next) => {
             return res.status(200).json(ApiResponse.success({ plan }, 'Subscription plan updated successfully with limited fields'));            
         } else {
             // If no users have purchased this plan, allow all updates
-            let updateData = { name, price, description, features, duration, sessions, status, sortOrder };
+            let updateData = { name, price, description, features, duration, sessions, totalService, status, sortOrder };
             
             if (session_type !== undefined) {
                 updateData.session_type = session_type;
