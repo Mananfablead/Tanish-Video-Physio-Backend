@@ -18,7 +18,10 @@ node_modules/
 uploads
 /uploads/**
 logs
-
+*.log
+combined.log
+access.log
+error.log
 
 # Runtime data
 pids/
