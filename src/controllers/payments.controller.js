@@ -421,7 +421,7 @@ const verifyPayment = async (req, res, next) => {
         // Get Razorpay credentials from database
         const { getRazorpayCredentials } = require('../utils/credentialsManager');
         const razorpayCreds = await getRazorpayCredentials();
-        const secret = razorpayCreds?.keySecret || 'uvPkIj6Wi9gO3WYHqje57gh7';
+        const secret = razorpayCreds?.keySecret || 'UsJaHKrfVtTzJUF391hBpYPf';
 
         if (!secret) {
             return res.status(500).json(ApiResponse.error('Server configuration error: Razorpay secret is not set'));
@@ -805,7 +805,7 @@ const verifyGuestPayment = async (req, res, next) => {
         // Get Razorpay credentials from database
         const { getRazorpayCredentials } = require('../utils/credentialsManager');
         const razorpayCreds = await getRazorpayCredentials();
-        const secret = razorpayCreds?.keySecret || 'uvPkIj6Wi9gO3WYHqje57gh7';
+        const secret = razorpayCreds?.keySecret || 'UsJaHKrfVtTzJUF391hBpYPf';
 
         if (!secret) {
             return res.status(500).json(ApiResponse.error('Server configuration error: Razorpay secret is not set'));
@@ -1677,7 +1677,7 @@ const verifySubscriptionPayment = async (req, res, next) => {
         // Get Razorpay credentials from database
         const { getRazorpayCredentials } = require('../utils/credentialsManager');
         const razorpayCreds = await getRazorpayCredentials();
-        const secret = razorpayCreds?.keySecret || 'uvPkIj6Wi9gO3WYHqje57gh7';
+        const secret = razorpayCreds?.keySecret || 'UsJaHKrfVtTzJUF391hBpYPf';
 
         if (!secret) {
             return res.status(500).json(ApiResponse.error('Server configuration error: Razorpay secret is not set'));
@@ -2067,7 +2067,7 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
         // Get Razorpay credentials from database
         const { getRazorpayCredentials } = require('../utils/credentialsManager');
         const razorpayCreds = await getRazorpayCredentials();
-        const secret = razorpayCreds?.keySecret || 'uvPkIj6Wi9gO3WYHqje57gh7';
+        const secret = razorpayCreds?.keySecret || 'UsJaHKrfVtTzJUF391hBpYPf';
 
         if (!secret) {
             return res.status(500).json(ApiResponse.error('Server configuration error: Razorpay secret is not set'));
@@ -2483,6 +2483,27 @@ const getAllPayments = async (req, res, next) => {
     }
 };
 
+// Get Razorpay configuration for client
+const getRazorpayConfig = async (req, res, next) => {
+    try {
+        // Get Razorpay credentials from database
+        const { getRazorpayCredentials } = require('../utils/credentialsManager');
+        const razorpayCreds = await getRazorpayCredentials();
+
+        if (!razorpayCreds || !razorpayCreds.keyId) {
+            return res.status(500).json(ApiResponse.error('Razorpay is not configured properly'));
+        }
+
+        res.status(200).json(
+            ApiResponse.success({
+                key: razorpayCreds.keyId
+            }, 'Razorpay configuration retrieved successfully')
+        );
+    } catch (error) {
+        next(error);
+    }
+};
+
 module.exports = {
     createOrder,
     createGuestOrder,
@@ -2495,5 +2516,6 @@ module.exports = {
     verifyGuestSubscriptionPayment,
     getUserPayments,
     getAllPayments,
-    getPaymentById
+    getPaymentById,
+    getRazorpayConfig
 };
