@@ -1064,7 +1064,6 @@ const createAdminSession = async (req, res, next) => {
 
     // Handle booking-based session
     if (bookingId) {
-      const Booking = require("../models/Booking.model");
       booking = await Booking.findById(bookingId).populate('serviceId');
       if (!booking) {
         return res.status(404).json(ApiResponse.error("Booking not found"));
@@ -1194,7 +1193,6 @@ const createAdminSession = async (req, res, next) => {
         
         // Check if service duration fits in the selected slot
         if (bookingId) {
-          const Booking = require("../models/Booking.model");
           const booking = await Booking.findById(bookingId).populate('serviceId');
           if (booking && booking.serviceId && booking.serviceId.duration) {
             const serviceDuration = parseDurationString(booking.serviceId.duration);

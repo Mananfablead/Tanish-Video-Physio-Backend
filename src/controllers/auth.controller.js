@@ -165,7 +165,7 @@ const getProfile = async (req, res, next) => {
             .sort({ createdAt: -1 })
             .limit(5); // Get last 5 subscriptions
 
-        // Manually populate plan details since planId is stored as a string, not ObjectId
+        // Manually populate plan details while preserving original planId
         const subscriptionsWithPlanDetails = await Promise.all(subscriptions.map(async (subscription) => {
             const subscriptionObj = subscription.toObject();
             
@@ -173,7 +173,8 @@ const getProfile = async (req, res, next) => {
             if (subscriptionObj.planId) {
                 const plan = await SubscriptionPlan.findOne({ planId: subscriptionObj.planId });
                 if (plan) {
-                    subscriptionObj.planId = plan.toObject();
+                    // Add plan details as a separate property instead of overwriting planId
+                    subscriptionObj.planDetails = plan.toObject();
                 }
             }
             
@@ -278,7 +279,10 @@ const getProfile = async (req, res, next) => {
         let usedSessions = 0;
         let usedServices = 0;
         
-        if (activeSubscription && activeSubscription.planId) {
+        // Use the plan details from the preserved object
+        const planDetails = activeSubscription?.planDetails;
+        
+        if (activeSubscription && planDetails) {
             // Count used sessions for this subscription
             usedSessions = await Session.countDocuments({
                 subscriptionId: activeSubscription._id,
@@ -294,8 +298,8 @@ const getProfile = async (req, res, next) => {
         }
         
         // Calculate remaining counts
-        const totalSessions = activeSubscription?.planId?.sessions || 0;
-        const totalServices = activeSubscription?.planId?.totalService || 0;
+        const totalSessions = planDetails?.sessions || 0;
+        const totalServices = planDetails?.totalService || 0;
         const remainingSessions = Math.max(0, totalSessions - usedSessions);
         const remainingServices = Math.max(0, totalServices - usedServices);
         
@@ -304,8 +308,8 @@ const getProfile = async (req, res, next) => {
             ...user.toObject(),
             subscriptionData: activeSubscription ? {
                 id: activeSubscription._id,
-                planId: activeSubscription.planId,
-                planName: activeSubscription.planName,
+                planId: activeSubscription.planId, // This is now preserved as a string
+                planName: planDetails?.name || activeSubscription.planName, // Use plan details name
                 amount: activeSubscription.amount,
                 currency: activeSubscription.currency,
                 status: activeSubscription.status,

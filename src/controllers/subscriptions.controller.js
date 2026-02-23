@@ -2,6 +2,7 @@ const razorpay = require('../config/razorpay');
 const Subscription = require('../models/Subscription.model');
 const SubscriptionPlan = require('../models/SubscriptionPlan.model');
 const Session = require('../models/Session.model');
+const Booking = require('../models/Booking.model');
 const ApiResponse = require('../utils/apiResponse');
 
 // Get available subscription plans
@@ -442,7 +443,6 @@ const getUserSubscriptions = async (req, res, next) => {
 
             if (plan && plan.sessions > 0) {
                 // Count all sessions for this subscription (more accurate approach)
-                const Booking = require('../models/Booking.model');
 
                 // Count all non-cancelled sessions for this specific subscription
                 const usedSessions = await Session.countDocuments({
@@ -498,10 +498,9 @@ const getUserSubscriptions = async (req, res, next) => {
             
             // Additionally, get user's purchased services with their session information
             const Service = require('../models/Service.model');
-            const BookingModel = require('../models/Booking.model');
             
             // Get all bookings for the user that are paid (representing purchased services)
-            const userBookings = await BookingModel.find({
+            const userBookings = await Booking.find({
                 userId: req.user.userId,
                 paymentStatus: 'paid'
             }).populate('serviceId');
@@ -598,7 +597,6 @@ const getAllSubscriptions = async (req, res, next) => {
 
             if (plan && plan.sessions > 0) {
                 // Count all sessions for this subscription (more accurate approach)
-                const Booking = require('../models/Booking.model');
 
                 // Count all non-cancelled sessions for this specific subscription
                 const usedSessions = await Session.countDocuments({
@@ -654,10 +652,9 @@ const getAllSubscriptions = async (req, res, next) => {
             
             // Additionally, get user's purchased services with their session information
             const Service = require('../models/Service.model');
-            const BookingModel = require('../models/Booking.model');
             
             // Get all bookings for the user that are paid (representing purchased services)
-            const userBookings = await BookingModel.find({
+            const userBookings = await Booking.find({
                 userId: subscription.userId,
                 paymentStatus: 'paid'
             }).populate('serviceId');
@@ -742,7 +739,6 @@ const getExpiredSubscriptions = async (req, res, next) => {
 // Get expired services for admin
 const getExpiredServices = async (req, res, next) => {
     try {
-        const Booking = require('../models/Booking.model');
         const Service = require('../models/Service.model');
         
         // Get all paid bookings
@@ -808,11 +804,64 @@ const checkSubscriptionEligibility = async (req, res, next) => {
             return res.status(200).json(ApiResponse.success({
                 eligible: false,
                 message: "Subscription plan not found",
-                reason: "PLAN_NOT_FOUND"
+                reason: "PLAN_NOT_FOUND",
+                subscriptionId: subscription._id
             }));
         }
         
         const plan = subscription.planId;
+        
+        // Validate that plan has required fields
+        // Handle cases where plan data might be inconsistent
+        let planSessions = 0;
+        
+        // More permissive validation - handle various edge cases
+        if (plan.sessions != null) {
+            if (typeof plan.sessions === 'number' && !isNaN(plan.sessions) && plan.sessions >= 0) {
+                planSessions = plan.sessions;
+            } else if (typeof plan.sessions === 'string') {
+                const parsed = parseInt(plan.sessions, 10);
+                if (!isNaN(parsed) && parsed >= 0) {
+                    planSessions = parsed;
+                }
+            }
+        }
+        
+        // Log detailed plan information for debugging
+        console.log(`Plan validation for subscription ${subscription._id}:`, {
+            planId: plan._id,
+            planName: plan.name,
+            rawSessions: plan.sessions,
+            sessionsType: typeof plan.sessions,
+            parsedSessions: planSessions,
+            isValid: planSessions > 0
+        });
+        
+        // If we have no valid sessions, check if user has used sessions already
+        if (planSessions <= 0) {
+            // Even if plan config is invalid, if user has used sessions, show appropriate message
+            if (usedSessions > 0) {
+                return res.status(200).json(ApiResponse.success({
+                    eligible: false,
+                    message: `You have used all sessions from your subscription plan.`,
+                    reason: "SESSIONS_EXHAUSTED",
+                    subscriptionId: subscription._id,
+                    planName: plan.name || "Your Plan",
+                    totalSessions: usedSessions, // Show what was actually used
+                    usedSessions: usedSessions,
+                    remainingSessions: 0
+                }));
+            } else {
+                return res.status(200).json(ApiResponse.success({
+                    eligible: false,
+                    message: `Subscription plan configuration error: sessions not properly configured`,
+                    reason: "PLAN_CONFIG_ERROR",
+                    subscriptionId: subscription._id,
+                    planName: plan.name || "Unknown Plan",
+                    planSessions: plan.sessions
+                }));
+            }
+        }
         
         // Count used sessions for this subscription
         const usedSessions = await Session.countDocuments({
@@ -831,53 +880,66 @@ const checkSubscriptionEligibility = async (req, res, next) => {
         const remainingSessions = Math.max(0, plan.sessions - usedSessions);
         const remainingServices = Math.max(0, plan.totalService - usedServices);
         
-        // Check if both sessions and services are exhausted
-        if (remainingSessions <= 0 && remainingServices <= 0) {
+        // Safe value calculations using validated planSessions
+        const safePlanSessions = planSessions;
+        const safeUsedSessions = (usedSessions != null && !isNaN(usedSessions)) ? usedSessions : 0;
+        const safeRemainingSessions = Math.max(0, safePlanSessions - safeUsedSessions);
+        const safeTotalServices = (plan.totalService != null && !isNaN(plan.totalService)) ? plan.totalService : 0;
+        
+        // Log session calculation details
+        console.log(`Session calculation for subscription ${subscription._id}:`, {
+            planSessions: safePlanSessions,
+            usedSessions: safeUsedSessions,
+            remainingSessions: safeRemainingSessions,
+            isEligible: safeRemainingSessions > 0
+        });
+        
+        // Focus ONLY on session count for eligibility (as requested)
+        if (safeRemainingSessions <= 0) {
+            // Handle different scenarios for exhausted sessions
+            let message;
+            let totalSessionsValue;
+            
+            if (safePlanSessions > 0) {
+                // Normal case: plan had valid sessions, all used up
+                message = `You have reached your session limit. Your ${plan.name || "plan"} includes ${safePlanSessions} sessions and you have used ${safeUsedSessions} of them.`;
+                totalSessionsValue = safePlanSessions;
+            } else {
+                // Edge case: plan config invalid, but sessions were used
+                message = `You have used all sessions from your subscription plan.`;
+                totalSessionsValue = safeUsedSessions; // Show what was actually used
+            }
+            
             return res.status(200).json(ApiResponse.success({
                 eligible: false,
-                message: `All ${plan.sessions} sessions and ${plan.totalService} services have been used`,
-                reason: "LIMITS_REACHED",
+                message: message,
+                reason: "SESSIONS_EXHAUSTED",
                 subscriptionId: subscription._id,
-                planName: plan.name,
-                totalSessions: plan.sessions,
-                totalServices: plan.totalService,
-                usedSessions: usedSessions,
-                usedServices: usedServices,
-                remainingSessions: remainingSessions,
-                remainingServices: remainingServices
+                planName: plan.name || "Your Plan",
+                totalSessions: totalSessionsValue,
+                totalServices: safeTotalServices,
+                usedSessions: safeUsedSessions,
+                usedServices: usedServices && !isNaN(usedServices) ? usedServices : 0,
+                remainingSessions: safeRemainingSessions,
+                remainingServices: remainingServices && !isNaN(remainingServices) ? remainingServices : 0
             }));
         }
         
-        // Check if user still has sessions or services available
-        if (remainingSessions > 0 || remainingServices > 0) {
-            return res.status(200).json(ApiResponse.success({
-                eligible: true,
-                message: `You have ${remainingSessions} sessions and ${remainingServices} services remaining`,
-                subscriptionId: subscription._id,
-                planName: plan.name,
-                totalSessions: plan.sessions,
-                totalServices: plan.totalService,
-                usedSessions: usedSessions,
-                usedServices: usedServices,
-                remainingSessions: remainingSessions,
-                remainingServices: remainingServices
-            }));
-        }
-        
-        // Fallback (should not reach here)
+        // User has sessions remaining - they are eligible
         return res.status(200).json(ApiResponse.success({
-            eligible: false,
-            message: "No sessions or services remaining",
-            reason: "NO_RESOURCES",
+            eligible: true,
+            message: `You have ${safeRemainingSessions} sessions remaining out of ${safePlanSessions} total sessions`,
             subscriptionId: subscription._id,
-            planName: plan.name,
-            totalSessions: plan.sessions,
-            totalServices: plan.totalService,
-            usedSessions: usedSessions,
-            usedServices: usedServices,
-            remainingSessions: remainingSessions,
-            remainingServices: remainingServices
+            planName: plan.name || "Unknown Plan",
+            totalSessions: safePlanSessions,
+            totalServices: safeTotalServices,
+            usedSessions: safeUsedSessions,
+            usedServices: usedServices && !isNaN(usedServices) ? usedServices : 0,
+            remainingSessions: safeRemainingSessions,
+            remainingServices: remainingServices && !isNaN(remainingServices) ? remainingServices : 0
         }));
+        
+
         
     } catch (error) {
         console.error("Error checking subscription eligibility:", error);

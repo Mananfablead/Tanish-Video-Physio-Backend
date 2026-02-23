@@ -68,7 +68,6 @@ const getAllServices = async (req, res, next) => {
 
         // If user is authenticated, add expiration information for their purchased services
         if (req.user && req.user.userId) {
-            const Booking = require('../models/Booking.model');
 
             // Get user's paid bookings
             const userBookings = await Booking.find({
@@ -179,7 +178,6 @@ const getAllServicesAdmin = async (req, res, next) => {
             .sort({ createdAt: -1 }); // Sort by createdAt descending
 
         // Add purchase count and expiration stats for each service
-        const Booking = require('../models/Booking.model');
         const servicesWithPurchaseCount = await Promise.all(services.map(async (service) => {
             // Count paid bookings for this service
             const purchaseCount = await Booking.countDocuments({
@@ -227,7 +225,6 @@ const getServiceByIdAdmin = async (req, res, next) => {
         }
 
             // Count total purchases for this service
-            const Booking = require('../models/Booking.model');
             const purchaseCount = await Booking.countDocuments({
                 serviceId: req.params.id,
                 paymentStatus: 'paid'

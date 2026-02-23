@@ -1,5 +1,5 @@
 const express = require('express');
-const { getAllBookings, getBookingById, createBooking, createGuestBooking, updateBooking, updateBookingStatus, updateGuestBookingStatus, deleteBooking, getBookingsByStatus, getAllBookingsForAdmin, getBookingDetails, checkSlotAvailability, updateBookingWithSchedule, createBookingWithSubscription } = require('../controllers/bookings.controller');
+const { getAllBookings, getBookingById, createBooking, createGuestBooking, updateBooking, updateBookingStatus, updateGuestBookingStatus, deleteBooking, getBookingsByStatus, getAllBookingsForAdmin, getBookingDetails, checkSlotAvailability, updateBookingWithSchedule, createBookingWithSubscription, checkSubscriptionBookingEligibility } = require('../controllers/bookings.controller');
 const { authenticateToken } = require('../middlewares/auth.middleware');
 const { requirePatientRole, requireAdminRole } = require('../middlewares/role.middleware');
 
@@ -26,5 +26,8 @@ router.put('/:id/schedule', authenticateToken, updateBookingWithSchedule);
 
 // Route for subscription-based bookings
 router.post('/subscription', authenticateToken, createBookingWithSubscription);
+
+// Route to check subscription booking eligibility
+router.get('/subscription/eligibility', authenticateToken, checkSubscriptionBookingEligibility);
 
 module.exports = router;
