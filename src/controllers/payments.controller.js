@@ -204,14 +204,6 @@ async function sendWelcomeEmailWithCredentials(email, name, username, password) 
             html: message
         };
 
-        // Verify transporter before sending email
-        try {
-            await transporter.verify();
-            console.log('✅ Transporter verified for welcome email');
-        } catch (verifyError) {
-            console.error('❌ Transporter verification failed:', verifyError.message);
-        }
-
         // Send email
         const info = await transporter.sendMail(mailOptions);
         console.log('✅ Welcome email sent', {
@@ -228,14 +220,6 @@ async function sendWelcomeEmailWithCredentials(email, name, username, password) 
             response: error.response,
             stack: error.stack
         });
-
-        // Log specific authentication error
-        if (error.code === 'EAUTH' || error.message.includes('535') || error.message.includes('Username and Password not accepted')) {
-            console.error('Authentication error: Please check your email credentials in the admin panel. If using Gmail, ensure you are using an App Password, not your regular password.');
-        }
-
-        // Don't throw the error, just log it, so the payment flow continues
-        // Throwing an error here would prevent payment verification
     }
 }
 
