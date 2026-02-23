@@ -42,7 +42,14 @@ const getBookingById = async (req, res, next) => {
         const booking = await Booking.findOne(query)
             .populate('serviceId', 'name price duration validity images')
             .populate('therapistId', 'name email role profilePicture')
-            .populate('userId', 'name email phone');
+            .populate({
+                path: 'userId',
+                select: 'name email phone joinDate healthProfile',
+                populate: {
+                    path: 'healthProfile',
+                    select: 'questionnaireResponses questionnaireMetadata additionalNotes primaryConcern painIntensity priorTreatments'
+                }
+            });
 
         if (!booking) {
             return res.status(404).json(ApiResponse.error('Booking not found or unauthorized'));
@@ -98,7 +105,15 @@ const getBookingDetails = async (req, res, next) => {
         // Find the booking by ID
         const booking = await Booking.findById(bookingId)
             .populate('serviceId', 'name price duration description validity images')
-            .populate('therapistId', 'name email role profilePicture');
+            .populate('therapistId', 'name email role profilePicture')
+            .populate({
+                path: 'userId',
+                select: 'name email phone joinDate healthProfile',
+                populate: {
+                    path: 'healthProfile',
+                    select: 'questionnaireResponses questionnaireMetadata additionalNotes primaryConcern painIntensity priorTreatments'
+                }
+            });
 
         if (!booking) {
             return res.status(404).json(ApiResponse.error('Booking not found'));
@@ -1218,7 +1233,14 @@ const getAllBookingsForAdmin = async (req, res, next) => {
         const bookings = await Booking.find(query)
             .populate('serviceId', 'name price duration validity images')
             .populate('therapistId', 'name email role profilePicture')
-            .populate('userId', 'name email phone profilePicture')
+            .populate({
+                path: 'userId',
+                select: 'name email phone profilePicture joinDate healthProfile',
+                populate: {
+                    path: 'healthProfile',
+                    select: 'questionnaireResponses questionnaireMetadata additionalNotes primaryConcern painIntensity priorTreatments'
+                }
+            })
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit);

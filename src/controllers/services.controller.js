@@ -1,6 +1,6 @@
 const Service = require('../models/Service.model');
-const ApiResponse = require('../utils/apiResponse');
 const Booking = require('../models/Booking.model');
+const ApiResponse = require('../utils/apiResponse');
 const path = require('path');
 const fs = require('fs');
 const config = require('../config/env');
