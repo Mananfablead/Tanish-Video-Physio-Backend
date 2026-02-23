@@ -1,6 +1,8 @@
 const User = require('../models/User.model');
 const Subscription = require('../models/Subscription.model');
+const SubscriptionPlan = require('../models/SubscriptionPlan.model');
 const Booking = require('../models/Booking.model');
+const Session = require('../models/Session.model');
 const { generateToken } = require('../config/jwt');
 const { hashPassword, comparePassword } = require('../utils/auth.utils');
 const ApiResponse = require('../utils/apiResponse');
@@ -163,15 +165,36 @@ const getProfile = async (req, res, next) => {
             .sort({ createdAt: -1 })
             .limit(5); // Get last 5 subscriptions
 
+        // Manually populate plan details since planId is stored as a string, not ObjectId
+        const subscriptionsWithPlanDetails = await Promise.all(subscriptions.map(async (subscription) => {
+            const subscriptionObj = subscription.toObject();
+            
+            // Look up the plan using the planId string
+            if (subscriptionObj.planId) {
+                const plan = await SubscriptionPlan.findOne({ planId: subscriptionObj.planId });
+                if (plan) {
+                    subscriptionObj.planId = plan.toObject();
+                }
+            }
+            
+            return subscriptionObj;
+        }));
+
         // Find the most relevant subscription (active/paid or most recent)
         let activeSubscription = null;
         let expiredSubscriptions = [];
 
         // Check expiration status for all subscriptions
-        const subscriptionsWithExpiry = await Promise.all(subscriptions.map(async (subscription) => {
-            const expiryStatus = subscription.checkExpirationStatus();
+        const subscriptionsWithExpiry = await Promise.all(subscriptionsWithPlanDetails.map(async (subscription) => {
+            const expiryStatus = subscription.checkExpirationStatus ? subscription.checkExpirationStatus() : {
+                isExpired: subscription.endDate ? new Date() > new Date(subscription.endDate) : false,
+                expiryDate: subscription.endDate,
+                status: subscription.endDate ? (new Date() > new Date(subscription.endDate) ? 'expired' : 'active') : 'active',
+                daysRemaining: subscription.endDate ? Math.ceil((new Date(subscription.endDate) - new Date()) / (1000 * 60 * 60 * 24)) : Infinity
+            };
+            
             return {
-                ...subscription.toObject(),
+                ...subscription,
                 ...expiryStatus
             };
         }));
@@ -251,6 +274,31 @@ const getProfile = async (req, res, next) => {
             })
             .filter(service => !service.isExpired); // Filter out expired services
 
+        // Count used sessions and services for this subscription before building response
+        let usedSessions = 0;
+        let usedServices = 0;
+        
+        if (activeSubscription && activeSubscription.planId) {
+            // Count used sessions for this subscription
+            usedSessions = await Session.countDocuments({
+                subscriptionId: activeSubscription._id,
+                status: { $ne: "cancelled" }
+            });
+            
+            // Count used services for this subscription (based on bookings)
+            usedServices = await Booking.countDocuments({
+                subscriptionId: activeSubscription._id,
+                serviceId: { $exists: true, $ne: null }, // Only bookings with a specific service
+                status: { $ne: "cancelled" }
+            });
+        }
+        
+        // Calculate remaining counts
+        const totalSessions = activeSubscription?.planId?.sessions || 0;
+        const totalServices = activeSubscription?.planId?.totalService || 0;
+        const remainingSessions = Math.max(0, totalSessions - usedSessions);
+        const remainingServices = Math.max(0, totalServices - usedServices);
+        
         // Add subscription data, expiration info, and purchased services to the response
         const responseData = {
             ...user.toObject(),
@@ -266,7 +314,14 @@ const getProfile = async (req, res, next) => {
                 isExpired: activeSubscription.isExpired,
                 daysRemaining: activeSubscription.daysRemaining,
                 expiryStatus: activeSubscription.status, // active, expiring_soon, expired
-                createdAt: activeSubscription.createdAt
+                createdAt: activeSubscription.createdAt,
+                // Add session and service usage information
+                totalSessions: totalSessions,
+                totalService: totalServices,
+                usedSessions: usedSessions,
+                usedServices: usedServices,
+                remainingSessions: remainingSessions,
+                remainingServices: remainingServices,
             } : null,
             expiredSubscriptions: expiredSubscriptions.map(sub => ({
                 id: sub._id,
@@ -281,6 +336,33 @@ const getProfile = async (req, res, next) => {
             })),
             purchasedServices: purchasedServices
         };
+
+        // If there's an active subscription, add detailed usage information with percentages
+        if (activeSubscription && activeSubscription.planId) {
+            const plan = activeSubscription.planId;
+            
+            // Calculate percentage used for sessions
+            const sessionPercentageUsed = plan.sessions > 0 ? Math.round(((responseData.subscriptionData.usedSessions || 0) / plan.sessions) * 100) : 0;
+            
+            // Add session usage info to subscription data
+            responseData.subscriptionData.availableSessions = {
+                total: plan.sessions,
+                used: responseData.subscriptionData.usedSessions || 0,
+                remaining: responseData.subscriptionData.remainingSessions || 0,
+                percentageUsed: sessionPercentageUsed
+            };
+            
+            // Calculate percentage used for services
+            const servicePercentageUsed = plan.totalService > 0 ? Math.round(((responseData.subscriptionData.usedServices || 0) / plan.totalService) * 100) : 0;
+            
+            // Add service usage info to subscription data
+            responseData.subscriptionData.availableServices = {
+                total: plan.totalService,
+                used: responseData.subscriptionData.usedServices || 0,
+                remaining: responseData.subscriptionData.remainingServices || 0,
+                percentageUsed: servicePercentageUsed
+            };
+        }
 
         // Add subscription warning message if there are expired subscriptions
         if (expiredSubscriptions.length > 0) {

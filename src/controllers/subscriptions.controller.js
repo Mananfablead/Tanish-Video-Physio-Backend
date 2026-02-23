@@ -814,49 +814,69 @@ const checkSubscriptionEligibility = async (req, res, next) => {
         
         const plan = subscription.planId;
         
-        // Check session limits (0 means unlimited)
-        if (plan.sessions === 0) {
-            return res.status(200).json(ApiResponse.success({
-                eligible: true,
-                message: "Unlimited sessions available",
-                subscriptionId: subscription._id,
-                planName: plan.name,
-                totalSessions: 'unlimited',
-                usedSessions: 0,
-                remainingSessions: 'unlimited'
-            }));
-        }
-        
         // Count used sessions for this subscription
         const usedSessions = await Session.countDocuments({
             subscriptionId: subscription._id,
             status: { $ne: "cancelled" }
         });
         
-        const remainingSessions = plan.sessions - usedSessions;
+        // Count used services for this subscription (based on bookings)
+        const usedServices = await Booking.countDocuments({
+            subscriptionId: subscription._id,
+            serviceId: { $exists: true, $ne: null }, // Only bookings with a specific service
+            status: { $ne: "cancelled" }
+        });
         
-        if (remainingSessions <= 0) {
+        // Calculate remaining with minimum value of 0 to avoid negative counts
+        const remainingSessions = Math.max(0, plan.sessions - usedSessions);
+        const remainingServices = Math.max(0, plan.totalService - usedServices);
+        
+        // Check if both sessions and services are exhausted
+        if (remainingSessions <= 0 && remainingServices <= 0) {
             return res.status(200).json(ApiResponse.success({
                 eligible: false,
-                message: `All ${plan.sessions} sessions have been used`,
-                reason: "SESSION_LIMIT_REACHED",
+                message: `All ${plan.sessions} sessions and ${plan.totalService} services have been used`,
+                reason: "LIMITS_REACHED",
                 subscriptionId: subscription._id,
                 planName: plan.name,
                 totalSessions: plan.sessions,
+                totalServices: plan.totalService,
                 usedSessions: usedSessions,
-                remainingSessions: 0
+                usedServices: usedServices,
+                remainingSessions: remainingSessions,
+                remainingServices: remainingServices
             }));
         }
         
-        // User is eligible for free booking
+        // Check if user still has sessions or services available
+        if (remainingSessions > 0 || remainingServices > 0) {
+            return res.status(200).json(ApiResponse.success({
+                eligible: true,
+                message: `You have ${remainingSessions} sessions and ${remainingServices} services remaining`,
+                subscriptionId: subscription._id,
+                planName: plan.name,
+                totalSessions: plan.sessions,
+                totalServices: plan.totalService,
+                usedSessions: usedSessions,
+                usedServices: usedServices,
+                remainingSessions: remainingSessions,
+                remainingServices: remainingServices
+            }));
+        }
+        
+        // Fallback (should not reach here)
         return res.status(200).json(ApiResponse.success({
-            eligible: true,
-            message: `You have ${remainingSessions} sessions remaining`,
+            eligible: false,
+            message: "No sessions or services remaining",
+            reason: "NO_RESOURCES",
             subscriptionId: subscription._id,
             planName: plan.name,
             totalSessions: plan.sessions,
+            totalServices: plan.totalService,
             usedSessions: usedSessions,
-            remainingSessions: remainingSessions
+            usedServices: usedServices,
+            remainingSessions: remainingSessions,
+            remainingServices: remainingServices
         }));
         
     } catch (error) {
