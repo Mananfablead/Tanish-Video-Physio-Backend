@@ -204,6 +204,14 @@ async function sendWelcomeEmailWithCredentials(email, name, username, password) 
             html: message
         };
 
+        // Verify transporter before sending email
+        try {
+            await transporter.verify();
+            console.log('✅ Transporter verified for welcome email');
+        } catch (verifyError) {
+            console.error('❌ Transporter verification failed:', verifyError.message);
+        }
+
         // Send email
         const info = await transporter.sendMail(mailOptions);
         console.log('✅ Welcome email sent', {
@@ -220,6 +228,14 @@ async function sendWelcomeEmailWithCredentials(email, name, username, password) 
             response: error.response,
             stack: error.stack
         });
+
+        // Log specific authentication error
+        if (error.code === 'EAUTH' || error.message.includes('535') || error.message.includes('Username and Password not accepted')) {
+            console.error('Authentication error: Please check your email credentials in the admin panel. If using Gmail, ensure you are using an App Password, not your regular password.');
+        }
+
+        // Don't throw the error, just log it, so the payment flow continues
+        // Throwing an error here would prevent payment verification
     }
 }
 
@@ -349,7 +365,7 @@ const createOrder = async (req, res, next) => {
         res.status(200).json(
             ApiResponse.success({
                 orderId: order.id,
-                key: razorpayCreds?.keyId || process.env.RAZORPAY_KEY_ID,
+                key: razorpayCreds?.keyId,
                 amount: order.amount,
                 currency: order.currency
             }, 'Payment order created successfully')
@@ -358,6 +374,7 @@ const createOrder = async (req, res, next) => {
         next(error);
     }
 };
+
 // Helper function to create session from booking
 async function createSessionFromBooking(booking, service) {
     if (booking.scheduledDate && booking.scheduledTime) {
@@ -769,7 +786,7 @@ const createGuestOrder = async (req, res, next) => {
         res.status(200).json(
             ApiResponse.success({
                 orderId: order.id,
-                key: razorpayCreds?.keyId || process.env.RAZORPAY_KEY_ID,
+                key: razorpayCreds?.keyId,
                 amount: order.amount,
                 currency: order.currency,
                 message: 'Payment order created successfully. Account will be created after payment verification.'
@@ -1487,7 +1504,7 @@ const createSubscriptionOrder = async (req, res, next) => {
         res.status(200).json(
             ApiResponse.success({
                 orderId: order.id,
-                key: razorpayCreds?.keyId || process.env.RAZORPAY_KEY_ID, // Frontend needs this to initialize Razorpay
+                key: razorpayCreds?.keyId, // Frontend needs this to initialize Razorpay
                 amount: order.amount,
                 currency: order.currency
             }, 'Subscription order created successfully')
@@ -1648,7 +1665,7 @@ const createGuestSubscriptionOrder = async (req, res, next) => {
         res.status(200).json(
             ApiResponse.success({
                 orderId: order.id,
-                key: razorpayCreds?.keyId || process.env.RAZORPAY_KEY_ID, // Frontend needs this to initialize Razorpay
+                key: razorpayCreds?.keyId, // Frontend needs this to initialize Razorpay
                 amount: order.amount,
                 currency: order.currency,
                 message: 'Subscription order created successfully. Account will be created after payment verification.'

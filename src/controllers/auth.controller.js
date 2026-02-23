@@ -783,15 +783,23 @@ const forgotPassword = async (req, res, next) => {
         }
 
         // Create transporter for sending email
-        const transporter = createTransport({
-            service: 'gmail',
+        const resetPasswordTransporter = createTransport({
             host: emailCreds.host,
             port: emailCreds.port,
+            secure: emailCreds.port === 465, // true for 465, false for other ports like 587
             auth: {
                 user: emailCreds.user,
                 pass: emailCreds.password
             }
         });
+
+        try {
+            // Verify transporter configuration
+            await resetPasswordTransporter.verify();
+        } catch (verifyError) {
+            console.error('Email transporter verification failed:', verifyError.message);
+            // Continue to send email, as verification sometimes fails but sending succeeds
+        }
 
         // Prepare email
         const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
@@ -903,8 +911,23 @@ const forgotPassword = async (req, res, next) => {
             html: message
         };
 
-        // Send email
-        await transporter.sendMail(mailOptions);
+        // Send email with error handling
+        try {
+            await resetPasswordTransporter.sendMail(mailOptions);
+        } catch (emailError) {
+            console.error('Error sending password reset email:', {
+                message: emailError.message,
+                code: emailError.code,
+                command: emailError.command
+            });
+
+            if (emailError.code === 'EAUTH' || emailError.message.includes('535') || emailError.message.includes('Username and Password not accepted')) {
+                console.error('Authentication error: Please check your email credentials in the admin panel. If using Gmail, ensure you are using an App Password, not your regular password.');
+                return res.status(500).json(ApiResponse.error('Email configuration error. Please contact administrator.'));
+            }
+
+            throw emailError;
+        }
 
         res.status(200).json(ApiResponse.success(null, 'Password reset email sent successfully'));
     } catch (error) {

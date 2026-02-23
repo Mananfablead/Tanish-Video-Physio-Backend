@@ -51,13 +51,29 @@ initializeTransporter();
 // Send email
 const sendEmail = async (options) => {
     try {
-        // Get transporter (initialize if needed)
-        const emailTransporter = await getTransporter();
-
         // Get fresh credentials for each email send
         const emailCreds = await getEmailCredentials();
         if (!emailCreds) {
             throw new Error('Email configuration not found in database');
+        }
+
+        // Create a fresh transporter with current credentials to avoid caching issues
+        const freshTransporter = nodemailer.createTransport({
+            host: emailCreds.host,
+            port: emailCreds.port,
+            secure: emailCreds.port === 465, // true for 465, false for other ports
+            auth: {
+                user: emailCreds.user,
+                pass: emailCreds.password,
+            },
+        });
+
+        // Verify transporter configuration before sending
+        try {
+            await freshTransporter.verify();
+        } catch (verifyError) {
+            logger.error('Email transporter verification failed:', verifyError.message);
+            // Still attempt to send, as verification sometimes fails but sending succeeds
         }
 
         const mailOptions = {
@@ -68,11 +84,23 @@ const sendEmail = async (options) => {
             html: options.html,
         };
 
-        const result = await emailTransporter.sendMail(mailOptions);
-        logger.info(`Email sent to ${options.to}`);
+        const result = await freshTransporter.sendMail(mailOptions);
+        logger.info(`Email sent successfully to ${options.to}`);
         return result;
     } catch (error) {
-        logger.error('Error sending email:', error);
+        logger.error('Error sending email:', {
+            message: error.message,
+            code: error.code,
+            command: error.command,
+            to: options?.to,
+            subject: options?.subject
+        });
+
+        // Log specific authentication error
+        if (error.code === 'EAUTH' || error.message.includes('535') || error.message.includes('Username and Password not accepted')) {
+            logger.error('Authentication error: Please check your email credentials in the admin panel. If using Gmail, ensure you are using an App Password, not your regular password.');
+        }
+
         throw error;
     }
 };

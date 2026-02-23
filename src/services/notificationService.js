@@ -354,14 +354,25 @@ class NotificationService {
                 this.emailConfig = {
                     host: emailCreds.host,
                     port: emailCreds.port,
-                    secure: false,
+                    secure: emailCreds.port === 465, // true for 465, false for other ports like 587
                     auth: {
                         user: emailCreds.user,
                         pass: emailCreds.password
                     }
                 };
+
                 this.emailTransporter = nodemailer.createTransport(this.emailConfig);
-                this.emailEnabled = !!(emailCreds.user && emailCreds.password);
+
+                try {
+                    // Verify transporter configuration
+                    await this.emailTransporter.verify();
+                    console.log('✅ Notification email transporter verified and ready');
+                    this.emailEnabled = !!(emailCreds.user && emailCreds.password);
+                } catch (verifyError) {
+                    console.warn('⚠️ Notification email transporter verification failed:', verifyError.message);
+                // Still enable email functionality but log the issue
+                    this.emailEnabled = !!(emailCreds.user && emailCreds.password);
+                }
             }
 
             // Initialize notification templates (without payment_received and new_booking)
@@ -584,16 +595,49 @@ class NotificationService {
                 html: htmlContent
             };
 
+            // Verify transporter before sending (in case credentials changed since initialization)
+            if (this.emailTransporter && this.emailTransporter.verify) {
+                try {
+                    await this.emailTransporter.verify();
+                } catch (verifyError) {
+                    console.warn('Email transporter verification failed, attempting to reinitialize:', verifyError.message);
+
+                    // Re-fetch credentials and recreate transporter
+                    const emailCreds = await getEmailCredentials();
+                    if (emailCreds) {
+                        this.emailConfig = {
+                            host: emailCreds.host,
+                            port: emailCreds.port,
+                            secure: emailCreds.port === 465,
+                            auth: {
+                                user: emailCreds.user,
+                                pass: emailCreds.password
+                            }
+                        };
+                        this.emailTransporter = nodemailer.createTransport(this.emailConfig);
+                        this.emailEnabled = !!(emailCreds.user && emailCreds.password);
+                    }
+                }
+            }
+
             const result = await this.emailTransporter.sendMail(mailOptions);
             console.log('Email sent successfully:', result.messageId);
             return { success: true, messageId: result.messageId };
         } catch (error) {
             console.error('❌ Email sending failed:', {
                 message: error.message,
+                code: error.code,
+                command: error.command,
                 stack: error.stack,
                 templateType: typeof template,
                 templateValue: template
             });
+
+            // Log specific authentication error
+            if (error.code === 'EAUTH' || error.message.includes('535') || error.message.includes('Username and Password not accepted')) {
+                console.error('Authentication error: Please check your email credentials in the admin panel. If using Gmail, ensure you are using an App Password, not your regular password.');
+            }
+
             return { success: false, error: error.message };
         }
     }

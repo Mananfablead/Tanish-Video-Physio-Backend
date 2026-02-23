@@ -1,6 +1,7 @@
 const razorpay = require('../config/razorpay');
 const Payment = require('../models/Payment.model');
 const logger = require('../utils/logger');
+const { getRazorpayCredentials } = require('../utils/credentialsManager');
 
 // Create a payment order
 const createOrder = async (options) => {
@@ -17,7 +18,15 @@ const createOrder = async (options) => {
 const verifyPayment = async (paymentData) => {
     try {
         const crypto = require('crypto');
-        const secret = process.env.RAZORPAY_KEY_SECRET;
+
+        // Get Razorpay credentials from database
+        const razorpayCreds = await getRazorpayCredentials();
+
+        if (!razorpayCreds || !razorpayCreds.keySecret) {
+            throw new Error('Razorpay key secret not found in database');
+        }
+
+        const secret = razorpayCreds.keySecret;
 
         const signature = paymentData.razorpay_signature;
         const paymentId = paymentData.razorpay_payment_id;

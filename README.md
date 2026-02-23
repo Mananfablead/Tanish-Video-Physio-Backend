@@ -31,9 +31,8 @@ Backend API for the Tanish Physio application, built with Node.js, Express, and 
 5. Set up your environment variables:
    - `MONGODB_URI`: Your MongoDB connection string
    - `JWT_SECRET`: Secret key for JWT tokens
-   - `RAZORPAY_KEY_ID`: Razorpay key ID
-   - `RAZORPAY_KEY_SECRET`: Razorpay key secret
    - `EMAIL_*`: Email configuration (optional)
+   - Razorpay credentials are now managed via the database (Credentials model)
 6. Start the server: `npm run dev`
 
 ## API Endpoints
@@ -45,13 +44,11 @@ For a complete list of API endpoints, please refer to the [Unified API Documenta
 Create a `.env` file in the root of the backend directory with the following variables:
 
 ```
-NODE_ENV=development
+```NODE_ENV=development
 PORT=5000
 MONGODB_URI=mongodb://localhost:27017/tanish-physio
 JWT_SECRET=your_jwt_secret_here
 JWT_EXPIRE=24h
-RAZORPAY_KEY_ID=your_razorpay_key_id
-RAZORPAY_KEY_SECRET=your_razorpay_key_secret
 ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5174
 EMAIL_HOST=smtp.gmail.com
 EMAIL_PORT=587
@@ -94,7 +91,7 @@ src/
 
 ## Payment Integration
 
-The backend uses Razorpay for payment processing. The following endpoints are available:
+The backend uses Razorpay for payment processing. Razorpay credentials are now managed via the database (Credentials model) instead of environment variables. The following endpoints are available:
 
 - `POST /api/payments/create-order` - Create a payment order
 - `POST /api/payments/webhook` - Handle payment webhooks from Razorpay
