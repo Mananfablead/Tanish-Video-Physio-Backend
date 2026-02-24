@@ -1267,12 +1267,11 @@ const handleWebhook = async (req, res) => {
                     if (!existingUser) {
                         // Create the user account with temporary password
                         tempPassword = Math.random().toString(36).slice(-8) + 'Temp1!';
-                        const hashedPassword = await hashPassword(tempPassword);
 
                         const newUser = new User({
                             name: subscription.guestName,
                             email: subscription.guestEmail,
-                            password: hashedPassword,
+                            password: tempPassword,
                             phone: subscription.guestPhone,
                             role: 'patient',
                             status: 'active'
@@ -2102,12 +2101,11 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
                 if (!existingUser) {
                     // Create the user account with temporary password
                     tempPassword = Math.random().toString(36).slice(-8) + 'Temp1!';
-                    const hashedPassword = await hashPassword(tempPassword);
 
                     newUser = new User({
                         name: subscription.guestName,
                         email: subscription.guestEmail,
-                        password: hashedPassword,
+                        password: tempPassword,
                         phone: subscription.guestPhone,
                         role: 'patient',
                         status: 'active'
