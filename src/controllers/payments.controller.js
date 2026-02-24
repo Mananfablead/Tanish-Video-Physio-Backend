@@ -1266,14 +1266,13 @@ const handleWebhook = async (req, res) => {
 
                     if (!existingUser) {
                         // Create the user account with temporary password
-                        // tempPassword = Math.random().toString(36).slice(-8) + 'Temp1!';
-                        // const hashedPassword = await hashPassword(tempPassword);
                         tempPassword = Math.random().toString(36).slice(-8) + 'Temp1!';
+                        const hashedPassword = await hashPassword(tempPassword);
 
                         const newUser = new User({
                             name: subscription.guestName,
                             email: subscription.guestEmail,
-                            password: tempPassword,
+                            password: hashedPassword,
                             phone: subscription.guestPhone,
                             role: 'patient',
                             status: 'active'
@@ -1730,11 +1729,19 @@ const verifySubscriptionPayment = async (req, res, next) => {
                     const bookingDate = subscription.scheduledDate || new Date().toISOString().split('T')[0];
                     const bookingTime = subscription.timeSlot?.start || subscription.scheduledTime || new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false });
 
+                    // Get therapist details to populate therapistName
+                    let therapistName = '';
+                    if (subscription.therapistId) {
+                        const Therapist = require('../models/Therapist.model'); // Adjust path as needed
+                        const therapist = await Therapist.findById(subscription.therapistId).select('name');
+                        therapistName = therapist ? therapist.name : 'Assigned Therapist';
+                    }
+
                     const booking = new Booking({
-                        serviceId: subscription.planId, // Use planId as serviceId for subscription bookings
+                        serviceId: null, // Don't set serviceId for subscription bookings
                         serviceName: subscription.planName,
                         therapistId: subscription.therapistId,
-                        therapistName: '', // We can populate this if needed
+                        therapistName: therapistName,
                         userId: subscription.userId,
                         clientName: user?.name || '',
                         date: bookingDate,
@@ -2094,14 +2101,13 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
 
                 if (!existingUser) {
                     // Create the user account with temporary password
-                    // tempPassword = Math.random().toString(36).slice(-8) + 'Temp1!';
-                    // const hashedPassword = await hashPassword(tempPassword);
                     tempPassword = Math.random().toString(36).slice(-8) + 'Temp1!';
+                    const hashedPassword = await hashPassword(tempPassword);
 
                     newUser = new User({
                         name: subscription.guestName,
                         email: subscription.guestEmail,
-                        password: tempPassword,
+                        password: hashedPassword,
                         phone: subscription.guestPhone,
                         role: 'patient',
                         status: 'active'
@@ -2157,11 +2163,19 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
                     const bookingDate = subscription.scheduledDate || new Date().toISOString().split('T')[0];
                     const bookingTime = subscription.timeSlot?.start || subscription.scheduledTime || new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false });
 
+                    // Get therapist details to populate therapistName
+                    let therapistName = '';
+                    if (subscription.therapistId) {
+                        const Therapist = require('../models/Therapist.model'); // Adjust path as needed
+                        const therapist = await Therapist.findById(subscription.therapistId).select('name');
+                        therapistName = therapist ? therapist.name : 'Assigned Therapist';
+                    }
+
                     const booking = new Booking({
-                        serviceId: subscription.planId, // Use planId as serviceId for subscription bookings
+                        serviceId: null, // Don't set serviceId for subscription bookings
                         serviceName: subscription.planName,
                         therapistId: subscription.therapistId,
-                        therapistName: '', // We can populate this if needed
+                        therapistName: therapistName,
                         userId: userIdToCheck,
                         clientName: userForBooking?.name || subscription.guestName || '',
                         clientEmail: subscription.guestEmail || '',

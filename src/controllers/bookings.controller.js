@@ -322,6 +322,38 @@ const createBooking = async (req, res, next) => {
 
         await booking.save();
 
+        // Create session for subscription-covered bookings
+        if (bookingTypeFinal === 'subscription-covered' && subscription) {
+            const Session = require('../models/Session.model');
+            const session = new Session({
+                therapistId: booking.therapistId,
+                userId: booking.userId,
+                date: booking.scheduledDate || booking.date,
+                time: booking.scheduledTime || booking.time,
+                startTime: new Date(`${booking.scheduledDate || booking.date}T${booking.scheduledTime || booking.time}`),
+                type: '1-on-1',
+                status: 'pending',
+                notes: `Session created automatically from subscription-covered booking #${booking._id}`,
+                bookingId: booking._id,
+                subscriptionId: subscription._id
+            });
+
+            // Calculate end time if duration is available
+            if (service && service.duration) {
+                const durationMatch = service.duration.match(/(\d+)/);
+                if (durationMatch) {
+                    const duration = parseInt(durationMatch[0]);
+                    const endTime = new Date(session.startTime);
+                    endTime.setMinutes(endTime.getMinutes() + duration);
+                    session.endTime = endTime;
+                    session.duration = duration;
+                }
+            }
+
+            await session.save();
+            console.log(`✅ Session created for subscription-covered booking ${booking._id}: Session ID ${session._id}`);
+        }
+
         // If scheduling now, update availability to mark the slot as tentative until payment is confirmed
         if (scheduleType === 'now' && scheduledDate && scheduledTime && timeSlot) {
             // Mark slot as tentative if payment is pending, booked if payment is confirmed
