@@ -88,6 +88,10 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    hasTempPassword: {
+      type: Boolean,
+      default: false,
+    },
     doctorProfile: {
       name: String,
       experience: String,

@@ -116,7 +116,6 @@ async function sendWelcomeEmailWithCredentials(email, name, username, password) 
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Welcome to Tanish Physio</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 
@@ -849,7 +848,8 @@ const verifyGuestPayment = async (req, res, next) => {
                         password: tempPassword,
                         phone: payment.guestPhone,
                         role: 'patient',
-                        status: 'active'
+                        status: 'active',
+                        hasTempPassword: true
                     });
 
                     await newUser.save();
@@ -2108,7 +2108,8 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
                         password: tempPassword,
                         phone: subscription.guestPhone,
                         role: 'patient',
-                        status: 'active'
+                        status: 'active',
+                        hasTempPassword: true
                     });
 
                     await newUser.save();

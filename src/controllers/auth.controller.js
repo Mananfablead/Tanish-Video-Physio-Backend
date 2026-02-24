@@ -91,7 +91,25 @@ const login = async (req, res, next) => {
                 .json(ApiResponse.error("Invalid email or password", 401));
         }
 
-        const isMatch = await comparePassword(password, user.password);
+        let isMatch = false;
+
+        // Handle temporary password case
+        if (user.hasTempPassword) {
+            // For users with temporary passwords, we need to compare against the hashed password
+            // because the temp password gets hashed when saved to the database
+            isMatch = await comparePassword(password, user.password);
+
+            // If temp password login is successful, convert it to regular password
+            if (isMatch) {
+                // Update user to remove temp password flag and keep the same password
+                user.hasTempPassword = false;
+                await user.save({ validateBeforeSave: false });
+                console.log(`Temp password used for user ${email}, converted to regular password`);
+            }
+        } else {
+            // Regular password comparison
+            isMatch = await comparePassword(password, user.password);
+        }
 
         if (!isMatch) {
             return res
@@ -999,6 +1017,7 @@ const resetPassword = async (req, res, next) => {
         user.password = password;
         user.resetPasswordToken = undefined;
         user.resetPasswordExpires = undefined;
+        user.hasTempPassword = false; // Clear temp password flag when password is reset
 
         await user.save();
 
@@ -1037,6 +1056,7 @@ const updatePassword = async (req, res, next) => {
 
         // Set new password (will be hashed by pre-save hook)
         user.password = newPassword;
+        user.hasTempPassword = false; // Clear temp password flag when user sets new password
         await user.save();
 
         res.status(200).json(ApiResponse.success(null, 'Password updated successfully'));
