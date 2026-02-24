@@ -109,7 +109,9 @@ const updateCredential = async (req, res, next) => {
       if (credentialData.emailHost) credential.emailHost = credentialData.emailHost;
       if (credentialData.emailPort) credential.emailPort = credentialData.emailPort;
       if (credentialData.emailUser) credential.emailUser = credentialData.emailUser;
+      if (credentialData.emailUsername) credential.emailUsername = credentialData.emailUsername;
       if (credentialData.emailPassword) credential.emailPassword = credentialData.emailPassword;
+      if (credentialData.emailEncryption) credential.emailEncryption = credentialData.emailEncryption;
       if (credentialData.adminEmail) credential.adminEmail = credentialData.adminEmail;
     } else if (credentialType === "razorpay") {
       if (credentialData.razorpayKeyId) credential.razorpayKeyId = credentialData.razorpayKeyId;

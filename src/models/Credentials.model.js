@@ -45,7 +45,15 @@ const credentialsSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    emailUsername: {
+      type: String,
+      default: null,
+    },
     emailPassword: {
+      type: String,
+      default: null,
+    },
+    emailEncryption: {
       type: String,
       default: null,
     },
