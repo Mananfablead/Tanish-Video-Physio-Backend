@@ -776,11 +776,11 @@ const checkSubscriptionEligibility = async (req, res, next) => {
     try {
         const userId = req.user.userId;
         
-        // Find user's active subscription
+        // Find user's active subscription (get the most recent one)
         const subscription = await Subscription.findOne({ 
             userId, 
             status: 'active' 
-        }).populate('planId');
+        }).sort({ createdAt: -1 }); // Get the most recent active subscription
         
         if (!subscription) {
             return res.status(200).json(ApiResponse.success({
@@ -799,8 +799,19 @@ const checkSubscriptionEligibility = async (req, res, next) => {
             }));
         }
         
-        // Check if subscription has plan
-        if (!subscription.planId) {
+        // Fetch the plan data manually since planId is a string field
+        let plan = null;
+        if (subscription.planId) {
+            const isValidObjectId = require('mongoose').Types.ObjectId.isValid(subscription.planId);
+            if (isValidObjectId) {
+                plan = await SubscriptionPlan.findById(subscription.planId);
+            } else {
+                // Try to find by planId string
+                plan = await SubscriptionPlan.findOne({ planId: subscription.planId });
+            }
+        }
+        
+        if (!plan) {
             return res.status(200).json(ApiResponse.success({
                 eligible: false,
                 message: "Subscription plan not found",
@@ -809,134 +820,139 @@ const checkSubscriptionEligibility = async (req, res, next) => {
             }));
         }
         
-        const plan = subscription.planId;
-        
-        // Validate that plan has required fields
-        // Handle cases where plan data might be inconsistent
-        let planSessions = 0;
-        
-        // More permissive validation - handle various edge cases
-        if (plan.sessions != null) {
-            if (typeof plan.sessions === 'number' && !isNaN(plan.sessions) && plan.sessions >= 0) {
-                planSessions = plan.sessions;
-            } else if (typeof plan.sessions === 'string') {
-                const parsed = parseInt(plan.sessions, 10);
-                if (!isNaN(parsed) && parsed >= 0) {
-                    planSessions = parsed;
-                }
-            }
-        }
-        
-        // Log detailed plan information for debugging
-        console.log(`Plan validation for subscription ${subscription._id}:`, {
-            planId: plan._id,
-            planName: plan.name,
-            rawSessions: plan.sessions,
-            sessionsType: typeof plan.sessions,
-            parsedSessions: planSessions,
-            isValid: planSessions > 0
-        });
-        
-        // If we have no valid sessions, check if user has used sessions already
-        if (planSessions <= 0) {
-            // Even if plan config is invalid, if user has used sessions, show appropriate message
-            if (usedSessions > 0) {
-                return res.status(200).json(ApiResponse.success({
-                    eligible: false,
-                    message: `You have used all sessions from your subscription plan.`,
-                    reason: "SESSIONS_EXHAUSTED",
-                    subscriptionId: subscription._id,
-                    planName: plan.name || "Your Plan",
-                    totalSessions: usedSessions, // Show what was actually used
-                    usedSessions: usedSessions,
-                    remainingSessions: 0
-                }));
-            } else {
-                return res.status(200).json(ApiResponse.success({
-                    eligible: false,
-                    message: `Subscription plan configuration error: sessions not properly configured`,
-                    reason: "PLAN_CONFIG_ERROR",
-                    subscriptionId: subscription._id,
-                    planName: plan.name || "Unknown Plan",
-                    planSessions: plan.sessions
-                }));
-            }
-        }
-        
         // Count used sessions for this subscription
+        // Include all sessions that are not cancelled (matching the logic in getUserSubscriptions)
         const usedSessions = await Session.countDocuments({
-            subscriptionId: subscription._id,
+            $or: [
+                { subscriptionId: subscription._id },
+                { subscriptionId: subscription._id.toString() }
+            ],
             status: { $ne: "cancelled" }
         });
         
-        // Count used services for this subscription (based on bookings)
+        // Count used services for this subscription (based on bookings that have been created)
         const usedServices = await Booking.countDocuments({
-            subscriptionId: subscription._id,
-            serviceId: { $exists: true, $ne: null }, // Only bookings with a specific service
+            $or: [
+                { subscriptionId: subscription._id },
+                { subscriptionId: subscription._id.toString() }
+            ],
+            serviceId: { $exists: true, $ne: null },
             status: { $ne: "cancelled" }
         });
         
-        // Calculate remaining with minimum value of 0 to avoid negative counts
-        const remainingSessions = Math.max(0, plan.sessions - usedSessions);
-        const remainingServices = Math.max(0, plan.totalService - usedServices);
+        // Get total sessions from plan (handle different formats)
+        let totalSessions = 0;
+        if (plan.sessions === 'unlimited' || plan.sessions === null || plan.sessions === undefined) {
+            totalSessions = 'unlimited';
+        } else if (typeof plan.sessions === 'number') {
+            totalSessions = plan.sessions;
+        } else if (typeof plan.sessions === 'string') {
+            const parsed = parseInt(plan.sessions, 10);
+            totalSessions = !isNaN(parsed) ? parsed : 0;
+        }
         
-        // Safe value calculations using validated planSessions
-        const safePlanSessions = planSessions;
+        // Get total services from plan
+        let totalServices = 0;
+        if (plan.totalService === 'unlimited' || plan.totalService === null || plan.totalService === undefined) {
+            totalServices = 'unlimited';
+        } else if (typeof plan.totalService === 'number') {
+            totalServices = plan.totalService;
+        } else if (typeof plan.totalService === 'string') {
+            const parsed = parseInt(plan.totalService, 10);
+            totalServices = !isNaN(parsed) ? parsed : 0;
+        }
+        
+        // Safe value calculations
         const safeUsedSessions = (usedSessions != null && !isNaN(usedSessions)) ? usedSessions : 0;
-        const safeRemainingSessions = Math.max(0, safePlanSessions - safeUsedSessions);
-        const safeTotalServices = (plan.totalService != null && !isNaN(plan.totalService)) ? plan.totalService : 0;
+        const safeUsedServices = (usedServices != null && !isNaN(usedServices)) ? usedServices : 0;
         
-        // Log session calculation details
-        console.log(`Session calculation for subscription ${subscription._id}:`, {
-            planSessions: safePlanSessions,
+        // Calculate total used (combined count for both sessions and services)
+        const totalUsed = safeUsedSessions + safeUsedServices;
+        
+        // Calculate remaining sessions (affected by both session and service usage)
+        let remainingSessions = 0;
+        if (totalSessions === 'unlimited') {
+            remainingSessions = 'unlimited';
+        } else {
+            remainingSessions = Math.max(0, totalSessions - totalUsed);
+        }
+        
+        // Calculate remaining services (affected by both session and service usage)
+        let remainingServices = 0;
+        if (totalServices === 'unlimited') {
+            remainingServices = 'unlimited';
+        } else {
+            remainingServices = Math.max(0, totalServices - totalUsed);
+        }
+        
+        // Log detailed information for debugging
+        console.log(`Subscription eligibility check for user ${userId}:`, {
+            subscriptionId: subscription._id,
+            planId: plan._id || plan.planId,
+            planName: plan.name,
+            totalSessions,
             usedSessions: safeUsedSessions,
-            remainingSessions: safeRemainingSessions,
-            isEligible: safeRemainingSessions > 0
+            totalServices,
+            usedServices: safeUsedServices,
+            totalUsed,
+            remainingSessions,
+            remainingServices,
+            subscriptionStatus: subscription.status,
+            isExpired: subscription.isExpired,
+            sessionQuery: {
+                subscriptionId: subscription._id,
+                status: { $ne: "cancelled" }
+            }
         });
         
-        // Focus ONLY on session count for eligibility (as requested)
-        if (safeRemainingSessions <= 0) {
-            // Handle different scenarios for exhausted sessions
-            let message;
-            let totalSessionsValue;
-            
-            if (safePlanSessions > 0) {
-                // Normal case: plan had valid sessions, all used up
-                message = `You have reached your session limit. Your ${plan.name || "plan"} includes ${safePlanSessions} sessions and you have used ${safeUsedSessions} of them.`;
-                totalSessionsValue = safePlanSessions;
-            } else {
-                // Edge case: plan config invalid, but sessions were used
-                message = `You have used all sessions from your subscription plan.`;
-                totalSessionsValue = safeUsedSessions; // Show what was actually used
-            }
-            
+        // Handle unlimited plans
+        if (totalSessions === 'unlimited') {
+            return res.status(200).json(ApiResponse.success({
+                eligible: true,
+                message: "Unlimited sessions and services available with your subscription",
+                subscriptionId: subscription._id,
+                planName: plan.name || "Unlimited Plan",
+                totalSessions: 'unlimited',
+                totalServices: totalServices,
+                usedSessions: safeUsedSessions,
+                usedServices: safeUsedServices,
+                totalUsed,
+                remainingSessions: 'unlimited',
+                remainingServices: remainingServices
+            }));
+        }
+        
+        // Check if sessions are exhausted
+        if (remainingSessions <= 0) {
             return res.status(200).json(ApiResponse.success({
                 eligible: false,
-                message: message,
+                message: `You have used all ${totalSessions} sessions/services from your ${plan.name} plan.`,
                 reason: "SESSIONS_EXHAUSTED",
                 subscriptionId: subscription._id,
                 planName: plan.name || "Your Plan",
-                totalSessions: totalSessionsValue,
-                totalServices: safeTotalServices,
+                totalSessions: totalSessions,
+                totalServices: totalServices,
                 usedSessions: safeUsedSessions,
-                usedServices: usedServices && !isNaN(usedServices) ? usedServices : 0,
-                remainingSessions: safeRemainingSessions,
-                remainingServices: remainingServices && !isNaN(remainingServices) ? remainingServices : 0
+                usedServices: safeUsedServices,
+                totalUsed,
+                remainingSessions: remainingSessions,
+                remainingServices: remainingServices
             }));
         }
         
         // User has sessions remaining - they are eligible
         return res.status(200).json(ApiResponse.success({
             eligible: true,
-            message: `You have ${safeRemainingSessions} sessions remaining out of ${safePlanSessions} total sessions`,
+            message: `You have ${remainingSessions} sessions/services remaining out of ${totalSessions} total in your ${plan.name} plan.`,
             subscriptionId: subscription._id,
             planName: plan.name || "Unknown Plan",
-            totalSessions: safePlanSessions,
-            totalServices: safeTotalServices,
+            totalSessions: totalSessions,
+            totalServices: totalServices,
             usedSessions: safeUsedSessions,
-            usedServices: usedServices && !isNaN(usedServices) ? usedServices : 0,
-            remainingSessions: safeRemainingSessions,
-            remainingServices: remainingServices && !isNaN(remainingServices) ? remainingServices : 0
+            usedServices: safeUsedServices,
+            totalUsed,
+            remainingSessions: remainingSessions,
+            remainingServices: remainingServices
         }));
         
 
