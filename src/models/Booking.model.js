@@ -5,7 +5,7 @@ const bookingSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Service',
         required: function() {
-            return this.bookingType !== 'free-consultation';
+            return this.bookingType !== 'free-consultation' && this.bookingType !== 'subscription-covered';
         }
     },
     serviceName: {
