@@ -176,27 +176,38 @@ const getProfile = async (req, res, next) => {
             user.profilePicture = `${baseUrl}${user.profilePicture}`;
         }
 
-        // Get user's subscriptions (both active and recent ones)
-        const subscriptions = await Subscription.find({
-            userId: req.user.userId
-        })
-            .sort({ createdAt: -1 })
-            .limit(5); // Get last 5 subscriptions
+        // Get user's subscriptions (both active and recent ones) - with error handling
+        let subscriptions = [];
+        try {
+            subscriptions = await Subscription.find({
+                userId: req.user.userId
+            })
+                .sort({ createdAt: -1 })
+                .limit(5); // Get last 5 subscriptions
+        } catch (subError) {
+            console.error('Error fetching subscriptions:', subError);
+            subscriptions = [];
+        }
 
-        // Manually populate plan details while preserving original planId
+        // Manually populate plan details while preserving original planId - with error handling
         const subscriptionsWithPlanDetails = await Promise.all(subscriptions.map(async (subscription) => {
-            const subscriptionObj = subscription.toObject();
-            
-            // Look up the plan using the planId string
-            if (subscriptionObj.planId) {
-                const plan = await SubscriptionPlan.findOne({ planId: subscriptionObj.planId });
-                if (plan) {
-                    // Add plan details as a separate property instead of overwriting planId
-                    subscriptionObj.planDetails = plan.toObject();
+            try {
+                const subscriptionObj = subscription.toObject();
+                
+                // Look up the plan using the planId string
+                if (subscriptionObj.planId) {
+                    const plan = await SubscriptionPlan.findOne({ planId: subscriptionObj.planId });
+                    if (plan) {
+                        // Add plan details as a separate property instead of overwriting planId
+                        subscriptionObj.planDetails = plan.toObject();
+                    }
                 }
+                
+                return subscriptionObj;
+            } catch (planError) {
+                console.error('Error populating plan details:', planError);
+                return subscription.toObject();
             }
-            
-            return subscriptionObj;
         }));
 
         // Find the most relevant subscription (active/paid or most recent)
@@ -237,12 +248,18 @@ const getProfile = async (req, res, next) => {
             }
         }
 
-        // Get user's bookings with service information
-        const userBookings = await Booking.find({
-            userId: req.user.userId
-        })
-            .populate('serviceId')
-            .sort({ createdAt: -1 });
+        // Get user's bookings with service information - with error handling
+        let userBookings = [];
+        try {
+            userBookings = await Booking.find({
+                userId: req.user.userId
+            })
+                .populate('serviceId')
+                .sort({ createdAt: -1 });
+        } catch (bookingError) {
+            console.error('Error fetching bookings:', bookingError);
+            userBookings = [];
+        }
 
         // Get active services from bookings (only services user has purchased)
         const purchasedServices = userBookings
@@ -293,7 +310,7 @@ const getProfile = async (req, res, next) => {
             })
             .filter(service => !service.isExpired); // Filter out expired services
 
-        // Count used sessions and services for this subscription before building response
+        // Count used sessions and services for this subscription before building response - with error handling
         let usedSessions = 0;
         let usedServices = 0;
         
@@ -301,18 +318,28 @@ const getProfile = async (req, res, next) => {
         const planDetails = activeSubscription?.planDetails;
         
         if (activeSubscription && planDetails) {
-            // Count used sessions for this subscription
-            usedSessions = await Session.countDocuments({
-                subscriptionId: activeSubscription._id,
-                status: { $ne: "cancelled" }
-            });
+            try {
+                // Count used sessions for this subscription
+                usedSessions = await Session.countDocuments({
+                    subscriptionId: activeSubscription._id,
+                    status: { $ne: "cancelled" }
+                });
+            } catch (sessionError) {
+                console.error('Error counting sessions:', sessionError);
+                usedSessions = 0;
+            }
             
-            // Count used services for this subscription (based on bookings)
-            usedServices = await Booking.countDocuments({
-                subscriptionId: activeSubscription._id,
-                serviceId: { $exists: true, $ne: null }, // Only bookings with a specific service
-                status: { $ne: "cancelled" }
-            });
+            try {
+                // Count used services for this subscription (based on bookings)
+                usedServices = await Booking.countDocuments({
+                    subscriptionId: activeSubscription._id,
+                    serviceId: { $exists: true, $ne: null }, // Only bookings with a specific service
+                    status: { $ne: "cancelled" }
+                });
+            } catch (serviceError) {
+                console.error('Error counting services:', serviceError);
+                usedServices = 0;
+            }
         }
         
         // Calculate remaining counts
