@@ -292,7 +292,7 @@ const createBooking = async (req, res, next) => {
 
         // Create booking with default status values
         const booking = new Booking({
-            serviceId: bookingType === 'free-consultation' ? serviceId : serviceId,
+            ...((bookingType !== 'free-consultation' && bookingType !== 'subscription-covered') && { serviceId }),
             serviceName: serviceName,
             therapistId: therapist._id,
             therapistName: therapist?.name || 'Admin',
@@ -317,7 +317,7 @@ const createBooking = async (req, res, next) => {
                 start: time.split('-')[0],
                 end: time.split('-')[1]
             } : null),
-            bookingType: bookingType || 'regular'
+            bookingType: bookingTypeFinal
         });
 
         await booking.save();
@@ -1822,7 +1822,7 @@ const createBookingWithSubscription = async (req, res, next) => {
 
         // Create booking with paid status (since it's covered by subscription)
         const booking = new Booking({
-            serviceId: serviceId || null,
+            ...(serviceId && { serviceId }),
             serviceName: serviceName,
             therapistId: therapist._id,
             therapistName: therapist?.name || 'Admin',
