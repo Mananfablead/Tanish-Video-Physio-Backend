@@ -1,5 +1,6 @@
 const Credentials = require("../models/Credentials.model");
 const ApiResponse = require("../utils/apiResponse");
+const { validateWhatsAppToken } = require("../utils/whatsapp.utils");
 
 // Get all credentials (admin only)
 const getAllCredentials = async (req, res, next) => {
@@ -221,12 +222,27 @@ const validateCredential = async (req, res, next) => {
 
     // Test credential based on type
     if (credential.credentialType === "whatsapp") {
-      // Simple validation - check if all required fields exist
-      isValid =
+      // Check if all required fields exist first
+      const hasRequiredFields =
         !!credential.whatsappAccessToken &&
         !!credential.whatsappPhoneNumberId &&
         !!credential.whatsappBusinessId;
-      message = isValid ? "WhatsApp credentials are valid" : "Missing required WhatsApp fields";
+
+      if (hasRequiredFields) {
+        // Test the access token with Facebook API using utility function
+        const tokenValidation = await validateWhatsAppToken(credential.whatsappAccessToken);
+
+        if (tokenValidation.valid) {
+          isValid = true;
+          message = "WhatsApp credentials are valid and token authenticated with Facebook API";
+        } else {
+          isValid = false;
+          message = `WhatsApp credentials exist but token validation failed: ${tokenValidation.error || 'Unknown error'}`;
+        }
+      } else {
+        isValid = false;
+        message = "Missing required WhatsApp fields";
+      }
     } else if (credential.credentialType === "email") {
       isValid =
         !!credential.emailHost &&

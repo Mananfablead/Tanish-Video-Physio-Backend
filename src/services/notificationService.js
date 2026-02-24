@@ -7,6 +7,7 @@ const nodemailer = require('nodemailer');
 const axios = require('axios');
 const EmailTemplates = require('../templates/emailTemplates');
 const { getWhatsAppCredentials, getEmailCredentials } = require('../utils/credentialsManager');
+const { validateWhatsAppToken, addCountryCode } = require('../utils/whatsapp.utils');
 
 class NotificationService {
     // WhatsApp Templates (Approved templates from Facebook Business Manager)
@@ -333,6 +334,12 @@ class NotificationService {
         this.init();
     }
 
+    // Validate WhatsApp access token with Facebook API
+    async validateWhatsAppToken(accessToken) {
+        // Use the utility function
+        return await validateWhatsAppToken(accessToken);
+    }
+
     // Async initialization to load credentials from database
     async init() {
         try {
@@ -345,16 +352,57 @@ class NotificationService {
                     businessId: whatsappCreds.businessId,
                     apiUrl: 'https://graph.facebook.com/v21.0'
                 };
-                this.whatsappEnabled = !!(this.whatsappConfig.accessToken && this.whatsappConfig.phoneNumberId);
+
+                // Validate the access token with Facebook API
+                const tokenValidation = await this.validateWhatsAppToken(whatsappCreds.accessToken);
+
+                if (tokenValidation.valid) {
+                    this.whatsappEnabled = !!(this.whatsappConfig.accessToken && this.whatsappConfig.phoneNumberId);
+                    console.log('✅ WhatsApp configured and token validated successfully');
+                } else {
+                    console.warn('⚠️ WhatsApp token validation failed:', tokenValidation.error);
+                    this.whatsappEnabled = false;
+                }
+            } else {
+                console.log('No WhatsApp credentials found in database');
             }
+            console.log('WhatsApp Config:', this.whatsappConfig);
 
             // Load Email credentials from database
             const emailCreds = await getEmailCredentials();
             if (emailCreds) {
+                // Configure security settings based on encryption type
+                let secure = false;
+                let requireTLS = false;
+
+                if (emailCreds.encryption) {
+                    switch (emailCreds.encryption.toUpperCase()) {
+                        case 'SSL':
+                            secure = true;
+                            break;
+                        case 'TLS':
+                        case 'STARTTLS':
+                            requireTLS = true;
+                            break;
+                        case 'NONE':
+                            secure = false;
+                            requireTLS = false;
+                            break;
+                        default:
+                            // Default behavior based on port
+                            secure = emailCreds.port === 465;
+                            break;
+                    }
+                } else {
+                    // Default behavior based on port if no encryption specified
+                    secure = emailCreds.port === 465;
+                }
+
                 this.emailConfig = {
                     host: emailCreds.host,
                     port: emailCreds.port,
-                    secure: emailCreds.port === 465, // true for 465, false for other ports like 587
+                    secure: secure, // true for 465, false for other ports like 587
+                    requireTLS: requireTLS, // Enable STARTTLS if required
                     auth: {
                         user: emailCreds.user,
                         pass: emailCreds.password
@@ -650,8 +698,8 @@ class NotificationService {
         let response = null;
 
         try {
-            // Format phone number (remove + and spaces)
-            formattedPhone = to.replace(/[\s\+]/g, '');
+            // Format phone number with country code if needed
+            formattedPhone = addCountryCode(to);
 
             // Generate message content
             messageContent = typeof template === 'function' ? template(data) : template;
@@ -685,10 +733,12 @@ class NotificationService {
                 }
             }, {
                 headers: {
+                    'Content-Type': 'application/json',
                     'Authorization': `Bearer ${this.whatsappConfig.accessToken}`,
-                    'Content-Type': 'application/json'
                 }
+
             });
+            console.log('WhatsApp API Request:', response.data);  
 
             // Analyze the response
             const analysis = this.analyzeWhatsAppResponse(response, requestData);
@@ -753,6 +803,12 @@ class NotificationService {
                     request_method: error.config?.method,
                     timestamp: new Date().toISOString()
                 });
+
+                // Check if the error is related to access token issues
+                if (error.response.data?.error?.code === 190) {
+                    console.error('🚨 WhatsApp Access Token Error: The access token may be invalid, expired, or malformed');
+                    console.error('💡 Solution: Please regenerate your WhatsApp access token in the Facebook Business Manager and update it in the admin panel');
+                }
             }
             return {
                 success: false,
@@ -773,8 +829,8 @@ class NotificationService {
                 throw new Error('WhatsApp not configured');
             }
 
-            // Format phone number
-            formattedPhone = to.replace(/[\s\+]/g, '');
+            // Format phone number with country code if needed
+            formattedPhone = addCountryCode(to);
 
             // Prepare template
             console.log('🔧 Preparing template:', templateName, 'with data:', data);
@@ -783,32 +839,8 @@ class NotificationService {
                 throw new Error(`Template ${templateName} not found`);
             }
 
-            console.log('✅ Prepared template result:', {
-                name: preparedTemplate.name,
-                language: preparedTemplate.language,
-                components: preparedTemplate.components,
-                componentCount: preparedTemplate.components?.length,
-                parameterCount: preparedTemplate.components?.[0]?.parameters?.length
-            });
-
-            // Log the prepared template structure for debugging
-            console.log('🔍 Prepared Template Structure:', {
-                templateName: templateName,
-                preparedTemplate: preparedTemplate,
-                hasName: !!preparedTemplate.name,
-                hasLanguage: !!preparedTemplate.language,
-                hasComponents: !!preparedTemplate.components,
-                templateKeys: Object.keys(preparedTemplate)
-            });
-
             // Restructure template for Facebook API - proper format required by Meta
             const templateNameToUse = preparedTemplate.name || templateName;
-            console.log('🏷️ Template Name Analysis:', {
-                requestedTemplateName: templateName,
-                preparedTemplateName: preparedTemplate.name,
-                finalTemplateName: templateNameToUse,
-                availableTemplates: Object.keys(NotificationService.whatsappTemplates)
-            });
 
             const facebookTemplate = {
                 name: templateNameToUse,
@@ -817,29 +849,6 @@ class NotificationService {
                 },
                 components: preparedTemplate.components || []
             };
-
-            // Log the complete template message being sent
-            console.log('📱 WhatsApp Template Message Being Sent:', {
-                to: formattedPhone,
-                template_name: templateName,
-                template_data: data,
-                prepared_template: preparedTemplate,
-                facebook_template: facebookTemplate,
-                type: 'template',
-                parameter_count: facebookTemplate.components?.[0]?.parameters?.length || 0,
-                expected_parameters: [
-                    'Client Name',
-                    'Service Name',
-                    'Date',
-                    'Time'
-                ],
-                actual_parameters: facebookTemplate.components?.[0]?.parameters?.map((p, i) => ({
-                    index: i + 1,
-                    value: p.text,
-                    type: p.type
-                })) || [],
-                timestamp: new Date().toISOString()
-            });
 
             // Log API request details
             const templateRequestData = {
@@ -884,58 +893,19 @@ class NotificationService {
             });
 
             // Log detailed WhatsApp template response
-            console.log('📱 WhatsApp Template API Response Details:', {
-                success: true,
-                message_id: response.data?.messages?.[0]?.id,
-                recipient_id: response.data?.contacts?.[0]?.wa_id,
-                template_name: templateName,
-                template_data_sent: data,
-                response_data: response.data,
-                http_status: response.status,
-                response_headers: Object.fromEntries(
-                    Object.entries(response.headers).filter(([key]) =>
-                        key.toLowerCase().includes('content') ||
-                        key.toLowerCase().includes('request') ||
-                        key.toLowerCase().includes('date')
-                    )
-                ),
-                timestamp: new Date().toISOString()
-            });
+
             return { success: true, messageId: response.data?.messages?.[0]?.id };
 
         } catch (error) {
-            console.error('❌ WhatsApp template sending failed:', {
-                error: error.message,
-                template_name: templateName,
-                template_data: data,
-                phone: formattedPhone,
-                response: response?.data,
-                response_status: response?.status,
-                error_code: error.code,
-                error_response: error.response?.data,
-                stack: error.stack,
-                timestamp: new Date().toISOString()
-            });
-
             // Log detailed template error response
             if (error.response) {
-                console.error('📱 WhatsApp Template API Error Response:', {
-                    status: error.response.status,
-                    status_text: error.response.statusText,
-                    error_data: error.response.data,
-                    error_headers: Object.fromEntries(
-                        Object.entries(error.response.headers).filter(([key]) =>
-                            key.toLowerCase().includes('content') ||
-                            key.toLowerCase().includes('request') ||
-                            key.toLowerCase().includes('www-authenticate')
-                        )
-                    ),
-                    request_url: error.config?.url,
-                    request_method: error.config?.method,
-                    template_name: templateName,
-                    template_data_sent: data,
-                    timestamp: new Date().toISOString()
-                });
+                console.error('❌ WhatsApp Template API Error Response:', error.response.data);
+
+                // Check if the error is related to access token issues
+                if (error.response.data?.error?.code === 190) {
+                    console.error('🚨 WhatsApp Access Token Error: The access token may be invalid, expired, or malformed');
+                    console.error('💡 Solution: Please regenerate your WhatsApp access token in the Facebook Business Manager and update it in the admin panel');
+                }
             }
             return { success: false, error: error.message };
         }

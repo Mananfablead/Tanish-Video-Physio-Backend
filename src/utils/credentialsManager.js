@@ -51,7 +51,9 @@ const getEmailCredentials = async () => {
       host: credential.emailHost,
       port: credential.emailPort,
       user: credential.emailUser,
+      username: credential.emailUsername,
       password: credential.emailPassword,
+      encryption: credential.emailEncryption,
       adminEmail: credential.adminEmail,
     };
   } catch (error) {

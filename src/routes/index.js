@@ -22,6 +22,7 @@ const groupSessionRoutes = require('./groupSession.route');
 const videoCallSignalingRoutes = require('./videoCallSignaling.routes');
 const offerRoutes = require('./offers');
 const credentialsRoutes = require('./credentials.routes');
+const phoneRoutes = require('./phoneRoutes');
 
 // Mount route modules
 router.use('/auth', authRoutes);
@@ -44,5 +45,6 @@ router.use('/group-sessions', groupSessionRoutes);
 router.use('/video-call', videoCallSignalingRoutes);
 router.use('/offers', offerRoutes);
 router.use('/credentials', credentialsRoutes);
+router.use('/phone', phoneRoutes);
 
 module.exports = router;

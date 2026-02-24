@@ -18,10 +18,38 @@ const initializeTransporter = async () => {
             throw new Error('Missing required email configuration fields');
         }
 
+        // Configure security settings based on encryption type
+        let secure = false;
+        let requireTLS = false;
+
+        if (emailCreds.encryption) {
+            switch (emailCreds.encryption.toUpperCase()) {
+                case 'SSL':
+                    secure = true;
+                    break;
+                case 'TLS':
+                case 'STARTTLS':
+                    requireTLS = true;
+                    break;
+                case 'NONE':
+                    secure = false;
+                    requireTLS = false;
+                    break;
+                default:
+                    // Default behavior based on port
+                    secure = emailCreds.port === 465;
+                    break;
+            }
+        } else {
+            // Default behavior based on port if no encryption specified
+            secure = emailCreds.port === 465;
+        }
+
         transporter = nodemailer.createTransport({
             host: emailCreds.host,
             port: emailCreds.port,
-            secure: emailCreds.port === 465, // Use TLS for port 465, STARTTLS for other ports
+            secure: secure, // Use TLS for port 465, STARTTLS for other ports
+            requireTLS: requireTLS, // Enable STARTTLS if required
             auth: {
                 user: emailCreds.user,
                 pass: emailCreds.password

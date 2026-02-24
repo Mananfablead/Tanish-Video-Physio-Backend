@@ -217,7 +217,14 @@ class BookingStatusHandler {
             triggers.push({
                 type: 'user',
                 template: 'booking_cancelled',
-                data: { bookingId: booking._id, reason: booking.cancellationReason }
+                data: {
+                    bookingId: booking._id,
+                    reason: "admin cancelled the booking",
+                    serviceName: booking.serviceName,
+                    clientName: booking.clientName,
+                    service: booking.serviceName,
+                    cancellationReason: "admin cancelled the booking"
+                }
             });
         }
 

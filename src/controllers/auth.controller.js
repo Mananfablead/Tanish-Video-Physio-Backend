@@ -782,11 +782,39 @@ const forgotPassword = async (req, res, next) => {
             return res.status(500).json(ApiResponse.error('Email configuration not found. Please contact administrator.'));
         }
 
+        // Configure security settings based on encryption type
+        let secure = false;
+        let requireTLS = false;
+
+        if (emailCreds.encryption) {
+            switch (emailCreds.encryption.toUpperCase()) {
+                case 'SSL':
+                    secure = true;
+                    break;
+                case 'TLS':
+                case 'STARTTLS':
+                    requireTLS = true;
+                    break;
+                case 'NONE':
+                    secure = false;
+                    requireTLS = false;
+                    break;
+                default:
+                    // Default behavior based on port
+                    secure = emailCreds.port === 465;
+                    break;
+            }
+        } else {
+            // Default behavior based on port if no encryption specified
+            secure = emailCreds.port === 465;
+        }
+
         // Create transporter for sending email
         const resetPasswordTransporter = createTransport({
             host: emailCreds.host,
             port: emailCreds.port,
-            secure: emailCreds.port === 465, // true for 465, false for other ports like 587
+            secure: secure, // true for 465, false for other ports like 587
+            requireTLS: requireTLS, // Enable STARTTLS if required
             auth: {
                 user: emailCreds.user,
                 pass: emailCreds.password

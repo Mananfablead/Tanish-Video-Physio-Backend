@@ -623,6 +623,39 @@ const updateBookingWithSchedule = async (req, res, next) => {
             await booking.save();
         }
 
+        // Send notifications if status was updated
+        if (status && status !== currentBooking.status) {
+            // Get booking owner's contact information
+            const bookingOwner = await User.findById(booking.userId).select('email phone name');
+
+            const statusChange = { from: currentBooking.status, to: status };
+            const triggers = BookingStatusHandler.getNotificationTriggers(
+                booking,
+                null,
+                statusChange
+            );
+
+            // Send notifications
+            for (const trigger of triggers) {
+                if (trigger.type === 'user') {
+                    await NotificationService.sendNotification(
+                        { email: bookingOwner.email, phone: bookingOwner.phone },
+                        trigger.template,
+                        { ...trigger.data, clientName: bookingOwner.name }
+                    );
+                } else if (trigger.type === 'admin') {
+                    const admins = await User.find({ role: 'admin' }).select('email phone name');
+                    for (const admin of admins) {
+                        await NotificationService.sendNotification(
+                            { email: admin.email, phone: admin.phone },
+                            trigger.template,
+                            trigger.data
+                        );
+                    }
+                }
+            }
+        }
+
         res.status(200).json(ApiResponse.success({ booking }, 'Booking updated with schedule successfully'));
     } catch (error) {
         next(error);
@@ -941,6 +974,39 @@ const updateBookingStatus = async (req, res, next) => {
 
         if (!booking) {
             return res.status(404).json(ApiResponse.error('Booking not found or unauthorized'));
+        }
+
+        // ✅ SEND NOTIFICATIONS FOR STATUS CHANGES
+        if (status !== currentBooking.status) {  // Only send if status actually changed
+            // Get booking owner's contact information
+            const bookingOwner = await User.findById(booking.userId).select('email phone name');
+
+            const statusChange = { from: currentBooking.status, to: status };
+            const triggers = BookingStatusHandler.getNotificationTriggers(
+                booking,
+                null,
+                statusChange
+            );
+
+            // Send notifications
+            for (const trigger of triggers) {
+                if (trigger.type === 'user') {
+                    await NotificationService.sendNotification(
+                        { email: bookingOwner.email, phone: bookingOwner.phone },
+                        trigger.template,
+                        { ...trigger.data, clientName: bookingOwner.name }
+                    );
+                } else if (trigger.type === 'admin') {
+                    const admins = await User.find({ role: 'admin' }).select('email phone name');
+                    for (const admin of admins) {
+                        await NotificationService.sendNotification(
+                            { email: admin.email, phone: admin.phone },
+                            trigger.template,
+                            trigger.data
+                        );
+                    }
+                }
+            }
         }
 
         /* =========================================================
