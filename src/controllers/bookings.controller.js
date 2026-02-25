@@ -1595,7 +1595,8 @@ const createGuestBooking = async (req, res, next) => {
                 password: tempPassword, // Will be hashed by the pre-save hook
                 phone: clientPhone,
                 role: 'patient',
-                status: 'active'
+                status: 'active',
+                hasTempPassword: true
             });
 
             await user.save();
