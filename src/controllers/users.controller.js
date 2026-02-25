@@ -205,6 +205,137 @@ const updateUser = async (req, res, next) => {
     }
 };
 
+// Create user (admin only)
+const createUser = async (req, res, next) => {
+    try {
+        const { name, email, phone, password, role = 'patient', status = 'active' } = req.body;
+        const crypto = require('crypto');
+        const { sendEmail } = require('../services/email.service');
+        const { hashPassword } = require('../utils/auth.utils');
+
+        // Validation - password is now optional
+        if (!name || !email) {
+            return res.status(400).json(ApiResponse.error('Name and email are required'));
+        }
+
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json(ApiResponse.error('Invalid email format'));
+        }
+
+        // Check if user already exists
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+            return res.status(400).json(ApiResponse.error('User with this email already exists'));
+        }
+
+        // Generate random password if not provided
+        let finalPassword = password;
+        let generatedPassword = null;
+        
+        if (!password) {
+            // Generate a random 12-character password
+            generatedPassword = crypto.randomBytes(6).toString('hex');
+            finalPassword = generatedPassword;
+        }
+
+        // Hash the password
+        const hashedPassword = await hashPassword(finalPassword);
+
+        // Create new user
+        const user = new User({
+            name,
+            email,
+            phone,
+            password: hashedPassword,
+            role,
+            status
+        });
+
+        await user.save();
+
+        // Remove password from response
+        const userResponse = user.toObject();
+        delete userResponse.password;
+
+        // Send welcome email with credentials
+        try {
+            let emailContent;
+            if (generatedPassword) {
+                emailContent = `
+                    <h2>Welcome to Tanish Physio!</h2>
+                    <p>Your account has been created successfully by an administrator.</p>
+                    <p><strong>Login Credentials:</strong></p>
+                    <p><strong>Email:</strong> ${email}</p>
+                    <p><strong>Password:</strong> ${generatedPassword}</p>
+                    <p><strong>Login URL:</strong> ${process.env.FRONTEND_URL || 'http://localhost:5173'}/login</p>
+                    <p style="color: #e53e3e; font-weight: bold;">⚠️ Important: Please change your password after first login for security.</p>
+                    <p>Thank you for choosing Tanish Physio & Fitness!</p>
+                `;
+            } else {
+                emailContent = `
+                    <h2>Welcome to Tanish Physio!</h2>
+                    <p>Your account has been created successfully by an administrator.</p>
+                    <p><strong>Login Email:</strong> ${email}</p>
+                    <p><strong>Login URL:</strong> ${process.env.FRONTEND_URL || 'http://localhost:5173'}/login</p>
+                    <p>Please use the password you provided during account creation.</p>
+                    <p>Thank you for choosing Tanish Physio & Fitness!</p>
+                `;
+            }
+
+            await sendEmail({
+                to: email,
+                subject: 'Welcome to Tanish Physio - Account Created',
+                html: `
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <meta charset="UTF-8">
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                        <title>Welcome to Tanish Physio</title>
+                    </head>
+                    <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+                        <div style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+                            <h1 style="margin: 0; font-size: 28px;">Welcome to Tanish Physio!</h1>
+                            <p style="margin: 10px 0 0; font-size: 16px; opacity: 0.9;">Your Health & Wellness Journey Starts Here</p>
+                        </div>
+                        
+                        <div style="background: white; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
+                            ${emailContent}
+                            
+                            <div style="margin-top: 30px; padding: 20px; background-color: #f9fafb; border-radius: 8px; border-left: 4px solid #4f46e5;">
+                                <h3 style="margin-top: 0; color: #4f46e5;">Next Steps:</h3>
+                                <ul style="padding-left: 20px;">
+                                    <li>Login to your account using the credentials above</li>
+                                    <li>Complete your profile information</li>
+                                    <li>Explore our services and book your first session</li>
+                                    <li>Start your recovery journey with our expert therapists</li>
+                                </ul>
+                            </div>
+                            
+                            <div style="margin-top: 25px; text-align: center; color: #6b7280; font-size: 14px;">
+                                <p>Need help? Contact our support team at <a href="mailto:support@tanishphysio.com" style="color: #4f46e5;">support@tanishphysio.com</a></p>
+                                <p style="margin-top: 15px;">© 2024 Tanish Physio & Fitness. All rights reserved.</p>
+                            </div>
+                        </div>
+                    </body>
+                    </html>
+                `
+            });
+            
+            console.log(`📧 Welcome email sent to ${email}`);
+        } catch (emailError) {
+            console.error('Email sending failed:', emailError);
+            // Don't fail the user creation if email fails
+        }
+
+        res.status(201).json(ApiResponse.success(userResponse, 'User created successfully'));
+    } catch (error) {
+        next(error);
+    }
+};
+
 // Delete user by ID (admin only)
 const deleteUser = async (req, res, next) => {
     try {
@@ -330,6 +461,7 @@ const checkUserExists = async (req, res, next) => {
 module.exports = {
     getAllUsers,
     getUserById,
+    createUser,
     updateUser,
     deleteUser,
     getUserProfile,

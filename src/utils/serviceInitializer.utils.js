@@ -1,6 +1,7 @@
 const { initializeGoogleCalendar } = require('../utils/googleMeet.utils');
 const { initializeTransporter } = require('../services/email.service');
 const { initializeTransporter: initializeContactTransporter } = require('../utils/email.utils');
+const ReminderService = require('../services/reminderService');
 const logger = require('../utils/logger');
 
 /**
@@ -36,6 +37,15 @@ const initializeServices = async () => {
         }
 
         logger.info('External services initialization completed');
+        
+        // Initialize reminder service
+        try {
+            ReminderService.initialize();
+            logger.info('✓ Reminder service initialized successfully');
+        } catch (reminderError) {
+            logger.warn('⚠ Reminder service initialization failed');
+            logger.error('Reminder service error details:', reminderError.message);
+        }
     } catch (error) {
         logger.error('Error initializing services:', error);
     }

@@ -2,6 +2,7 @@ const Notification = require('../models/Notification.model');
 const ApiResponse = require('../utils/apiResponse');
 const NotificationService = require('../services/notificationService');
 const User = require('../models/User.model');
+const CmsContact = require('../models/CmsContact.model');
 
 // Get all notifications for authenticated user
 const getAllNotifications = async (req, res, next) => {
@@ -121,17 +122,23 @@ const sendNotification = async (req, res, next) => {
                 }
 
                 // Send WhatsApp if selected
-                if (channels.whatsapp !== false && recipient.phone) {
+                if (channels.whatsapp !== false) {
                     try {
-                        const whatsappResult = await NotificationService.sendWhatsApp(
-                            recipient.phone,
-                            (data) => `${data.title}: ${data.message}`,
-                            notificationData
-                        );
-                        if (whatsappResult.success) {
-                            result.channels.push('whatsapp');
+                        // Get admin phone number from CmsContact instead of recipient phone
+                        const contactInfo = await CmsContact.findOne().sort({ createdAt: -1 });
+                        if (contactInfo && contactInfo.phone) {
+                            const whatsappResult = await NotificationService.sendWhatsApp(
+                                contactInfo.phone,
+                                (data) => `${data.title}: ${data.message}`,
+                                notificationData
+                            );
+                            if (whatsappResult.success) {
+                                result.channels.push('whatsapp');
+                            } else {
+                                result.whatsappError = whatsappResult.error;
+                            }
                         } else {
-                            result.whatsappError = whatsappResult.error;
+                            result.whatsappError = 'Admin phone number not configured';
                         }
                     } catch (whatsappError) {
                         console.error('WhatsApp sending failed:', whatsappError);
