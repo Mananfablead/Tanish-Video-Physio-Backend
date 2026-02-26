@@ -4,6 +4,7 @@
 const cron = require('node-cron');
 const Booking = require('../models/Booking.model');
 const Payment = require('../models/Payment.model');
+const Session = require('../models/Session.model');
 const NotificationService = require('./notificationService');
 const BookingStatusHandler = require('./bookingStatusHandler');
 
@@ -100,35 +101,62 @@ class ReminderService {
     // Process session reminders
     async processSessionReminders() {
         try {
-            // Find confirmed bookings with sessions tomorrow
-            const tomorrow = new Date();
-            tomorrow.setDate(tomorrow.getDate() + 1);
-            tomorrow.setHours(0, 0, 0, 0);
-
-            const endOfDay = new Date(tomorrow);
-            endOfDay.setHours(23, 59, 59, 999);
-
-            const confirmedBookings = await Booking.find({
-                status: BookingStatusHandler.BOOKING_STATUS.CONFIRMED,
-                date: { $gte: tomorrow, $lte: endOfDay }
+            console.log('Running session reminder job...');
+            
+            // Find upcoming sessions that need reminders
+            const now = new Date();
+            const in24Hours = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+            const in1Hour = new Date(now.getTime() + 60 * 60 * 1000);
+            
+            // Find sessions that are starting within the next 24-25 hours (for 24-hour reminder)
+            const sessionsFor24HourReminder = await Session.find({
+                startTime: { 
+                    $gte: in24Hours,
+                    $lt: new Date(in24Hours.getTime() + 60 * 60 * 1000) // 1 hour window
+                },
+                status: { $in: ['scheduled', 'pending'] },
+                last24HourReminderSent: { $exists: false }
             }).populate('userId', 'name email phone')
-                .populate('therapistId', 'name');
-
-            console.log(`Found ${confirmedBookings.length} bookings for session reminders`);
-
-            for (const booking of confirmedBookings) {
+              .populate('therapistId', 'name email phone')
+              .populate('bookingId');
+            
+            // Find sessions that are starting within the next 1-2 hours (for 1-hour reminder)
+            const sessionsFor1HourReminder = await Session.find({
+                startTime: { 
+                    $gte: in1Hour,
+                    $lt: new Date(in1Hour.getTime() + 60 * 60 * 1000) // 1 hour window
+                },
+                status: { $in: ['scheduled', 'pending'] },
+                last1HourReminderSent: { $exists: false }
+            }).populate('userId', 'name email phone')
+              .populate('therapistId', 'name email phone')
+              .populate('bookingId');
+            
+            console.log(`Found ${sessionsFor24HourReminder.length} sessions for 24-hour reminders`);
+            console.log(`Found ${sessionsFor1HourReminder.length} sessions for 1-hour reminders`);
+            
+            // Send 24-hour reminders
+            for (const session of sessionsFor24HourReminder) {
                 try {
-                    // Check if we should send reminder
-                    const shouldSend = await this.shouldSendSessionReminder(booking);
-
-                    if (shouldSend) {
-                        await this.sendSessionReminder(booking);
-                        await this.updateLastReminderSent(booking, 'session');
-                    }
+                    await this.sendSessionReminder(session, '24hour');
+                    await this.updateSessionReminderSent(session, '24hour');
+                    console.log(`✅ 24-hour reminder sent for session ${session._id}`);
                 } catch (error) {
-                    console.error(`Error processing session reminder for booking ${booking._id}:`, error);
+                    console.error(`❌ Error sending 24-hour reminder for session ${session._id}:`, error);
                 }
             }
+            
+            // Send 1-hour reminders
+            for (const session of sessionsFor1HourReminder) {
+                try {
+                    await this.sendSessionReminder(session, '1hour');
+                    await this.updateSessionReminderSent(session, '1hour');
+                    console.log(`✅ 1-hour reminder sent for session ${session._id}`);
+                } catch (error) {
+                    console.error(`❌ Error sending 1-hour reminder for session ${session._id}:`, error);
+                }
+            }
+            
         } catch (error) {
             console.error('Error in session reminder processing:', error);
         }
@@ -217,23 +245,62 @@ class ReminderService {
         await NotificationService.sendNotification(recipient, 'payment_reminder', data);
     }
 
-    async sendSessionReminder(booking) {
+    async sendSessionReminder(session, reminderType) {
         const recipient = {
-            email: booking.userId?.email,
-            phone: booking.userId?.phone
+            email: session.userId?.email,
+            phone: session.userId?.phone
         };
-
+        
+        // Get booking information if available
+        const booking = session.bookingId;
+        const serviceName = booking?.serviceName || 'Physiotherapy Session';
+        const therapistName = session.therapistId?.name || 'Your Therapist';
+        
+        // Format session time
+        const sessionDate = session.startTime.toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+        
+        const sessionTime = session.startTime.toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+        });
+        
         const data = {
-            clientName: booking.clientName,
-            serviceName: booking.serviceName,
-            date: booking.date,
-            time: booking.time,
-            therapistName: booking.therapistId?.name,
-            meetLink: booking.googleMeetLink,
-            bookingId: booking._id
+            clientName: session.userId?.name || 'Valued Patient',
+            serviceName: serviceName,
+            date: sessionDate,
+            time: sessionTime,
+            therapistName: therapistName,
+            meetLink: session.joinLink || session.googleMeetLink,
+            sessionLink: session.joinLink || session.googleMeetLink,
+            sessionId: session._id,
+            reminderType: reminderType
         };
-
-        await NotificationService.sendNotification(recipient, 'session_reminder', data);
+        
+        // Use different template based on reminder type
+        let templateName = 'session_reminder';
+        if (reminderType === '24hour') {
+            templateName = 'session_reminder_24h';
+        } else if (reminderType === '1hour') {
+            templateName = 'session_reminder_1h';
+        }
+        
+        await NotificationService.sendNotification(recipient, templateName, data);
+    }
+    
+    async updateSessionReminderSent(session, reminderType) {
+        const updateField = reminderType === '24hour' 
+            ? 'last24HourReminderSent' 
+            : 'last1HourReminderSent';
+        
+        await Session.findByIdAndUpdate(session._id, {
+            [updateField]: new Date()
+        });
     }
 
     async sendDailySummary(stats) {

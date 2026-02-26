@@ -2089,9 +2089,8 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
         // Compare signatures
         if (expectedSignature === signature) {
             // Payment verified successfully
-
-            let tempPassword = null; // Initialize to track if we created a new user with temp password
-            let newUser = null; // Initialize to track the new user created for guest subscription
+            let tempPassword = null;
+            let newUser = null;
 
             // If this is a guest subscription, create the user account first
             if (subscription.guestName && subscription.guestEmail && subscription.guestPhone) {
@@ -2122,6 +2121,7 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
                 }
             }
 
+            // Update subscription status and payment details
             await Subscription.findOneAndUpdate(
                 { orderId },
                 {
@@ -2137,268 +2137,264 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
                 }
             );
 
-            // If coupon was used, increment its usage count
+            // If coupon was used, increment its usage count (async to not block main flow)
             if (subscription.couponCode) {
-                const Offer = require('../models/Offer');
-                const offer = await Offer.findOne({ code: subscription.couponCode.toUpperCase() });
-                if (offer) {
-                    // Increment usage count
-                    offer.usedCount = offer.usedCount + 1;
-                    await offer.save();
-                }
+                // Run this in background to not delay response
+                (async () => {
+                    try {
+                        const Offer = require('../models/Offer');
+                        const offer = await Offer.findOne({ code: subscription.couponCode.toUpperCase() });
+                        if (offer) {
+                            // Use atomic update to increment usage count
+                            await Offer.updateOne(
+                                { _id: offer._id },
+                                { $inc: { usedCount: 1 } }
+                            );
+                        }
+                    } catch (couponError) {
+                        console.error('Error updating coupon usage count:', couponError);
+                    }
+                })();
             }
 
             // Activate the subscription with calculated end date
             const updatedSubscription = await activateSubscription(subscription._id);
 
-            // If subscription has a therapist assigned, create a booking record
+            // If subscription has a therapist assigned, create a booking record (async to not block main flow)
             if (subscription.therapistId) {
-                try {
-                    const userIdToCheck = subscription.userId || (newUser ? newUser._id : null);
-                    const userForBooking = await User.findById(userIdToCheck).select('name');
+                // Run booking creation in background to not delay response
+                (async () => {
+                    try {
+                        const userIdToCheck = subscription.userId || (newUser ? newUser._id : null);
+                        const userForBooking = await User.findById(userIdToCheck).select('name');
 
-                    // Create a booking to associate the therapist with the subscription
-                    // Use scheduled date/time from subscription if available, otherwise use current time
-                    const bookingDate = subscription.scheduledDate || new Date().toISOString().split('T')[0];
-                    const bookingTime = subscription.timeSlot?.start || subscription.scheduledTime || new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false });
+                        // Create a booking to associate the therapist with the subscription
+                        const bookingDate = subscription.scheduledDate || new Date().toISOString().split('T')[0];
+                        const bookingTime = subscription.timeSlot?.start || subscription.scheduledTime || new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false });
 
-                    // Get therapist details to populate therapistName
-                    let therapistName = '';
-                    if (subscription.therapistId) {
-                        const Therapist = require('../models/Therapist.model'); // Adjust path as needed
-                        const therapist = await Therapist.findById(subscription.therapistId).select('name');
-                        therapistName = therapist ? therapist.name : 'Assigned Therapist';
+                        // Get therapist details to populate therapistName
+                        let therapistName = '';
+                        if (subscription.therapistId) {
+                            const Therapist = require('../models/Therapist.model');
+                            const therapist = await Therapist.findById(subscription.therapistId).select('name');
+                            therapistName = therapist ? therapist.name : 'Assigned Therapist';
+                        }
+
+                        const booking = new Booking({
+                            serviceId: null, // Don't set serviceId for subscription bookings
+                            serviceName: subscription.planName,
+                            therapistId: subscription.therapistId,
+                            therapistName: therapistName,
+                            userId: userIdToCheck,
+                            clientName: userForBooking?.name || subscription.guestName || '',
+                            clientEmail: subscription.guestEmail || '',
+                            clientPhone: subscription.guestPhone || '',
+                            date: bookingDate,
+                            time: bookingTime,
+                            status: 'confirmed', // Initially confirmed
+                            notes: `Booking created automatically from guest subscription purchase (Order ID: ${orderId})`,
+                            paymentStatus: 'paid',
+                            amount: subscription.amount,
+                            purchaseDate: new Date(),
+                            serviceExpiryDate: updatedSubscription.endDate,
+                            serviceValidityDays: 30, // Default, can be adjusted based on plan
+                            isServiceExpired: false,
+                            createdAt: new Date(),
+                            updatedAt: new Date()
+                        });
+
+                        await booking.save();
+                        console.log(`✅ Booking created for guest subscription with therapist: ${subscription.therapistId}, Booking ID: ${booking._id}`);
+                    } catch (bookingError) {
+                        console.error('Error creating booking for guest subscription:', bookingError);
                     }
-
-                    const booking = new Booking({
-                        serviceId: null, // Don't set serviceId for subscription bookings
-                        serviceName: subscription.planName,
-                        therapistId: subscription.therapistId,
-                        therapistName: therapistName,
-                        userId: userIdToCheck,
-                        clientName: userForBooking?.name || subscription.guestName || '',
-                        clientEmail: subscription.guestEmail || '',
-                        clientPhone: subscription.guestPhone || '',
-                        date: bookingDate,
-                        time: bookingTime,
-                        status: 'confirmed', // Initially confirmed
-                        notes: `Booking created automatically from guest subscription purchase (Order ID: ${orderId})`,
-                        paymentStatus: 'paid',
-                        amount: subscription.amount,
-                        purchaseDate: new Date(),
-                        serviceExpiryDate: updatedSubscription.endDate,
-                        serviceValidityDays: 30, // Default, can be adjusted based on plan
-                        isServiceExpired: false,
-                        createdAt: new Date(),
-                        updatedAt: new Date()
-                    });
-
-                    await booking.save();
-                    console.log(`✅ Booking created for guest subscription with therapist: ${subscription.therapistId}, Booking ID: ${booking._id}`);
-                } catch (bookingError) {
-                    console.error('Error creating booking for guest subscription:', bookingError);
-                    // Don't fail the subscription process if booking creation fails
-                }
+                })();
             }
 
-            // Send payment success notifications to user and admin for guest subscription
-            try {
-                // Get user information for notification
-                const userIdToCheck = subscription.userId || (newUser ? newUser._id : null);
-                const user = await User.findById(userIdToCheck).select('email phone name');
+            // Send payment success notifications asynchronously to not block response
+            (async () => {
+                try {
+                    const userIdToCheck = subscription.userId || (newUser ? newUser._id : null);
+                    const user = await User.findById(userIdToCheck).select('email phone name');
 
-                if (user) {
-                    // Send payment success notification to user (email and WhatsApp)
-                    await NotificationService.sendNotification(
-                        { email: user.email, phone: user.phone },
-                        'payment_successful',
-                        {
-                            clientName: user.name,
-                            amount: subscription.amount,
-                            serviceName: 'Subscription Plan',
-                            transactionId: paymentId,
-                            orderId: orderId
-                        }
-                    );
-
-                    // Send payment received notification to admin
-                    const admins = await User.find({ role: 'admin' }).select('email phone name');
-                    for (const admin of admins) {
+                    if (user) {
+                        // Send payment success notification to user (email and WhatsApp)
                         await NotificationService.sendNotification(
-                            { email: admin.email, phone: admin.phone },
-                            'payment_received',
+                            { email: user.email, phone: user.phone },
+                            'payment_successful',
                             {
+                                clientName: user.name,
                                 amount: subscription.amount,
                                 serviceName: 'Subscription Plan',
                                 transactionId: paymentId,
-                                orderId: orderId,
-                                clientName: user.name
+                                orderId: orderId
                             }
                         );
+
+                        // Send payment received notification to admin
+                        const admins = await User.find({ role: 'admin' }).select('email phone name');
+                        for (const admin of admins) {
+                            await NotificationService.sendNotification(
+                                { email: admin.email, phone: admin.phone },
+                                'payment_received',
+                                {
+                                    amount: subscription.amount,
+                                    serviceName: 'Subscription Plan',
+                                    transactionId: paymentId,
+                                    orderId: orderId,
+                                    clientName: user.name
+                                }
+                            );
+                        }
+                    }
+                } catch (notificationError) {
+                    console.error('Error sending guest subscription payment notifications:', notificationError);
+                }
+
+                // Send welcome email with credentials if applicable
+                if (subscription.guestEmail && tempPassword) {
+                    try {
+                        await sendWelcomeEmailWithCredentials(subscription.guestEmail, subscription.guestName, subscription.guestEmail, tempPassword);
+                    } catch (emailError) {
+                        console.error('Error sending welcome email:', emailError);
                     }
                 }
-            } catch (notificationError) {
-                console.error('Error sending guest subscription payment notifications:', notificationError);
-                // Don't fail the payment process if notifications fail
-            }
+            })();
 
-            // If this was a guest subscription and we created a new user, send login credentials
-            // This would typically be for cases where account was created during subscription purchase
-            if (subscription.guestEmail && tempPassword) {
-                // Send welcome email with login credentials to the user
-                await sendWelcomeEmailWithCredentials(subscription.guestEmail, subscription.guestName, subscription.guestEmail, tempPassword);
-            }
+            // Process pending bookings and create sessions asynchronously
+            (async () => {
+                try {
+                    const userIdToCheck = subscription.userId || (newUser ? newUser._id : null);
+                    if (userIdToCheck) {
+                        // Look for existing bookings to convert to sessions
+                        let pendingBookings = [];
 
-            // Check if there's a pending booking that should create a session
-            // This would be for cases where user scheduled during the booking process
-            // Handle both regular users and guest users who now have an account created
-            const userIdToCheck = subscription.userId || (newUser ? newUser._id : null);
-            if (userIdToCheck) {
-                // First, look for existing bookings to convert to sessions (legacy flow)
-                // Find all pending bookings for this user that are scheduled and paid
-                // Also check for bookings that might have been created with guest email before account was linked
-                let pendingBookings = [];
+                        // First, look for bookings by userId
+                        pendingBookings = await Booking.find({
+                            userId: userIdToCheck,
+                            paymentStatus: 'paid',
+                            status: 'pending',
+                            scheduleType: 'now',
+                            scheduledDate: { $exists: true, $ne: null },
+                            scheduledTime: { $exists: true, $ne: null }
+                        }).sort({ createdAt: -1 });
 
-                // First, look for bookings by userId
-                // Only process bookings with scheduleType 'now', skip 'later' bookings
-                pendingBookings = await Booking.find({
-                    userId: userIdToCheck,
-                    paymentStatus: 'paid',
-                    status: 'pending', // Only process bookings that are still marked as scheduled
-                    scheduleType: 'now', // Only process 'now' scheduled bookings
-                    scheduledDate: { $exists: true, $ne: null },
-                    scheduledTime: { $exists: true, $ne: null }
-                }).sort({ createdAt: -1 });
+                        // Additionally, for guest users, also look for bookings with guest email
+                        if (subscription.guestEmail) {
+                            const emailBasedBookings = await Booking.find({
+                                clientEmail: subscription.guestEmail,
+                                paymentStatus: 'paid',
+                                status: 'pending',
+                                scheduleType: 'now',
+                                scheduledDate: { $exists: true, $ne: null },
+                                scheduledTime: { $exists: true, $ne: null }
+                            }).sort({ createdAt: -1 });
 
-                // Additionally, for guest users, also look for bookings that might have been created 
-                // with the guest email before the account was finalized
-                if (subscription.guestEmail) {
-                    const emailBasedBookings = await Booking.find({
-                        clientEmail: subscription.guestEmail,
-                        paymentStatus: 'paid',
-                        status: 'pending',
-                        scheduleType: 'now', // Only process 'now' scheduled bookings
-                        scheduledDate: { $exists: true, $ne: null },
-                        scheduledTime: { $exists: true, $ne: null }
-                    }).sort({ createdAt: -1 });
+                            // Combine and deduplicate bookings
+                            const allBookingsMap = new Map();
+                            [...pendingBookings, ...emailBasedBookings].forEach(booking => {
+                                allBookingsMap.set(booking._id.toString(), booking);
+                            });
+                            pendingBookings = Array.from(allBookingsMap.values());
+                        }
 
-                    // Combine and deduplicate bookings
-                    const allBookingsMap = new Map();
-                    [...pendingBookings, ...emailBasedBookings].forEach(booking => {
-                        allBookingsMap.set(booking._id.toString(), booking);
-                    });
-                    pendingBookings = Array.from(allBookingsMap.values());
-                }
+                        // Process all pending bookings to create sessions
+                        for (const pendingBooking of pendingBookings) {
+                            if (pendingBooking.scheduledDate && pendingBooking.scheduledTime) {
+                                const Session = require('../models/Session.model');
+                                const Service = require('../models/Service.model');
 
-                // Process all pending bookings to create sessions
-                for (const pendingBooking of pendingBookings) {
-                    if (pendingBooking.scheduledDate && pendingBooking.scheduledTime) {
+                                // Check if a session already exists for this booking to avoid duplicates
+                                const existingSession = await Session.findOne({
+                                    bookingId: pendingBooking._id
+                                });
+
+                                if (!existingSession) {
+                                    const session = new Session({
+                                        therapistId: pendingBooking.therapistId || subscription.therapistId,
+                                        userId: pendingBooking.userId || userIdToCheck,
+                                        date: pendingBooking.scheduledDate,
+                                        time: pendingBooking.scheduledTime,
+                                        startTime: new Date(`${pendingBooking.scheduledDate}T${pendingBooking.scheduledTime}`),
+                                        type: '1-on-1',
+                                        status: 'pending',
+                                        notes: `Session created from subscription booking #${pendingBooking._id}`,
+                                        bookingId: pendingBooking._id,
+                                        subscriptionId: subscription._id
+                                    });
+
+                                    // Calculate end time if duration is available
+                                    const service = await Service.findById(pendingBooking.serviceId);
+                                    if (service && service.duration) {
+                                        const durationMatch = service.duration.match(/(\d+)/);
+                                        if (durationMatch) {
+                                            const duration = parseInt(durationMatch[0]);
+                                            const endTime = new Date(session.startTime);
+                                            endTime.setMinutes(endTime.getMinutes() + duration);
+                                            session.endTime = endTime;
+                                            session.duration = duration;
+                                        }
+                                    }
+
+                                    await session.save();
+
+                                    // Update the booking status
+                                    await Booking.findByIdAndUpdate(pendingBooking._id, {
+                                        status: 'session_created'
+                                    });
+                                }
+                            }
+                        }
+
+                        // Create direct subscription sessions
                         const Session = require('../models/Session.model');
-                        const Service = require('../models/Service.model');
+                        const SubscriptionPlan = require('../models/SubscriptionPlan.model');
 
-                        // Check if a session already exists for this booking to avoid duplicates
-                        const existingSession = await Session.findOne({
-                            bookingId: pendingBooking._id
-                        });
+                        const plan = await SubscriptionPlan.findOne({ planId: subscription.planId });
+                        if (plan) {
+                            const sessionDate = subscription.scheduledDate || new Date().toISOString().split('T')[0];
+                            const sessionTime = subscription.timeSlot?.start || subscription.scheduledTime || '09:00';
 
-                        if (!existingSession) {
-                            // Create a new session based on the booking
-                            // Use therapistId from booking first, fall back to subscription therapistId
-                            console.log('DEBUG GUEST: subscription scheduledDate:', subscription.scheduledDate);
-                            console.log('DEBUG GUEST: subscription scheduledTime:', subscription.scheduledTime);
+                            const startTime = subscription.scheduledDate && (subscription.timeSlot?.start || subscription.scheduledTime)
+                                ? new Date(`${subscription.scheduledDate}T${sessionTime}`)
+                                : new Date(new Date().setHours(9, 0, 0, 0));
+
+                            let endTime = new Date(startTime);
+                            if (subscription.timeSlot?.end) {
+                                const [endHour, endMinute] = subscription.timeSlot.end.split(':').map(Number);
+                                endTime = new Date(startTime);
+                                endTime.setHours(endHour, endMinute, 0, 0);
+                            } else {
+                                endTime.setMinutes(endTime.getMinutes() + (plan.duration ? parseInt(plan.duration.match(/(\d+)/)?.[1] || '60') : 60));
+                            }
+
                             const session = new Session({
-                                therapistId: pendingBooking.therapistId || subscription.therapistId,
-                                userId: pendingBooking.userId || userIdToCheck, // Ensure userId is properly set
-                                date: pendingBooking.scheduledDate,
-                                time: pendingBooking.scheduledTime,
-                                startTime: new Date(`${pendingBooking.scheduledDate}T${pendingBooking.scheduledTime}`),
+                                therapistId: subscription.therapistId,
+                                userId: userIdToCheck,
+                                date: sessionDate,
+                                time: sessionTime,
+                                startTime: startTime,
+                                endTime: endTime,
                                 type: '1-on-1',
                                 status: 'pending',
-                                notes: `Session created from subscription booking #${pendingBooking._id}`,
-                                bookingId: pendingBooking._id,
-                                subscriptionId: subscription._id
+                                notes: `Initial session created from subscription #${subscription._id}`,
+                                subscriptionId: subscription._id,
+                                duration: Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60))
                             });
 
-                            // Calculate end time if duration is available
-                            const service = await Service.findById(pendingBooking.serviceId);
-                            if (service && service.duration) {
-                                const durationMatch = service.duration.match(/(\d+)/);
-                                if (durationMatch) {
-                                    const duration = parseInt(durationMatch[0]);
-                                    const endTime = new Date(session.startTime);
-                                    endTime.setMinutes(endTime.getMinutes() + duration);
-                                    session.endTime = endTime;
-                                    session.duration = duration;
-                                }
+                            if (session.duration > 0) {
+                                const endTime = new Date(session.startTime);
+                                endTime.setMinutes(endTime.getMinutes() + session.duration);
+                                session.endTime = endTime;
                             }
 
                             await session.save();
-
-                            // Update the booking status to indicate session has been created
-                            await Booking.findByIdAndUpdate(pendingBooking._id, {
-                                status: 'session_created'
-                            });
                         }
                     }
+                } catch (sessionError) {
+                    console.error('Error processing sessions for guest subscription:', sessionError);
                 }
-
-                // ALSO create direct subscription sessions for subscription-based plans
-                // This handles the case where users subscribe directly without creating bookings first
-                const Session = require('../models/Session.model');
-                const SubscriptionPlan = require('../models/SubscriptionPlan.model');
-
-                // Get the subscription plan to determine session parameters
-                const plan = await SubscriptionPlan.findOne({ planId: subscription.planId });
-                if (plan) {
-                    console.log('DEBUG GUEST FINAL: subscription scheduledDate:', subscription.scheduledDate);
-                    console.log('DEBUG GUEST FINAL: subscription scheduledTime:', subscription.scheduledTime);
-                    console.log('DEBUG GUEST FINAL: subscription timeSlot:', subscription.timeSlot);
-
-                    // Determine time to use for session based on available data
-                    const sessionDate = subscription.scheduledDate || new Date().toISOString().split('T')[0];
-                    const sessionTime = subscription.timeSlot?.start || subscription.scheduledTime || '09:00';
-
-                    // Calculate start and end times
-                    const startTime = subscription.scheduledDate && (subscription.timeSlot?.start || subscription.scheduledTime)
-                        ? new Date(`${subscription.scheduledDate}T${sessionTime}`)
-                        : new Date(new Date().setHours(9, 0, 0, 0));
-
-                    // Calculate end time based on timeSlot or default duration
-                    let endTime = new Date(startTime);
-                    if (subscription.timeSlot?.end) {
-                        // If timeSlot has end time, calculate duration from that
-                        const [endHour, endMinute] = subscription.timeSlot.end.split(':').map(Number);
-                        endTime = new Date(startTime);
-                        endTime.setHours(endHour, endMinute, 0, 0);
-                    } else {
-                        // Use default duration if no end time in timeSlot
-                        endTime.setMinutes(endTime.getMinutes() + (plan.duration ? parseInt(plan.duration.match(/(\d+)/)?.[1] || '60') : 60));
-                    }
-
-                    const session = new Session({
-                        therapistId: subscription.therapistId, // Use therapist from subscription if available
-                        userId: userIdToCheck,
-                        date: sessionDate, // Use scheduled date or today's date
-                        time: sessionTime, // Use timeSlot start or scheduled time or default
-                        startTime: startTime,
-                        endTime: endTime,
-                        type: '1-on-1',
-                        status: 'pending', // Changed from 'scheduled' to 'pending' as requested
-                        notes: `Initial session created from subscription #${subscription._id}`,
-                        subscriptionId: subscription._id,
-                        duration: Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60)) // Calculate duration in minutes
-                    });
-
-                    // Set end time based on duration
-                    if (session.duration > 0) {
-                        const endTime = new Date(session.startTime);
-                        endTime.setMinutes(endTime.getMinutes() + session.duration);
-                        session.endTime = endTime;
-                    }
-
-                    await session.save();
-                }
-            }
+            })();
 
             // Generate JWT token for auto-login
             let authToken = null;
@@ -2413,6 +2409,7 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
                 }
             }
 
+            // Return response immediately without waiting for async operations
             res.status(200).json(
                 ApiResponse.success({
                     paymentId,
@@ -2429,7 +2426,7 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
                         endDate: updatedSubscription.endDate,
                         nextBillingDate: updatedSubscription.nextBillingDate
                     }
-                }, 'Guest subscription payment verified and activated successfully')
+                }, 'Guest subscription payment verified and activation initiated successfully')
             );
         } else {
             // Invalid signature

@@ -6,8 +6,10 @@
 const nodemailer = require('nodemailer');
 const axios = require('axios');
 const EmailTemplates = require('../templates/emailTemplates');
+const SessionReminderTemplates = require('../templates/sessionReminderTemplates');
 const { getWhatsAppCredentials, getEmailCredentials } = require('../utils/credentialsManager');
 const { validateWhatsAppToken, addCountryCode } = require('../utils/whatsapp.utils');
+const CmsContact = require('../models/CmsContact.model');
 
 class NotificationService {
     // WhatsApp Templates (Approved templates from Facebook Business Manager)
@@ -288,6 +290,14 @@ class NotificationService {
                     }
                 ];
                 break;
+                
+            case 'session_reminder_24h':
+                messageContent = SessionReminderTemplates.sessionReminder24hWhatsApp(data);
+                break;
+                
+            case 'session_reminder_1h':
+                messageContent = SessionReminderTemplates.sessionReminder1hWhatsApp(data);
+                break;
 
             case 'appointment_rescheduled':
                 preparedTemplate.components = [
@@ -524,20 +534,26 @@ class NotificationService {
             }
 
             // Send WhatsApp if configured
-            if (this.whatsappEnabled && recipient.phone && template.whatsapp) {
-                // Log the data being sent to the template
-                console.log('📤 Sending WhatsApp template:', {
-                    templateName: template.whatsapp,
-                    recipientPhone: recipient.phone,
-                    dataKeys: Object.keys(data || {}),
-                    data: data
-                });
+            if (this.whatsappEnabled && template.whatsapp) {
+                // Get admin phone number from CmsContact instead of recipient phone
+                const contactInfo = await CmsContact.findOne().sort({ createdAt: -1 });
+                if (contactInfo && contactInfo.phone) {
+                    // Log the data being sent to the template
+                    console.log('📤 Sending WhatsApp template to admin:', {
+                        templateName: template.whatsapp,
+                        recipientPhone: contactInfo.phone,
+                        dataKeys: Object.keys(data || {}),
+                        data: data
+                    });
 
-                results.whatsapp = await this.sendWhatsAppTemplate(
-                    recipient.phone,
-                    template.whatsapp,
-                    data
-                );
+                    results.whatsapp = await this.sendWhatsAppTemplate(
+                        contactInfo.phone,
+                        template.whatsapp,
+                        data
+                    );
+                } else {
+                    console.warn('Admin phone number not configured in CMS');
+                }
             }
 
             return results;
@@ -557,6 +573,8 @@ class NotificationService {
             'payment_reminder': `Payment Reminder - ${data.serviceName || 'Your Booking'}`,
             'payment_successful': `Payment Successful - ${data.serviceName || 'Your Service'}`,
             'session_reminder': `Session Reminder - ${data.serviceName || 'Your Appointment'}`,
+            'session_reminder_24h': `Session Reminder - 24 Hours - ${data.serviceName || 'Your Appointment'}`,
+            'session_reminder_1h': `Session Reminder - 1 Hour - ${data.serviceName || 'Your Appointment'}`,
             'appointment_rescheduled': `Appointment Rescheduled - ${data.serviceName || 'Your Session'}`,
             'new_booking': `New Booking Request - ${data.serviceName || 'Service'}`,
             'upcoming_session': `Upcoming Session - ${data.serviceName || 'Tomorrow'}`,
@@ -599,6 +617,8 @@ class NotificationService {
                     'payment_reminder': EmailTemplates.paymentReminder,
                     'payment_successful': EmailTemplates.paymentSuccess,
                     'session_reminder': EmailTemplates.sessionReminder,
+                    'session_reminder_24h': SessionReminderTemplates.sessionReminder24hEmail,
+                    'session_reminder_1h': SessionReminderTemplates.sessionReminder1hEmail,
                     'appointment_rescheduled': EmailTemplates.appointmentRescheduled,
                     'upcoming_session': EmailTemplates.adminUpcomingSession,
                     'custom_notification': EmailTemplates.customNotification
@@ -698,14 +718,21 @@ class NotificationService {
         let response = null;
 
         try {
-            // Format phone number with country code if needed
-            formattedPhone = addCountryCode(to);
+            // Get admin phone number from CmsContact instead of the 'to' parameter
+            const contactInfo = await CmsContact.findOne().sort({ createdAt: -1 });
+            if (!contactInfo || !contactInfo.phone) {
+                throw new Error('Admin phone number not configured in CMS');
+            }
+            
+            // Format admin phone number with country code if needed
+            formattedPhone = addCountryCode(contactInfo.phone);
 
             // Generate message content
             messageContent = typeof template === 'function' ? template(data) : template;
 
             // Log the complete message being sent
-            console.log('📱 WhatsApp Message Being Sent:', {
+            console.log('📱 WhatsApp Message Being Sent to admin:', {
+                original_to: to,
                 to: formattedPhone,
                 message: messageContent,
                 type: 'text',

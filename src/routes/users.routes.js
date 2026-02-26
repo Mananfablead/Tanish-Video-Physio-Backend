@@ -1,9 +1,10 @@
 const express = require('express');
-const { getAllUsers, getUserById, updateUser, deleteUser, getUserProfile, updateUserProfile, checkUserExists } = require('../controllers/users.controller');
+const { getAllUsers, getUserById, createUser, updateUser, deleteUser, getUserProfile, updateUserProfile, checkUserExists } = require('../controllers/users.controller');
 const { authenticateToken, authorizeRoles } = require('../middlewares/auth.middleware');
 
 const router = express.Router();
 
+router.post('/', authenticateToken, authorizeRoles('admin'), createUser);
 router.get('/', authenticateToken, authorizeRoles('admin'), getAllUsers);
 router.get('/profile', authenticateToken, getUserProfile);
 router.get('/:id', authenticateToken, getUserById);

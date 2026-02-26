@@ -821,7 +821,7 @@ const checkSubscriptionEligibility = async (req, res, next) => {
         }
         
         // Count used sessions for this subscription
-        // Include all sessions that are not cancelled (matching the logic in getUserSubscriptions)
+        // ONLY count actual Session documents, not Booking documents
         const usedSessions = await Session.countDocuments({
             $or: [
                 { subscriptionId: subscription._id },
@@ -866,16 +866,20 @@ const checkSubscriptionEligibility = async (req, res, next) => {
         const safeUsedSessions = (usedSessions != null && !isNaN(usedSessions)) ? usedSessions : 0;
         const safeUsedServices = (usedServices != null && !isNaN(usedServices)) ? usedServices : 0;
         
-        // Calculate total used (combined count for both sessions and services)
-        const totalUsed = safeUsedSessions + safeUsedServices;
+        // For session eligibility check, ONLY count actual Session documents
+        // Do NOT count Bookings as used sessions
+        const totalUsed = safeUsedSessions; // Only count actual sessions
+        const remainingSessions = (totalSessions === 'unlimited') ? 'unlimited' : Math.max(0, totalSessions - totalUsed);
         
-        // Calculate remaining sessions (affected by both session and service usage)
-        let remainingSessions = 0;
-        if (totalSessions === 'unlimited') {
-            remainingSessions = 'unlimited';
-        } else {
-            remainingSessions = Math.max(0, totalSessions - totalUsed);
-        }
+        console.log(`Subscription eligibility check for user ${userId}:`, {
+            subscriptionId: subscription._id,
+            planName: plan.name,
+            totalSessions: totalSessions,
+            usedSessions: safeUsedSessions,
+            usedServices: safeUsedServices,
+            totalUsed: totalUsed,
+            remainingSessions: remainingSessions
+        });
         
         // Calculate remaining services (affected by both session and service usage)
         let remainingServices = 0;
@@ -904,6 +908,24 @@ const checkSubscriptionEligibility = async (req, res, next) => {
                 status: { $ne: "cancelled" }
             }
         });
+        
+        // Handle plans with no sessions
+        if (totalSessions === 0) {
+            return res.status(200).json(ApiResponse.success({
+                eligible: false,
+                message: `Your ${plan.name} plan does not include any sessions. Please upgrade your plan.`,
+                reason: "NO_SESSIONS_IN_PLAN",
+                subscriptionId: subscription._id,
+                planName: plan.name || "Your Plan",
+                totalSessions: totalSessions,
+                totalServices: totalServices,
+                usedSessions: safeUsedSessions,
+                usedServices: safeUsedServices,
+                totalUsed,
+                remainingSessions: remainingSessions,
+                remainingServices: remainingServices
+            }));
+        }
         
         // Handle unlimited plans
         if (totalSessions === 'unlimited') {

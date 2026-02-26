@@ -9,7 +9,14 @@ router.get('/', authenticateToken, requirePatientRole, getAllBookings);
 router.get('/admin/all', authenticateToken, getAllBookingsForAdmin);
 router.get('/status/:status', authenticateToken, requirePatientRole, getBookingsByStatus);
 router.get('/:id', authenticateToken, getBookingById);
-router.post('/', authenticateToken, requirePatientRole, createBooking);
+router.post('/', authenticateToken, (req, res, next) => {
+    // Allow both patients and admins to create bookings
+    if (req.user.role === 'admin') {
+        return next(); // Skip role middleware for admins
+    }
+    // For non-admin users, check patient role
+    requirePatientRole(req, res, next);
+}, createBooking);
 // Public route for guest bookings
 router.post('/guest', createGuestBooking);
 router.put('/:id', authenticateToken, updateBooking);

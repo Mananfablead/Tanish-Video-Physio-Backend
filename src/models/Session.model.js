@@ -89,6 +89,12 @@ const sessionSchema = new mongoose.Schema({
     },
     therapistJoinLink: {
         type: String
+    },
+    last24HourReminderSent: {
+        type: Date
+    },
+    last1HourReminderSent: {
+        type: Date
     }
 }, {
     timestamps: true

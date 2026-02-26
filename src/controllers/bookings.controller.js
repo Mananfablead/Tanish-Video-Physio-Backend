@@ -203,18 +203,85 @@ const createBooking = async (req, res, next) => {
             // For free consultations, no service validation needed
         } else if (subscription && !subscription.isExpired) {
             // Check if subscription has remaining sessions
-            const plan = subscription.planId;
+            // Fetch the plan data manually since planId might be a string field
+            let plan = null;
+            if (subscription.planId) {
+                const isValidObjectId = require('mongoose').Types.ObjectId.isValid(subscription.planId);
+                if (isValidObjectId) {
+                    const SubscriptionPlan = require('../models/SubscriptionPlan.model');
+                    plan = await SubscriptionPlan.findById(subscription.planId);
+                } else {
+                    // Try to find by planId string
+                    const SubscriptionPlan = require('../models/SubscriptionPlan.model');
+                    plan = await SubscriptionPlan.findOne({ planId: subscription.planId });
+                }
+            }
             
-            // Check session limits (0 means unlimited)
-            if (plan && plan.sessions > 0) {
+            if (!plan) {
+                // No valid plan found, proceed with regular booking
+                // Validate required fields
+                if (!serviceId) {
+                    return res.status(400).json(ApiResponse.error('Service ID is required'));
+                }
+
+                // Validate service exists
+                service = await Service.findById(serviceId);
+
+                if (!service || service.status !== 'active') {
+                    return res.status(404).json(ApiResponse.error('Service not found or not active'));
+                }
+                serviceName = service.name;
+                amount = service.price;
+            } else {
+                console.log(`Regular booking with subscription check:`, {
+                    subscriptionId: subscription._id,
+                    planName: plan.name,
+                    planSessions: plan.sessions,
+                    planType: typeof plan.sessions,
+                    userId: req.user.userId
+                });
+            
+                // Check session limits - enforce actual session limit from subscription
+                // Only count actual Session documents, not Booking documents
                 const usedSessions = await Session.countDocuments({
                     subscriptionId: subscription._id,
                     status: { $ne: "cancelled" }
                 });
                 
-                if (usedSessions >= plan.sessions) {
+                // Get total sessions from subscription plan (consider both sessions and totalService fields)
+                // Some plans might use 'totalService' instead of 'sessions' field
+                let totalSessions = 0;
+                if (plan && typeof plan.sessions === 'number') {
+                    totalSessions = plan.sessions;
+                } else if (plan && typeof plan.totalService === 'number') {
+                    totalSessions = plan.totalService;
+                }
+                            
+                console.log(`Session check for subscription ${subscription._id}:`, {
+                    planName: plan.name,
+                    planSessions: plan.sessions,
+                    planTotalService: plan.totalService,
+                    totalSessions: totalSessions,
+                    usedSessions: usedSessions,
+                    remainingSessions: totalSessions - usedSessions
+                });
+                            
+                if (totalSessions <= 0) {
+                    // No sessions in plan, proceed with regular paid booking
+                    if (!serviceId) {
+                        return res.status(400).json(ApiResponse.error('Service ID is required'));
+                    }
+                
+                    // Validate service exists
+                    service = await Service.findById(serviceId);
+                
+                    if (!service || service.status !== 'active') {
+                        return res.status(404).json(ApiResponse.error('Service not found or not active'));
+                    }
+                    serviceName = service.name;
+                    amount = service.price;
+                } else if (usedSessions >= totalSessions) {
                     // Session limit reached, proceed with regular booking flow
-                    // Validate required fields
                     if (!serviceId) {
                         return res.status(400).json(ApiResponse.error('Service ID is required'));
                     }
@@ -240,18 +307,6 @@ const createBooking = async (req, res, next) => {
                     paymentStatus = 'paid'; // Mark as paid since it's covered by subscription
                     bookingTypeFinal = 'subscription-covered';
                 }
-            } else {
-                // Unlimited sessions in subscription, make booking free
-                if (serviceId) {
-                    service = await Service.findById(serviceId);
-                    if (!service || service.status !== 'active') {
-                        return res.status(404).json(ApiResponse.error('Service not found or not active'));
-                    }
-                    serviceName = service.name;
-                }
-                amount = 0; // No charge as it's covered by subscription
-                paymentStatus = 'paid'; // Mark as paid since it's covered by subscription
-                bookingTypeFinal = 'subscription-covered';
             }
         } else {
             // No active subscription, proceed with regular booking flow
@@ -296,8 +351,10 @@ const createBooking = async (req, res, next) => {
             serviceName: serviceName,
             therapistId: therapist._id,
             therapistName: therapist?.name || 'Admin',
-            userId: req.user.userId,
-            clientName: clientName || req.user?.name || 'Unknown User',
+            // For admin users, allow specifying a different user; otherwise use current user
+            userId: req.user.role === 'admin' && req.body.userId ? req.body.userId : req.user.userId,
+            // For admin users, use the specified client name; otherwise use current user's name
+            clientName: req.user.role === 'admin' && req.body.clientName ? req.body.clientName : (clientName || req.user?.name || 'Unknown User'),
             date,
             time,
             notes,
@@ -307,7 +364,8 @@ const createBooking = async (req, res, next) => {
             couponCode: couponCode || null,
             discountAmount: discountAmount || 0,
             paymentStatus: bookingType === 'free-consultation' ? 'paid' : paymentStatus,
-            status: bookingType === 'subscription-covered' ? 'pending' : (bookingType === 'free-consultation' ? 'pending' : ((scheduledDate && scheduledTime) ? 'scheduled' : (scheduleType === 'later' ? 'pending' : 'scheduled'))),
+            // For admin booking creation, default to 'pending' status initially
+            status: req.user.role === 'admin' && !bookingType ? 'pending' : (bookingType === 'subscription-covered' ? 'pending' : (bookingType === 'free-consultation' ? 'pending' : ((scheduledDate && scheduledTime) ? 'scheduled' : (scheduleType === 'later' ? 'pending' : 'scheduled')))),
             serviceValidityDays: bookingType === 'free-consultation' ? 30 : service?.validity, // Free consultation has 30 days validity
             purchaseDate: new Date(),
             scheduleType: scheduleType || 'now',
@@ -321,6 +379,59 @@ const createBooking = async (req, res, next) => {
         });
 
         await booking.save();
+
+        // Send booking confirmation notifications for free consultations
+        if (bookingTypeFinal === 'free-consultation') {
+            try {
+                // Get user details for notifications
+                const user = await User.findById(req.user.userId).select('email phone name');
+                
+                if (user) {
+                    const notificationService = require('../services/notificationService');
+                    
+                    // Prepare notification data
+                    const notificationData = {
+                        clientName: user.name,
+                        serviceName: booking.serviceName,
+                        date: booking.scheduledDate || booking.date,
+                        time: booking.scheduledTime || booking.time,
+                        therapistName: booking.therapistName,
+                        bookingId: booking._id
+                    };
+                    
+                    // Send email notification
+                    if (user.email) {
+                        try {
+                            await notificationService.sendEmail(
+                                user.email,
+                                'booking_confirmation',
+                                notificationData
+                            );
+                            console.log(`✅ Email notification sent for free consultation booking ${booking._id}`);
+                        } catch (emailError) {
+                            console.error(`❌ Failed to send email for booking ${booking._id}:`, emailError);
+                        }
+                    }
+                    
+                    // Send WhatsApp notification
+                    if (user.phone) {
+                        try {
+                            await notificationService.sendWhatsApp(
+                                user.phone,
+                                (data) => `🎉 Booking Confirmed!\n\nHello ${data.clientName},\n\nYour free consultation with ${data.therapistName} is confirmed for ${data.date} at ${data.time}.\n\nBooking ID: ${data.bookingId}\n\nLooking forward to helping you!\n\n- Tanish Physio Team`,
+                                notificationData
+                            );
+                            console.log(`✅ WhatsApp notification sent for free consultation booking ${booking._id}`);
+                        } catch (whatsappError) {
+                            console.error(`❌ Failed to send WhatsApp for booking ${booking._id}:`, whatsappError);
+                        }
+                    }
+                }
+            } catch (notificationError) {
+                console.error(`❌ Error sending notifications for booking ${booking._id}:`, notificationError);
+                // Don't fail the booking if notifications fail
+            }
+        }
 
         // Create session for subscription-covered bookings
         if (bookingTypeFinal === 'subscription-covered' && subscription) {
@@ -1541,6 +1652,54 @@ const createGuestBooking = async (req, res, next) => {
 
         await booking.save();
 
+        // Send booking confirmation notifications for free consultations
+        if (bookingType === 'free-consultation') {
+            try {
+                const notificationService = require('../services/notificationService');
+                
+                // Prepare notification data
+                const notificationData = {
+                    clientName: clientName,
+                    serviceName: booking.serviceName,
+                    date: booking.scheduledDate || booking.date,
+                    time: booking.scheduledTime || booking.time,
+                    therapistName: booking.therapistName,
+                    bookingId: booking._id
+                };
+                
+                // Send email notification
+                if (clientEmail) {
+                    try {
+                        await notificationService.sendEmail(
+                            clientEmail,
+                            'booking_confirmation',
+                            notificationData
+                        );
+                        console.log(`✅ Email notification sent for guest free consultation booking ${booking._id}`);
+                    } catch (emailError) {
+                        console.error(`❌ Failed to send email for guest booking ${booking._id}:`, emailError);
+                    }
+                }
+                
+                // Send WhatsApp notification
+                if (clientPhone) {
+                    try {
+                        await notificationService.sendWhatsApp(
+                            clientPhone,
+                            (data) => `🎉 Booking Confirmed!\n\nHello ${data.clientName},\n\nYour free consultation with ${data.therapistName} is confirmed for ${data.date} at ${data.time}.\n\nBooking ID: ${data.bookingId}\n\nLooking forward to helping you!\n\n- Tanish Physio Team`,
+                            notificationData
+                        );
+                        console.log(`✅ WhatsApp notification sent for guest free consultation booking ${booking._id}`);
+                    } catch (whatsappError) {
+                        console.error(`❌ Failed to send WhatsApp for guest booking ${booking._id}:`, whatsappError);
+                    }
+                }
+            } catch (notificationError) {
+                console.error(`❌ Error sending notifications for guest booking ${booking._id}:`, notificationError);
+                // Don't fail the booking if notifications fail
+            }
+        }
+
         // If scheduling now, update availability to mark the slot as tentative until payment is confirmed
         if (scheduleType === 'now' && scheduledDate && scheduledTime && timeSlot) {
             // Mark slot as tentative if payment is pending, booked if payment is confirmed
@@ -1773,28 +1932,76 @@ const createBookingWithSubscription = async (req, res, next) => {
             return res.status(400).json(ApiResponse.error('Subscription has expired'));
         }
         
-        const plan = subscription.planId;
-        
-        // Check session limits (0 means unlimited)
-        let usedSessions = 0;
-        let remainingSessions = 0;
-        
-        if (plan && plan.sessions > 0) {
-            usedSessions = await Session.countDocuments({
-                subscriptionId: subscription._id,
-                status: { $ne: "cancelled" }
-            });
-            
-            remainingSessions = plan.sessions - usedSessions;
-            
-            if (remainingSessions <= 0) {
-                return res.status(400).json(ApiResponse.error(
-                    `Session limit reached. You have used all ${plan.sessions} sessions in your plan.`
-                ));
+        // Fetch the plan data manually since planId might be a string field
+        let plan = null;
+        if (subscription.planId) {
+            const isValidObjectId = require('mongoose').Types.ObjectId.isValid(subscription.planId);
+            if (isValidObjectId) {
+                const SubscriptionPlan = require('../models/SubscriptionPlan.model');
+                plan = await SubscriptionPlan.findById(subscription.planId);
+            } else {
+                // Try to find by planId string
+                const SubscriptionPlan = require('../models/SubscriptionPlan.model');
+                plan = await SubscriptionPlan.findOne({ planId: subscription.planId });
             }
-        } else {
-            // Unlimited sessions
-            remainingSessions = 'unlimited';
+        }
+        
+        if (!plan) {
+            console.error(`Plan not found for subscription ${subscription._id}`);
+            return res.status(400).json(ApiResponse.error('Subscription plan not found'));
+        }
+        
+        console.log(`Booking with subscription check:`, {
+            subscriptionId: subscription._id,
+            planName: plan.name,
+            planSessions: plan.sessions,
+            planType: typeof plan.sessions,
+            userId: req.user.userId
+        });
+        
+        // Check session limits - enforce actual session limit from subscription
+        // Only count actual Session documents, not Booking documents
+        const usedSessions = await Session.countDocuments({
+            subscriptionId: subscription._id,
+            status: { $ne: "cancelled" }
+        });
+        
+        // Get total sessions from subscription plan (consider both sessions and totalService fields)
+        // Some plans might use 'totalService' instead of 'sessions' field
+        let totalSessions = 0;
+        if (plan && typeof plan.sessions === 'number') {
+            totalSessions = plan.sessions;
+        } else if (plan && typeof plan.totalService === 'number') {
+            totalSessions = plan.totalService;
+        }
+        const remainingSessions = totalSessions - usedSessions;
+        
+        console.log(`Session check for subscription ${subscription._id}:`, {
+            planName: plan.name,
+            planSessions: plan.sessions,
+            planTotalService: plan.totalService,
+            totalSessions: totalSessions,
+            usedSessions: usedSessions,
+            remainingSessions: remainingSessions
+        });
+        
+        if (totalSessions <= 0) {
+            console.log(`NO_SESSIONS_IN_PLAN triggered:`, {
+                planSessions: plan.sessions,
+                planTotalService: plan.totalService,
+                totalSessions: totalSessions,
+                planType: typeof plan.sessions
+            });
+            return res.status(400).json(ApiResponse.error(
+                'Your subscription plan does not include any sessions. Please upgrade your plan.',
+                'NO_SESSIONS_IN_PLAN'
+            ));
+        }
+        
+        if (remainingSessions <= 0) {
+            return res.status(400).json(ApiResponse.error(
+                `Session limit reached. You have used all ${totalSessions} sessions in your plan.`
+            ));
         }
 
         // Validate service exists
