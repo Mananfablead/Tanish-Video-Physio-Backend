@@ -196,7 +196,7 @@ const createBooking = async (req, res, next) => {
         let service = null;
         let serviceName = "Free Consultation";
         let amount = 0;
-        let paymentStatus = 'pending'; // Default to pending
+        let paymentStatus = req.user.role === 'admin' ? 'paid' : 'pending'; // Admin bookings default to paid, others to pending
         let bookingTypeFinal = bookingType || 'regular';
 
         if (bookingType === 'free-consultation') {
@@ -363,9 +363,9 @@ const createBooking = async (req, res, next) => {
             finalAmount: finalAmount || amount,
             couponCode: couponCode || null,
             discountAmount: discountAmount || 0,
-            paymentStatus: bookingType === 'free-consultation' ? 'paid' : paymentStatus,
+            paymentStatus: bookingType === 'free-consultation' ? 'paid' : (req.user.role === 'admin' && bookingType !== 'subscription-covered' ? 'paid' : paymentStatus),
             // For admin booking creation, default to 'pending' status initially
-            status: req.user.role === 'admin' && !bookingType ? 'pending' : (bookingType === 'subscription-covered' ? 'pending' : (bookingType === 'free-consultation' ? 'pending' : ((scheduledDate && scheduledTime) ? 'scheduled' : (scheduleType === 'later' ? 'pending' : 'scheduled')))),
+            status: req.user.role === 'admin' && !bookingType ? 'pending' : (bookingType === 'subscription-covered' ? 'pending' : (bookingType === 'free-consultation' ? 'pending' : ((scheduledDate && scheduledTime) ? 'pending' : (scheduleType === 'later' ? 'pending' : 'pending')))),
             serviceValidityDays: bookingType === 'free-consultation' ? 30 : service?.validity, // Free consultation has 30 days validity
             purchaseDate: new Date(),
             scheduleType: scheduleType || 'now',
@@ -418,7 +418,17 @@ const createBooking = async (req, res, next) => {
                         try {
                             await notificationService.sendWhatsApp(
                                 user.phone,
-                                (data) => `🎉 Booking Confirmed!\n\nHello ${data.clientName},\n\nYour free consultation with ${data.therapistName} is confirmed for ${data.date} at ${data.time}.\n\nBooking ID: ${data.bookingId}\n\nLooking forward to helping you!\n\n- Tanish Physio Team`,
+                                (data) => `🎉 Booking Confirmed!
+
+Hello ${data.clientName},
+
+Your free consultation with ${data.therapistName} is confirmed for ${data.date} at ${data.time}.
+
+Booking ID: ${data.bookingId}
+
+Looking forward to helping you!
+
+- Tanish Physio Team`,
                                 notificationData
                             );
                             console.log(`✅ WhatsApp notification sent for free consultation booking ${booking._id}`);
@@ -1425,11 +1435,17 @@ const getAllBookingsForAdmin = async (req, res, next) => {
         // Build query
         let query = {};
 
-        // Only show bookings where payment has been completed
-        query.paymentStatus = 'paid';
+        // Show all bookings to admin by default, but allow filtering by payment status
+        // Only apply default paymentStatus filter if no specific paymentStatus is requested
+        if (!paymentStatus) {
+            // Optionally filter to paid bookings only, but this can be overridden
+            // For now, removing the hardcoded filter to show all bookings to admin
+        } else {
+            query.paymentStatus = paymentStatus; // Filter by specific paymentStatus if provided
+        }
         
         if (status) query.status = status;
-        if (paymentStatus) query.paymentStatus = paymentStatus; // Override with specific paymentStatus if provided
+        if (req.query.paymentStatus) query.paymentStatus = req.query.paymentStatus; // Override with specific paymentStatus if provided
 
         if (dateFrom || dateTo) {
             query.date = {};
@@ -1454,7 +1470,7 @@ const getAllBookingsForAdmin = async (req, res, next) => {
             .skip(skip)
             .limit(limit);
 
-        const total = await Booking.countDocuments({ ...query, paymentStatus: 'paid' }); // Count only paid bookings
+        const total = await Booking.countDocuments(query); // Count all bookings matching the query
 
         // Add status evaluation to each booking
         const bookingsWithStatus = bookings.map(booking => ({
@@ -1686,7 +1702,17 @@ const createGuestBooking = async (req, res, next) => {
                     try {
                         await notificationService.sendWhatsApp(
                             clientPhone,
-                            (data) => `🎉 Booking Confirmed!\n\nHello ${data.clientName},\n\nYour free consultation with ${data.therapistName} is confirmed for ${data.date} at ${data.time}.\n\nBooking ID: ${data.bookingId}\n\nLooking forward to helping you!\n\n- Tanish Physio Team`,
+                            (data) => `🎉 Booking Confirmed!
+
+Hello ${data.clientName},
+
+Your free consultation with ${data.therapistName} is confirmed for ${data.date} at ${data.time}.
+
+Booking ID: ${data.bookingId}
+
+Looking forward to helping you!
+
+- Tanish Physio Team`,
                             notificationData
                         );
                         console.log(`✅ WhatsApp notification sent for guest free consultation booking ${booking._id}`);
