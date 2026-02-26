@@ -240,15 +240,12 @@ const createUser = async (req, res, next) => {
             finalPassword = generatedPassword;
         }
 
-        // Hash the password
-        const hashedPassword = await hashPassword(finalPassword);
-
-        // Create new user
+        // Create new user - password will be hashed by pre-save hook
         const user = new User({
             name,
             email,
             phone,
-            password: hashedPassword,
+            password: finalPassword,
             role,
             status,
             hasTempPassword: generatedPassword ? true : false
