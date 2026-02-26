@@ -36,14 +36,17 @@ class ReminderService {
         console.log('Reminder service initialized successfully');
     }
 
-    // Schedule payment reminders (every hour)
+    // Schedule payment reminders (every hour) - DISABLED
     schedulePaymentReminders() {
+        // PAYMENT REMINDERS DISABLED
+        /*
         const job = cron.schedule('0 * * * *', async () => {
             console.log('Running payment reminder job...');
             await this.processPaymentReminders();
         });
 
         this.cronJobs.set('paymentReminders', job);
+        */
     }
 
     // Schedule session reminders (every 30 minutes)
@@ -66,8 +69,10 @@ class ReminderService {
         this.cronJobs.set('dailySummary', job);
     }
 
-    // Process payment reminders
+    // Process payment reminders - DISABLED
     async processPaymentReminders() {
+        // PAYMENT REMINDERS DISABLED
+        /*
         try {
             // Find bookings with pending payments older than 24 hours
             const cutoffTime = new Date(Date.now() - 24 * 60 * 60 * 1000); // 24 hours ago
@@ -96,6 +101,7 @@ class ReminderService {
         } catch (error) {
             console.error('Error in payment reminder processing:', error);
         }
+        */
     }
 
     // Process session reminders
@@ -229,6 +235,8 @@ class ReminderService {
     }
 
     async sendPaymentReminder(booking) {
+        // PAYMENT REMINDER DISABLED
+        /*
         const recipient = {
             email: booking.userId?.email,
             phone: booking.userId?.phone
@@ -243,6 +251,7 @@ class ReminderService {
         };
 
         await NotificationService.sendNotification(recipient, 'payment_reminder', data);
+        */
     }
 
     async sendSessionReminder(session, reminderType) {

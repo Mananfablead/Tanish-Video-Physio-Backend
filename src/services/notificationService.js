@@ -9,7 +9,7 @@ const EmailTemplates = require('../templates/emailTemplates');
 const SessionReminderTemplates = require('../templates/sessionReminderTemplates');
 const { getWhatsAppCredentials, getEmailCredentials } = require('../utils/credentialsManager');
 const { validateWhatsAppToken, addCountryCode } = require('../utils/whatsapp.utils');
-const CmsContact = require('../models/CmsContact.model');
+const User = require('../models/User.model'); // Import User model for admin profile
 
 class NotificationService {
     // WhatsApp Templates (Approved templates from Facebook Business Manager)
@@ -44,7 +44,7 @@ class NotificationService {
             ]
         },
 
-        payment_successful: {
+        /* DISABLED: payment_successful: {
             name: 'payment_successful',
             language: 'en',
             components: [
@@ -58,9 +58,9 @@ class NotificationService {
                     ]
                 }
             ]
-        },
+        }, */
 
-        payment_reminder: {
+        /* DISABLED: payment_reminder: {
             name: 'payment_reminder',
             language: 'en',
             components: [
@@ -73,7 +73,7 @@ class NotificationService {
                     ]
                 }
             ]
-        },
+        }, */
 
         booking_cancelled: {
             name: 'booking_cancelled',
@@ -225,7 +225,7 @@ class NotificationService {
                 ];
                 break;
 
-            case 'payment_successful':
+            /* DISABLED: case 'payment_successful':
                 preparedTemplate.components = [
                     {
                         type: 'body',
@@ -237,9 +237,9 @@ class NotificationService {
                         ]
                     }
                 ];
-                break;
+                break; */
 
-            case 'payment_reminder':
+            /* DISABLED: case 'payment_reminder':
                 preparedTemplate.components = [
                     {
                         type: 'body',
@@ -250,7 +250,7 @@ class NotificationService {
                         ]
                     }
                 ];
-                break;
+                break; */
 
             case 'session_reminder':
                 // Ensure we have all required data
@@ -461,21 +461,21 @@ class NotificationService {
                     whatsapp: 'booking_cancelled'
                 },
 
-                payment_successful: {
+                /* DISABLED: payment_successful: {
                     email: {
                         subject: 'Payment Successful - Tanish Physio',
                         template: EmailTemplates.paymentSuccess
                     },
                     whatsapp: 'payment_successful'
-                },
+                }, */
 
-                payment_reminder: {
+                /* DISABLED: payment_reminder: {
                     email: {
                         subject: 'Payment Reminder - Tanish Physio',
                         template: EmailTemplates.paymentReminder
                     },
                     whatsapp: 'payment_reminder'
-                },
+                }, */
 
                 session_reminder: {
                     email: {
@@ -535,24 +535,24 @@ class NotificationService {
 
             // Send WhatsApp if configured
             if (this.whatsappEnabled && template.whatsapp) {
-                // Get admin phone number from CmsContact instead of recipient phone
-                const contactInfo = await CmsContact.findOne().sort({ createdAt: -1 });
-                if (contactInfo && contactInfo.phone) {
+                // Get admin phone number from admin user profile instead of CMS Contact
+                const adminUser = await User.findOne({ role: 'admin' }).select('phone');
+                if (adminUser && adminUser.phone) {
                     // Log the data being sent to the template
                     console.log('📤 Sending WhatsApp template to admin:', {
                         templateName: template.whatsapp,
-                        recipientPhone: contactInfo.phone,
+                        recipientPhone: adminUser.phone,
                         dataKeys: Object.keys(data || {}),
                         data: data
                     });
 
                     results.whatsapp = await this.sendWhatsAppTemplate(
-                        contactInfo.phone,
+                        adminUser.phone,
                         template.whatsapp,
                         data
                     );
                 } else {
-                    console.warn('Admin phone number not configured in CMS');
+                    console.warn('Admin phone number not configured in admin profile');
                 }
             }
 
@@ -570,8 +570,8 @@ class NotificationService {
             'booking_created': `Booking Request Submitted - ${data.serviceName || 'Your Service'}`,
             'booking_confirmation': `Booking Confirmed - ${data.serviceName || 'Your Appointment'}`,
             'booking_cancelled': `Booking Cancelled - ${data.serviceName || 'Your Appointment'}`,
-            'payment_reminder': `Payment Reminder - ${data.serviceName || 'Your Booking'}`,
-            'payment_successful': `Payment Successful - ${data.serviceName || 'Your Service'}`,
+            /* 'payment_reminder': `Payment Reminder - ${data.serviceName || 'Your Booking'}`, */
+            /* 'payment_successful': `Payment Successful - ${data.serviceName || 'Your Service'}`, */
             'session_reminder': `Session Reminder - ${data.serviceName || 'Your Appointment'}`,
             'session_reminder_24h': `Session Reminder - 24 Hours - ${data.serviceName || 'Your Appointment'}`,
             'session_reminder_1h': `Session Reminder - 1 Hour - ${data.serviceName || 'Your Appointment'}`,
@@ -614,8 +614,8 @@ class NotificationService {
                     'welcome_message': EmailTemplates.welcome,
                     'booking_confirmation': EmailTemplates.bookingConfirmed,
                     'booking_cancelled': EmailTemplates.bookingCancelled,
-                    'payment_reminder': EmailTemplates.paymentReminder,
-                    'payment_successful': EmailTemplates.paymentSuccess,
+                    /* 'payment_reminder': EmailTemplates.paymentReminder, */
+                    /* 'payment_successful': EmailTemplates.paymentSuccess, */
                     'session_reminder': EmailTemplates.sessionReminder,
                     'session_reminder_24h': SessionReminderTemplates.sessionReminder24hEmail,
                     'session_reminder_1h': SessionReminderTemplates.sessionReminder1hEmail,
@@ -718,14 +718,14 @@ class NotificationService {
         let response = null;
 
         try {
-            // Get admin phone number from CmsContact instead of the 'to' parameter
-            const contactInfo = await CmsContact.findOne().sort({ createdAt: -1 });
-            if (!contactInfo || !contactInfo.phone) {
-                throw new Error('Admin phone number not configured in CMS');
+            // Get admin phone number from admin user profile instead of CMS Contact
+            const adminUser = await User.findOne({ role: 'admin' }).select('phone');
+            if (!adminUser || !adminUser.phone) {
+                throw new Error('Admin phone number not configured in admin profile');
             }
             
             // Format admin phone number with country code if needed
-            formattedPhone = addCountryCode(contactInfo.phone);
+            formattedPhone = addCountryCode(adminUser.phone);
 
             // Generate message content
             messageContent = typeof template === 'function' ? template(data) : template;

@@ -108,7 +108,7 @@ class BookingStatusHandler {
             [this.PAYMENT_STATUS.FAILED]: {
                 description: 'Payment failed',
                 sendPaymentLink: true,
-                sendPaymentReminder: true,
+                sendPaymentReminder: false,  // DISABLED: Payment reminders are turned off
                 updateBookingStatus: false,
                 allowRetry: true,
                 notifyAdmin: true

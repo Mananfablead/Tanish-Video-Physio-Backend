@@ -985,7 +985,8 @@ const verifyGuestPayment = async (req, res, next) => {
                     const user = await User.findById(booking.userId).select('email phone name');
 
                     if (user) {
-                        // Send payment success notification to user (email and WhatsApp)
+                        // DISABLED: Send payment success notification to user (email and WhatsApp)
+                        /*
                         await NotificationService.sendNotification(
                             { email: user.email, phone: user.phone },
                             'payment_successful',
@@ -997,8 +998,10 @@ const verifyGuestPayment = async (req, res, next) => {
                                 orderId: orderId
                             }
                         );
+                        */
 
-                        // Send payment received notification to admin
+                        // DISABLED: Send payment received notification to admin
+                        /*
                         const admins = await User.find({ role: 'admin' }).select('email phone name');
                         for (const admin of admins) {
                             await NotificationService.sendNotification(
@@ -1013,6 +1016,7 @@ const verifyGuestPayment = async (req, res, next) => {
                                 }
                             );
                         }
+                        */
                     }
                 } catch (notificationError) {
                     console.error('Error sending payment notifications:', notificationError);
@@ -1825,9 +1829,10 @@ const verifySubscriptionPayment = async (req, res, next) => {
             try {
                 // Get user information for notification
                 const user = await User.findById(subscription.userId).select('email phone name');
-
+            
                 if (user) {
-                    // Send payment success notification to user (email and WhatsApp)
+                    // DISABLED: Send payment success notification to user (email and WhatsApp)
+                    /*
                     await NotificationService.sendNotification(
                         { email: user.email, phone: user.phone },
                         'payment_successful',
@@ -1839,8 +1844,10 @@ const verifySubscriptionPayment = async (req, res, next) => {
                             orderId: orderId
                         }
                     );
-
-                    // Send payment received notification to admin
+                    */
+            
+                    // DISABLED: Send payment received notification to admin
+                    /*
                     const admins = await User.find({ role: 'admin' }).select('email phone name');
                     for (const admin of admins) {
                         await NotificationService.sendNotification(
@@ -1855,6 +1862,7 @@ const verifySubscriptionPayment = async (req, res, next) => {
                             }
                         );
                     }
+                    */
                 }
             } catch (notificationError) {
                 console.error('Error sending subscription payment notifications:', notificationError);
@@ -2218,7 +2226,8 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
                     const user = await User.findById(userIdToCheck).select('email phone name');
 
                     if (user) {
-                        // Send payment success notification to user (email and WhatsApp)
+                        // DISABLED: Send payment success notification to user (email and WhatsApp)
+                        /*
                         await NotificationService.sendNotification(
                             { email: user.email, phone: user.phone },
                             'payment_successful',
@@ -2230,8 +2239,10 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
                                 orderId: orderId
                             }
                         );
+                        */
 
-                        // Send payment received notification to admin
+                        // DISABLED: Send payment received notification to admin
+                        /*
                         const admins = await User.find({ role: 'admin' }).select('email phone name');
                         for (const admin of admins) {
                             await NotificationService.sendNotification(
@@ -2246,6 +2257,7 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
                                 }
                             );
                         }
+                        */
                     }
                 } catch (notificationError) {
                     console.error('Error sending guest subscription payment notifications:', notificationError);

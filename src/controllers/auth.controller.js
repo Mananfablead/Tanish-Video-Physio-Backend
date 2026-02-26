@@ -67,7 +67,7 @@ const register = async (req, res, next) => {
 const login = async (req, res, next) => {
     try {
 
-        const { email, password } = req.body;
+        const { email, password, appType } = req.body; // appType can be 'client' or 'admin'
 
         // Find user by email
         const user = await User.findOne({ email });
@@ -83,6 +83,24 @@ const login = async (req, res, next) => {
             return res
                 .status(401)
                 .json(ApiResponse.error("Account is not active. Please contact support.", 401));
+        }
+
+        // Strict role-based login isolation
+        if (appType === 'client' && user.role !== 'patient') {
+            return res
+                .status(403)
+                .json(ApiResponse.error("Access denied. Admin users cannot login to client portal.", 403));
+        }
+
+        if (appType === 'admin' && user.role !== 'admin') {
+            return res
+                .status(403)
+                .json(ApiResponse.error("Access denied. Patient users cannot login to admin portal.", 403));
+        }
+
+        // If no appType specified, allow login but log warning
+        if (!appType) {
+            console.warn(`Login attempt without appType specified for user ${email}`);
         }
 
         // Check if password is properly hashed

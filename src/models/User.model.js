@@ -33,6 +33,14 @@ const userSchema = new mongoose.Schema(
       type: String,
       enum: ["patient", "admin"],
       default: "patient",
+      required: true,
+      validate: {
+        validator: function (v) {
+          // Ensure role is properly set
+          return ['patient', 'admin'].includes(v);
+        },
+        message: props => `${props.value} is not a valid role!`
+      }
     },
     status: {
       type: String,
@@ -119,6 +127,21 @@ userSchema.pre("save", async function (next) {
   } catch (error) {
     next(error);
   }
+});
+
+// Pre-save hook to ensure role integrity
+userSchema.pre('save', function (next) {
+  // Ensure role is always set
+  if (!this.role) {
+    this.role = 'patient';
+  }
+
+  // Validate role
+  if (!['patient', 'admin'].includes(this.role)) {
+    return next(new Error(`Invalid role: ${this.role}`));
+  }
+
+  next();
 });
 
 module.exports = mongoose.model("User", userSchema);

@@ -2,13 +2,14 @@ const express = require('express');
 const { register, login, logout, getProfile, getPublicProfile, getAllAdminProfiles, updateProfile, createAdminUser, forgotPassword, resetPassword, updatePassword } = require('../controllers/auth.controller');
 const { authenticateToken } = require('../middlewares/auth.middleware');
 const { validateLogin } = require('../middlewares/validate.middleware');
+const { detectAppType } = require('../middlewares/appType.middleware');
 const upload = require('../middlewares/upload.middleware');
 const profileUpload = require('../middlewares/profileUpload.middleware');
 
 const router = express.Router();
 
 router.post('/register', register);
-router.post('/login', validateLogin, login);
+router.post('/login', detectAppType, validateLogin, login);
 router.post('/logout', authenticateToken, logout);
 router.get('/profile', authenticateToken, getProfile);
 router.get('/profile/:userId', getPublicProfile); // Public profile endpoint for individual admin access

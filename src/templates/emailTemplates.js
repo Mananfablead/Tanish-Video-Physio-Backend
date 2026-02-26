@@ -402,7 +402,7 @@ class EmailTemplates {
         `;
     }
 
-    // Template 5: Payment Reminder
+    /* DISABLED: // Template 5: Payment Reminder
     static paymentReminder(data) {
         return `
 <!DOCTYPE html>
@@ -479,7 +479,7 @@ class EmailTemplates {
 </body>
 </html>
         `;
-    }
+    } */
 
     // Template 6: Payment Success
     static paymentSuccess(data) {
