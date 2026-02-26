@@ -250,7 +250,8 @@ const createUser = async (req, res, next) => {
             phone,
             password: hashedPassword,
             role,
-            status
+            status,
+            hasTempPassword: generatedPassword ? true : false
         });
 
         await user.save();

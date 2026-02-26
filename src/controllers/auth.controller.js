@@ -71,6 +71,7 @@ const login = async (req, res, next) => {
 
         // Find user by email
         const user = await User.findOne({ email });
+        console.log("findOne result:", user);
         if (!user) {
             return res
                 .status(401)
