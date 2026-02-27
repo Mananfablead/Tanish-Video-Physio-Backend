@@ -7,6 +7,7 @@ const SubscriptionPlan = require("../models/SubscriptionPlan.model");
 const ApiResponse = require("../utils/apiResponse");
 const { parseDurationString } = require("../utils/session.utils");
 const { generateJoinLink } = require("../utils/videoCall.utils");
+const NotificationService = require("../services/notificationService");
 
 // Helper function to check subscription session limits
 const checkSubscriptionLimits = async (subscriptionId, userId = null) => {
@@ -967,6 +968,69 @@ const rescheduleUserSession = async (req, res, next) => {
       }
     }
 
+    // Send appointment rescheduled notification
+    try {
+      // Format old and new dates for the notification
+      const oldDate = new Date(`${session.date}T${session.time}:00`).toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+
+      const oldTime = new Date(`${session.date}T${session.time}:00`).toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+
+      const newDate = new Date(`${date}T${time}:00`).toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+
+      const newTime = new Date(`${date}T${time}:00`).toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+
+      // Prepare notification data
+      const notificationData = {
+        serviceName: updatedSession.bookingId?.serviceName || 'Service',
+        oldDate: oldDate,
+        oldTime: oldTime,
+        newDate: newDate,
+        newTime: newTime,
+        clientName: updatedSession.userId?.name || 'Valued Patient'
+      };
+
+      // Get user information for notification recipient
+      const User = require('../models/User.model');
+      const user = await User.findById(updatedSession.userId);
+
+      if (user) {
+        const recipient = {
+          email: user.email,
+          phone: user.phone
+        };
+
+        // Send notification
+        await NotificationService.sendNotification(
+          recipient,
+          'appointment_rescheduled',
+          notificationData
+        );
+
+        console.log(`✅ Appointment rescheduled notification sent for session ${updatedSession._id}`);
+      }
+    } catch (notificationError) {
+      console.error(`❌ Error sending appointment rescheduled notification for session ${updatedSession._id}:`, notificationError);
+      // Continue with response even if notification fails
+    }
+
     res
       .status(200)
       .json(
@@ -1641,6 +1705,69 @@ const rescheduleAdminSession = async (req, res, next) => {
         );
         // Continue with response even if availability update fails
       }
+    }
+
+    // Send appointment rescheduled notification
+    try {
+      // Format old and new dates for the notification
+      const oldDate = new Date(`${session.date}T${session.time}:00`).toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+
+      const oldTime = new Date(`${session.date}T${session.time}:00`).toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+
+      const newDate = new Date(`${date}T${time}:00`).toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+
+      const newTime = new Date(`${date}T${time}:00`).toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+
+      // Prepare notification data
+      const notificationData = {
+        serviceName: updatedSession.bookingId?.serviceName || 'Service',
+        oldDate: oldDate,
+        oldTime: oldTime,
+        newDate: newDate,
+        newTime: newTime,
+        clientName: updatedSession.userId?.name || 'Valued Patient'
+      };
+
+      // Get user information for notification recipient
+      const User = require('../models/User.model');
+      const user = await User.findById(updatedSession.userId);
+
+      if (user) {
+        const recipient = {
+          email: user.email,
+          phone: user.phone
+        };
+
+        // Send notification
+        await NotificationService.sendNotification(
+          recipient,
+          'appointment_rescheduled',
+          notificationData
+        );
+
+        console.log(`✅ Appointment rescheduled notification sent for session ${updatedSession._id}`);
+      }
+    } catch (notificationError) {
+      console.error(`❌ Error sending appointment rescheduled notification for session ${updatedSession._id}:`, notificationError);
+      // Continue with response even if notification fails
     }
 
     res

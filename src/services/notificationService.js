@@ -91,29 +91,7 @@ class NotificationService {
             ]
         },
 
-        session_reminder: {
-            name: 'session_reminder',
-            language: 'en',
-            components: [
-                {
-                    type: 'body',
-                    parameters: [
-                        { type: 'text', text: '{{1}}' },  // Service name
-                        { type: 'text', text: '{{2}}' },  // Date
-                        { type: 'text', text: '{{3}}' },  // Time
-                        { type: 'text', text: '{{4}}' }   // Meeting link
-                    ]
-                },
-                {
-                    type: 'button',
-                    sub_type: 'url',
-                    index: '0',
-                    parameters: [
-                        { type: 'text', text: '{{4}}' }  // Meeting link
-                    ]
-                }
-            ]
-        },
+
 
         appointment_rescheduled: {
             name: 'appointment_rescheduled',
@@ -151,21 +129,7 @@ class NotificationService {
             ]
         },
 
-        payment_received: {
-            name: 'payment_received',
-            language: 'en',
-            components: [
-                {
-                    type: 'body',
-                    parameters: [
-                        { type: 'text', text: '{{1}}' },  // Amount
-                        { type: 'text', text: '{{2}}' },  // Service name
-                        { type: 'text', text: '{{3}}' },  // Transaction ID
-                        { type: 'text', text: '{{4}}' }   // Client name
-                    ]
-                }
-            ]
-        }
+
     };
 
     // Prepare WhatsApp template with actual data
@@ -215,12 +179,6 @@ class NotificationService {
                 const cancelServiceName = data.serviceName || 'Physiotherapy Session';
                 const cancelReason = data.reason || data.cancellationReason || 'No reason provided';
 
-                console.log('📋 Booking Cancelled Data:', {
-                    clientName: cancelClientName,
-                    serviceName: cancelServiceName,
-                    reason: cancelReason,
-                    originalData: data
-                });
 
                 preparedTemplate.components = [
                     {
@@ -261,51 +219,34 @@ class NotificationService {
                 ];
                 break; */
 
-            case 'session_reminder':
-                // Ensure we have all required data
-                const sessionServiceName = data.serviceName || 'Physiotherapy Session';
-                const sessionDate = data.date || 'TBD';
-                const sessionTime = data.time || 'TBD';
-                const sessionMeetingLink = data.meetingLink || 'Meeting Link TBD';
 
-                console.log('📋 Session Reminder Data:', {
-                    serviceName: sessionServiceName,
-                    date: sessionDate,
-                    time: sessionTime,
-                    meetingLink: sessionMeetingLink,
-                    originalData: data
-                });
 
+            case 'session_reminder_24h':
                 preparedTemplate.components = [
                     {
                         type: 'body',
                         parameters: [
-                            { type: 'text', text: sessionServiceName },
-                            { type: 'text', text: sessionDate },
-                            { type: 'text', text: sessionTime },
-                            { type: 'text', text: sessionMeetingLink }
-                        ]
-                    },
-                    {
-                        type: 'button',
-                        sub_type: 'url',
-                        index: '0',
-                        parameters: [
-                            {
-                                type: 'text',
-                                text: sessionMeetingLink
-                            }
+                            { type: 'text', text: data.clientName || 'Patient' },     // 1
+                            { type: 'text', text: data.serviceName || 'Service' },    // 2
+                            { type: 'text', text: data.date || 'Date' },             // 3
+                            { type: 'text', text: data.time || 'Time' }              // 4
                         ]
                     }
                 ];
                 break;
-                
-            case 'session_reminder_24h':
-                messageContent = SessionReminderTemplates.sessionReminder24hWhatsApp(data);
-                break;
-                
+
             case 'session_reminder_1h':
-                messageContent = SessionReminderTemplates.sessionReminder1hWhatsApp(data);
+                preparedTemplate.components = [
+                    {
+                        type: 'body',
+                        parameters: [
+                            { type: 'text', text: data.clientName || 'Patient' },     // 1
+                            { type: 'text', text: data.serviceName || 'Service' },    // 2
+                            { type: 'text', text: data.date || 'Date' },             // 3
+                            { type: 'text', text: data.time || 'Time' }              // 4
+                        ]
+                    }
+                ];
                 break;
 
             case 'appointment_rescheduled':
@@ -324,15 +265,16 @@ class NotificationService {
                 ];
                 break;
 
-            case 'payment_received':
+            case 'admin_session_reminder':
                 preparedTemplate.components = [
                     {
                         type: 'body',
                         parameters: [
-                            { type: 'text', text: data.amount || '0' },
-                            { type: 'text', text: data.serviceName || 'Service' },
-                            { type: 'text', text: data.transactionId || 'N/A' },
-                            { type: 'text', text: data.clientName || 'Customer' }
+                            { type: 'text', text: data.patientName || 'Patient' },      // Patient Name
+                            { type: 'text', text: data.phone || 'N/A' },               // Phone
+                            { type: 'text', text: data.serviceName || 'Service' },      // Service Name
+                            { type: 'text', text: data.date || 'N/A' },                // Date
+                            { type: 'text', text: data.time || 'N/A' }                 // Time
                         ]
                     }
                 ];
@@ -522,13 +464,7 @@ class NotificationService {
                     whatsapp: 'payment_reminder'
                 }, */
 
-                session_reminder: {
-                    email: {
-                        subject: 'Session Reminder - Tanish Physio',
-                        template: EmailTemplates.sessionReminder
-                    },
-                    whatsapp: 'session_reminder'
-                },
+
 
                 // Admin notifications (without payment_received)
                 new_booking: {
@@ -539,21 +475,25 @@ class NotificationService {
                     whatsapp: 'new_booking_request'
                 },
 
-                upcoming_session: {
+
+
+                appointment_rescheduled: {
                     email: {
-                        subject: 'Upcoming Session - Admin',
+                        subject: 'Appointment Rescheduled - Tanish Physio',
+                        template: EmailTemplates.appointmentRescheduled
+                    },
+                    whatsapp: 'appointment_rescheduled'
+                },
+
+                admin_session_reminder: {
+                    email: {
+                        subject: 'Upcoming Session Reminder - Admin',
                         template: EmailTemplates.adminUpcomingSession
                     },
                     whatsapp: 'upcoming_session'
                 },
 
-                payment_received: {
-                    email: {
-                        subject: 'Payment Received - Admin',
-                        template: EmailTemplates.adminPaymentReceived
-                    },
-                    whatsapp: 'payment_received'
-                }
+
             };
         } catch (error) {
             console.error('Error initializing notification service credentials:', error);
@@ -574,7 +514,7 @@ class NotificationService {
             };
 
             // For admin notifications, get admin email from credentials instead of recipient
-            const isAdminNotification = ['new_booking', 'upcoming_session'].includes(type);
+            const isAdminNotification = ['new_booking', 'admin_session_reminder'].includes(type);
 
             if (isAdminNotification) {
                 // Get admin email from credentials
@@ -599,7 +539,7 @@ class NotificationService {
                 // Determine recipient based on notification type
                 // For user-specific notifications, use the user's phone from recipient
                 // For admin notifications, get admin's phone from user profile
-                const userSpecificTemplates = ['welcome_message', 'booking_confirmation', 'booking_cancelled', 'session_reminder', 'session_reminder_24h', 'session_reminder_1h', 'appointment_rescheduled', 'payment_successful', 'payment_reminder'];
+                const userSpecificTemplates = ['welcome_message', 'booking_confirmation', 'booking_cancelled', 'session_reminder_24h', 'session_reminder_1h', 'appointment_rescheduled'];
 
                 if (userSpecificTemplates.includes(template.whatsapp)) {
                     // Use user's phone from the recipient parameter
@@ -650,12 +590,13 @@ class NotificationService {
             'booking_cancelled': `Booking Cancelled - ${data.serviceName || 'Your Appointment'}`,
             /* 'payment_reminder': `Payment Reminder - ${data.serviceName || 'Your Booking'}`, */
             /* 'payment_successful': `Payment Successful - ${data.serviceName || 'Your Service'}`, */
-            'session_reminder': `Session Reminder - ${data.serviceName || 'Your Appointment'}`,
+
             'session_reminder_24h': `Session Reminder - 24 Hours - ${data.serviceName || 'Your Appointment'}`,
             'session_reminder_1h': `Session Reminder - 1 Hour - ${data.serviceName || 'Your Appointment'}`,
             'appointment_rescheduled': `Appointment Rescheduled - ${data.serviceName || 'Your Session'}`,
+            'admin_session_reminder': `Upcoming Session Reminder - ${data.serviceName || 'Service'}`,
             'new_booking': `New Booking Request - ${data.serviceName || 'Service'}`,
-            'upcoming_session': `Upcoming Session - ${data.serviceName || 'Tomorrow'}`,
+
             'custom_notification': data.title || 'Notification from Tanish Physio'
         };
 
@@ -695,11 +636,10 @@ class NotificationService {
                     'new_booking': EmailTemplates.adminNewBooking,  // Added for admin notifications
                     /* 'payment_reminder': EmailTemplates.paymentReminder, */
                     /* 'payment_successful': EmailTemplates.paymentSuccess, */
-                    'session_reminder': EmailTemplates.sessionReminder,
                     'session_reminder_24h': SessionReminderTemplates.sessionReminder24hEmail,
                     'session_reminder_1h': SessionReminderTemplates.sessionReminder1hEmail,
                     'appointment_rescheduled': EmailTemplates.appointmentRescheduled,
-                    'upcoming_session': EmailTemplates.adminUpcomingSession,
+                    'admin_session_reminder': EmailTemplates.adminUpcomingSession,
                     'custom_notification': EmailTemplates.customNotification
                 };
 

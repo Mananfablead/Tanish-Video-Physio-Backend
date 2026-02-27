@@ -5,7 +5,7 @@ require('dotenv').config();
 // Connect to MongoDB first
 async function connectDB() {
     try {
-        const dbURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/tanish-physio';
+        const dbURI = process.env.MONGODB_URI;
         await mongoose.connect(dbURI);
         console.log('🔗 Database connected successfully');
     } catch (error) {

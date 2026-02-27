@@ -49,9 +49,9 @@ class ReminderService {
         */
     }
 
-    // Schedule session reminders (every 30 minutes)
+    // Schedule session reminders (every minute)
     scheduleSessionReminders() {
-        const job = cron.schedule('*/30 * * * *', async () => {
+        const job = cron.schedule('* * * * *', async () => {
             console.log('Running session reminder job...');
             await this.processSessionReminders();
         });
@@ -67,41 +67,6 @@ class ReminderService {
         });
 
         this.cronJobs.set('dailySummary', job);
-    }
-
-    // Process payment reminders - DISABLED
-    async processPaymentReminders() {
-        // PAYMENT REMINDERS DISABLED
-        /*
-        try {
-            // Find bookings with pending payments older than 24 hours
-            const cutoffTime = new Date(Date.now() - 24 * 60 * 60 * 1000); // 24 hours ago
-
-            const pendingBookings = await Booking.find({
-                status: BookingStatusHandler.BOOKING_STATUS.PENDING,
-                paymentStatus: BookingStatusHandler.PAYMENT_STATUS.PENDING,
-                createdAt: { $lte: cutoffTime }
-            }).populate('userId', 'name email phone');
-
-            console.log(`Found ${pendingBookings.length} bookings for payment reminders`);
-
-            for (const booking of pendingBookings) {
-                try {
-                    // Check if we should send reminder (based on last reminder sent)
-                    const shouldSend = await this.shouldSendPaymentReminder(booking);
-
-                    if (shouldSend) {
-                        await this.sendPaymentReminder(booking);
-                        await this.updateLastReminderSent(booking, 'payment');
-                    }
-                } catch (error) {
-                    console.error(`Error processing payment reminder for booking ${booking._id}:`, error);
-                }
-            }
-        } catch (error) {
-            console.error('Error in payment reminder processing:', error);
-        }
-        */
     }
 
     // Process session reminders
@@ -255,7 +220,8 @@ class ReminderService {
     }
 
     async sendSessionReminder(session, reminderType) {
-        const recipient = {
+        // Send to user/patient
+        const userRecipient = {
             email: session.userId?.email,
             phone: session.userId?.phone
         };
@@ -279,7 +245,7 @@ class ReminderService {
             hour12: true
         });
         
-        const data = {
+        const userData = {
             clientName: session.userId?.name || 'Valued Patient',
             serviceName: serviceName,
             date: sessionDate,
@@ -299,7 +265,24 @@ class ReminderService {
             templateName = 'session_reminder_1h';
         }
         
-        await NotificationService.sendNotification(recipient, templateName, data);
+        // Send to user/patient
+        await NotificationService.sendNotification(userRecipient, templateName, userData);
+        
+        // Send to admin as well
+        const adminData = {
+            ...userData,
+            patientName: session.userId?.name || 'Patient',
+            serviceName: serviceName,
+            date: sessionDate,
+            time: sessionTime,
+            therapistName: therapistName,
+            sessionLink: session.joinLink || session.googleMeetLink,
+            sessionId: session._id,
+            reminderType: reminderType
+        };
+        
+        // Send admin-specific notification
+        await NotificationService.sendNotification({}, 'admin_session_reminder', adminData);
     }
     
     async updateSessionReminderSent(session, reminderType) {
