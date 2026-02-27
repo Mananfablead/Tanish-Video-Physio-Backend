@@ -2064,19 +2064,60 @@ const createBookingWithSubscription = async (req, res, next) => {
         // Populate the response
         await booking.populate('serviceId', 'name price duration validity images');
         await booking.populate('therapistId', 'name email role profilePicture');
-
-        // Send notifications
-        const notificationData = {
-            clientName: booking.clientName,
-            serviceName: serviceName,
+  const session = new Session({
+            subscriptionId: subscription._id,
             bookingId: booking._id,
+            therapistId: therapist._id,
+            userId: req.user.userId,
             date: date,
             time: time,
-            remainingSessions: remainingSessions
-        };
+            startTime: new Date(`${date}T${time}:00`),
+            type: '1-on-1',
+            status: 'pending', // Session status matches booking status
+            notes: `Session created from subscription booking #${booking._id}`,
+            sessionId: `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        });
+        
+        // Calculate end time if service duration is available
+        if (service && service.duration) {
+            const durationMatch = service.duration.match(/(\d+)/);
+            if (durationMatch) {
+                const duration = parseInt(durationMatch[1]);
+                const endTime = new Date(session.startTime);
+                endTime.setMinutes(endTime.getMinutes() + duration);
+                session.endTime = endTime;
+                session.duration = duration;
+            }
+        }
+        
+        await session.save();
+        
+        console.log(`Subscription booking and session created successfully.`);
+        console.log(`Session ${session._id} linked to subscription ${subscription._id}`);
+        console.log(`User now has ${remainingSessions - 1} sessions remaining.`);
+        
+        // Also update the booking to link it properly with subscription
+        // This ensures both session and service counts are tracked correctly
+        booking.subscriptionId = subscription._id;
+        await booking.save();
 
+        // Get updated counts for the response
+        const updatedUsedSessions = usedSessions + 1;
+        const updatedRemainingSessions = remainingSessions - 1;
+        
+        // Count used services for this subscription (all bookings associated with subscription)
+        const updatedUsedServices = await Booking.countDocuments({
+            $or: [
+                { subscriptionId: subscription._id },
+                { subscriptionId: subscription._id.toString() }
+            ],
+            status: { $ne: "cancelled" }
+        });
+        const updatedRemainingServices = plan.totalService ? plan.totalService - updatedUsedServices : 0;
+        
         res.status(201).json(ApiResponse.success({ 
             booking, 
+            session, // Include the created session
             subscriptionInfo: {
                 totalSessions: plan.sessions,
                 usedSessions: updatedUsedSessions, // Incremented used sessions count
