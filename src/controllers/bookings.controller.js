@@ -488,22 +488,12 @@ Looking forward to helping you!
 
         // Send notifications
         const notificationData = {
-            clientName: req.user?.name || 'Unknown User',
+            clientName: booking.clientName,
             serviceName: serviceName,
             bookingId: booking._id,
             date: date,
             time: time
         };
-
-        // Notify admins
-        const admins = await User.find({ role: 'admin' }).select('email phone name');
-        for (const admin of admins) {
-            await NotificationService.sendNotification(
-                { email: admin.email, phone: admin.phone },
-                'new_booking',
-                { ...notificationData, clientName: req.user?.name || 'Unknown User' }
-            );
-        }
 
         res.status(201).json(ApiResponse.success({ booking }, 'Booking created successfully'));
     } catch (error) {
@@ -797,14 +787,12 @@ const updateBookingWithSchedule = async (req, res, next) => {
                         { ...trigger.data, clientName: bookingOwner.name }
                     );
                 } else if (trigger.type === 'admin') {
-                    const admins = await User.find({ role: 'admin' }).select('email phone name');
-                    for (const admin of admins) {
-                        await NotificationService.sendNotification(
-                            { email: admin.email, phone: admin.phone },
-                            trigger.template,
-                            trigger.data
-                        );
-                    }
+                    // Send admin notification - notification service will handle getting admin contact from credentials/profile
+                    await NotificationService.sendNotification(
+                        { email: 'placeholder', phone: 'placeholder' }, // Will be replaced by notification service
+                        trigger.template,
+                        trigger.data
+                    );
                 }
             }
         }
@@ -1058,14 +1046,12 @@ const updateBooking = async (req, res, next) => {
                         { ...trigger.data, clientName: bookingOwner.name }
                     );
                 } else if (trigger.type === 'admin') {
-                    const admins = await User.find({ role: 'admin' }).select('email phone name');
-                    for (const admin of admins) {
-                        await NotificationService.sendNotification(
-                            { email: admin.email, phone: admin.phone },
-                            trigger.template,
-                            trigger.data
-                        );
-                    }
+                    // Send admin notification - notification service will handle getting admin contact from credentials/profile
+                    await NotificationService.sendNotification(
+                        { email: 'placeholder', phone: 'placeholder' }, // Will be replaced by notification service
+                        trigger.template,
+                        trigger.data
+                    );
                 }
             }
         }
@@ -1150,14 +1136,12 @@ const updateBookingStatus = async (req, res, next) => {
                         { ...trigger.data, clientName: bookingOwner.name }
                     );
                 } else if (trigger.type === 'admin') {
-                    const admins = await User.find({ role: 'admin' }).select('email phone name');
-                    for (const admin of admins) {
-                        await NotificationService.sendNotification(
-                            { email: admin.email, phone: admin.phone },
-                            trigger.template,
-                            trigger.data
-                        );
-                    }
+                    // Send admin notification - notification service will handle getting admin contact from credentials/profile
+                    await NotificationService.sendNotification(
+                        { email: 'placeholder', phone: 'placeholder' }, // Will be replaced by notification service
+                        trigger.template,
+                        trigger.data
+                    );
                 }
             }
         }
@@ -1746,16 +1730,6 @@ Looking forward to helping you!
             time: time
         };
 
-        // Notify admins
-        const admins = await User.find({ role: 'admin' }).select('email phone name');
-        for (const admin of admins) {
-            await NotificationService.sendNotification(
-                { email: admin.email, phone: admin.phone },
-                'new_booking',
-                { ...notificationData, clientName: clientName }
-            );
-        }
-
         // Generate JWT token for auto-login
         const token = generateToken({ userId: user._id.toString(), role: user.role });
 
@@ -2093,23 +2067,13 @@ const createBookingWithSubscription = async (req, res, next) => {
 
         // Send notifications
         const notificationData = {
-            clientName: req.user?.name || 'Unknown User',
+            clientName: booking.clientName,
             serviceName: serviceName,
             bookingId: booking._id,
             date: date,
             time: time,
             remainingSessions: remainingSessions
         };
-
-        // Notify admins
-        const admins = await User.find({ role: 'admin' }).select('email phone name');
-        for (const admin of admins) {
-            await NotificationService.sendNotification(
-                { email: admin.email, phone: admin.phone },
-                'new_booking',
-                { ...notificationData, clientName: req.user?.name || 'Unknown User' }
-            );
-        }
 
         res.status(201).json(ApiResponse.success({ 
             booking, 

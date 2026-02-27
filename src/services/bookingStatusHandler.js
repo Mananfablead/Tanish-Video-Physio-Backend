@@ -251,6 +251,21 @@ class BookingStatusHandler {
                 template: 'payment_received',
                 data: { bookingId: booking._id, amount: payment.amount }
             });
+            // Send new booking notification when payment is made to ensure admin gets notified
+            triggers.push({
+                type: 'admin',
+                template: 'new_booking',
+                data: {
+                    bookingId: booking._id,
+                    clientName: booking.clientName,
+                    patientName: booking.clientName,
+                    serviceName: booking.serviceName,
+                    amount: payment.amount,
+                    phone: booking.phone || (booking.userId?.phone),  // Use booking phone or user phone
+                    date: booking.date || booking.scheduledDate,     // Use booking date
+                    time: booking.time || booking.scheduledTime      // Use booking time
+                }
+            });
         }
 
         return triggers;

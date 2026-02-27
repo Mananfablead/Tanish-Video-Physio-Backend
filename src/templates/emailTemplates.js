@@ -684,91 +684,47 @@ class EmailTemplates {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>New Booking Request - Admin</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #eff6ff;">
-    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #eff6ff; padding: 20px 0;">
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f5f5;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5; padding: 20px 0;">
         <tr>
             <td align="center">
-                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #dbeafe;">
-                    ${EmailTemplates.generateHeader(
-                        'New Booking Request',
-                        'Action required',
-                        { start: '#2563eb', end: '#1d4ed8', text: '#dbeafe' },
-                        '🔔'
-                    )}
-                    
+                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
                     <tr>
-                        <td style="padding: 40px;">
-                            <p style="font-size: 20px; color: #1e3a8a; margin: 0 0 25px 0; font-weight: 600;">
-                                Team,
-                            </p>
-                            
-                            <div style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-radius: 12px; padding: 25px; margin: 25px 0; border: 1px solid #bae6fd;">
-                                <h2 style="color: #1e3a8a; margin: 0 0 20px 0; font-size: 24px;">📋 Booking Details</h2>
-                                
-                                <div style="display: grid; gap: 15px;">
-                                    <div style="display: flex; align-items: center; gap: 15px; padding: 15px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-                                        <div style="background-color: #2563eb; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;">
-                                            👤
-                                        </div>
-                                        <div>
-                                            <div style="font-weight: 600; color: #1e3a8a;">${data.clientName || 'Client Name'}</div>
-                                            <div style="font-size: 14px; color: #3b82f6;">Client</div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div style="display: flex; align-items: center; gap: 15px; padding: 15px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-                                        <div style="background-color: #0ea5e9; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;">
-                                            📋
-                                        </div>
-                                        <div>
-                                            <div style="font-weight: 600; color: #1e3a8a;">${data.serviceName || 'Service Name'}</div>
-                                            <div style="font-size: 14px; color: #3b82f6;">Service Requested</div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div style="display: flex; align-items: center; gap: 15px; padding: 15px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-                                        <div style="background-color: #f59e0b; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;">
-                                            ⏰
-                                        </div>
-                                        <div>
-                                            <div style="font-weight: 600; color: #1e3a8a;">${new Date().toLocaleString()}</div>
-                                            <div style="font-size: 14px; color: #3b82f6;">Request Time</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 25px; margin: 25px 0; border-radius: 0 12px 12px 0;">
-                                <h3 style="color: #92400e; margin: 0 0 15px 0; font-size: 20px;">⚡ Action Required</h3>
-                                <ul style="color: #c2410c; margin: 0; padding-left: 20px; line-height: 1.6;">
-                                    <li>Review the booking request details</li>
-                                    <li>Verify client information and service requirements</li>
-                                    <li>Confirm or reject the booking within 24 hours</li>
-                                    <li>Notify the client of your decision</li>
-                                </ul>
-                                <div style="margin-top: 20px; text-align: center;">
-                                    <a href="#" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; text-decoration: none; padding: 12px 25px; border-radius: 8px; font-weight: 600; display: inline-block;">Review Booking</a>
-                                </div>
-                            </div>
-                            
-                            <div style="background-color: #f0fdf4; border-radius: 12px; padding: 20px; margin: 25px 0; border: 1px solid #bbf7d0;">
-                                <h3 style="color: #15803d; margin: 0 0 15px 0; font-size: 18px;">📊 System Status</h3>
-                                <p style="color: #16a34a; margin: 0; font-size: 16px; line-height: 1.6;">
-                                    This notification was automatically generated. Please process this request promptly to maintain excellent customer service standards.
-                                </p>
-                            </div>
-                            
-                            <p style="font-size: 16px; color: #475569; margin: 30px 0 0 0; line-height: 1.6;">
-                                Thank you for your attention to this matter. Your prompt response helps us provide exceptional service to our clients.
-                            </p>
+                        <td style="padding: 20px; text-align: center; background-color: #2563eb; color: white; border-radius: 8px 8px 0 0;">
+                            <h1 style="margin: 0; font-size: 24px;">New Booking Request</h1>
                         </td>
                     </tr>
                     
-                    ${EmailTemplates.generateFooter(
-                        '#1e3a8a',
-                        { light: '#dbeafe', accent: '#a5b4fc', border: '#3730a3' },
-                        'Tanish Physio Administration System'
-                    )}
+                    <tr>
+                        <td style="padding: 30px;">
+                            <h2 style="color: #333; margin-top: 0;">Hello,</h2>
+                            
+                            <p>You have received a new booking request:</p>
+
+                            <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                                <p><strong>Client Name:</strong> ${data.clientName || 'N/A'}</p>
+                                <p><strong>Service:</strong> ${data.serviceName || 'N/A'}</p>
+                                <p><strong>Date:</strong> ${data.date || 'N/A'}</p>
+                                <p><strong>Time:</strong> ${data.time || 'N/A'}</p>
+                                <p><strong>Request Time:</strong> ${new Date().toLocaleString()}</p>
+                            </div>
+                            
+                            <p>Please review this booking request and take appropriate action.</p>
+                            
+                            <div style="margin: 20px 0; text-align: center;">
+                                <a href="#" style="background-color: #2563eb; color: white; text-decoration: none; padding: 12px 25px; border-radius: 5px; display: inline-block;">View Booking Details</a>
+                            </div>
+                            
+                            <p>Thank you,</p>
+                            <p>Tanish Physio Administration</p>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td style="padding: 15px; text-align: center; background-color: #f0f0f0; color: #666; font-size: 12px; border-radius: 0 0 8px 8px;">
+                            <p style="margin: 0;">&copy; 2024 Tanish Physio. All rights reserved.</p>
+                        </td>
+                    </tr>
                 </table>
             </td>
         </tr>

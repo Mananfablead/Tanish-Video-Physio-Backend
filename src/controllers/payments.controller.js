@@ -561,20 +561,18 @@ const verifyPayment = async (req, res, next) => {
                         );
 
                         // Send payment received notification to admin
-                        const admins = await User.find({ role: 'admin' }).select('email phone name');
-                        for (const admin of admins) {
-                            await NotificationService.sendNotification(
-                                { email: admin.email, phone: admin.phone },
-                                'payment_received',
-                                {
-                                    amount: payment.amount,
-                                    serviceName: service?.name || 'Service',
-                                    transactionId: paymentId,
-                                    orderId: orderId,
-                                    clientName: user.name
-                                }
-                            );
-                        }
+                        // The notification service will handle getting admin contact from credentials/profile
+                        await NotificationService.sendNotification(
+                            { email: 'placeholder', phone: 'placeholder' }, // Will be replaced by notification service
+                            'payment_received',
+                            {
+                                amount: payment.amount,
+                                serviceName: service?.name || 'Service',
+                                transactionId: paymentId,
+                                orderId: orderId,
+                                clientName: user.name
+                            }
+                        );
                     }
                 } catch (notificationError) {
                     console.error('Error sending payment notifications:', notificationError);
@@ -1229,20 +1227,19 @@ const handleWebhook = async (req, res) => {
                             );
 
                             // Send payment received notification to admin
-                            const admins = await User.find({ role: 'admin' }).select('email phone name');
-                            for (const admin of admins) {
-                                await NotificationService.sendNotification(
-                                    { email: admin.email, phone: admin.phone },
-                                    'payment_received',
-                                    {
-                                        amount: payment.amount,
-                                        serviceName: service?.name || 'Service',
-                                        transactionId: paymentId,
-                                        orderId: orderId,
-                                        clientName: user.name
-                                    }
-                                );
-                            }
+                            // Send payment received notification to admin
+                            // The notification service will handle getting admin contact from credentials/profile
+                            await NotificationService.sendNotification(
+                                { email: 'placeholder', phone: 'placeholder' }, // Will be replaced by notification service
+                                'payment_received',
+                                {
+                                    amount: payment.amount,
+                                    serviceName: service?.name || 'Service',
+                                    transactionId: paymentId,
+                                    orderId: orderId,
+                                    clientName: user.name
+                                }
+                            );
                         }
                     } catch (notificationError) {
                         console.error('Error sending payment notifications:', notificationError);

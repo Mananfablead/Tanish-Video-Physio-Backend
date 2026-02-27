@@ -1,13 +1,14 @@
 // Notification Service - WhatsApp & Email Integration (Modified)
 // Works with existing notification system
 // Uses credentials from database instead of environment variables
-// Removed payment_received and new_booking notifications as requested
+// Removed payment_received notifications as requested, new_booking notifications are active
 
 const nodemailer = require('nodemailer');
 const axios = require('axios');
 const EmailTemplates = require('../templates/emailTemplates');
 const SessionReminderTemplates = require('../templates/sessionReminderTemplates');
 const { getWhatsAppCredentials, getEmailCredentials } = require('../utils/credentialsManager');
+const Credentials = require('../models/Credentials.model');
 const { validateWhatsAppToken, addCountryCode } = require('../utils/whatsapp.utils');
 const User = require('../models/User.model'); // Import User model for admin profile
 
@@ -133,6 +134,23 @@ class NotificationService {
             ]
         },
 
+        new_booking: {
+            name: 'new_booking_request',
+            language: 'en',
+            components: [
+                {
+                    type: 'body',
+                    parameters: [
+                        { type: 'text', text: '{{1}}' },  // Patient Name
+                        { type: 'text', text: '{{2}}' },  // Phone
+                        { type: 'text', text: '{{3}}' },  // Service Name
+                        { type: 'text', text: '{{4}}' },  // Date
+                        { type: 'text', text: '{{5}}' }   // Time
+                    ]
+                }
+            ]
+        },
+
         payment_received: {
             name: 'payment_received',
             language: 'en',
@@ -176,15 +194,6 @@ class NotificationService {
                 const serviceName = data.serviceName || 'Physiotherapy Session';
                 const date = data.date || 'TBD';
                 const time = data.time || 'TBD';
-
-                console.log('📋 Booking Confirmation Data:', {
-                    clientName,
-                    serviceName,
-                    date,
-                    time,
-                    originalData: data,
-                    parameterCount: 4
-                });
 
                 // Ensure we provide exactly 4 parameters as expected by the template
                 preparedTemplate.components = [
@@ -328,9 +337,46 @@ class NotificationService {
                     }
                 ];
                 break;
+
+            case 'new_booking':
+                preparedTemplate.components = [
+                    {
+                        type: 'body',
+                        parameters: [
+                            { type: 'text', text: data.clientName || data.patientName || 'Patient' },  // Patient Name
+                            { type: 'text', text: data.phone || 'N/A' },  // Phone
+                            { type: 'text', text: data.serviceName || 'Service' },  // Service Name
+                            { type: 'text', text: data.date || 'N/A' },  // Date
+                            { type: 'text', text: data.time || 'N/A' }   // Time
+                        ]
+                    }
+                ];
+                break;
         }
 
         return preparedTemplate;
+    }
+
+    // Get admin email from credentials
+    static async getAdminEmail() {
+        try {
+            const emailCreds = await getEmailCredentials();
+            return emailCreds?.adminEmail || null;
+        } catch (error) {
+            console.error('Error getting admin email from credentials:', error);
+            return null;
+        }
+    }
+
+    // Get admin phone from credentials
+    static async getAdminPhone() {
+        try {
+            const emailCreds = await getEmailCredentials();
+            return emailCreds?.adminPhone || null;
+        } catch (error) {
+            console.error('Error getting admin phone from credentials:', error);
+            return null;
+        }
     }
 
     constructor() {
@@ -433,7 +479,7 @@ class NotificationService {
                 }
             }
 
-            // Initialize notification templates (without payment_received and new_booking)
+            // Initialize notification templates (without payment_received only, new_booking added)
             this.templates = {
                 // User notifications
                 welcome_message: {
@@ -449,8 +495,7 @@ class NotificationService {
                     email: {
                         subject: 'Booking Confirmed - Tanish Physio',
                         template: EmailTemplates.bookingConfirmed
-                    },
-                    whatsapp: 'booking_confirmation'
+                    }
                 },
 
                 booking_cancelled: {
@@ -485,13 +530,13 @@ class NotificationService {
                     whatsapp: 'session_reminder'
                 },
 
-                // Admin notifications (without payment_received and new_booking)
+                // Admin notifications (without payment_received)
                 new_booking: {
                     email: {
                         subject: 'New Booking Request - Admin',
                         template: EmailTemplates.adminNewBooking
                     },
-                    whatsapp: 'new_booking'
+                    whatsapp: 'new_booking_request'
                 },
 
                 upcoming_session: {
@@ -528,6 +573,20 @@ class NotificationService {
                 whatsapp: null
             };
 
+            // For admin notifications, get admin email from credentials instead of recipient
+            const isAdminNotification = ['new_booking', 'upcoming_session'].includes(type);
+
+            if (isAdminNotification) {
+                // Get admin email from credentials
+                const adminEmail = await NotificationService.getAdminEmail();
+                if (adminEmail) {
+                    recipient.email = adminEmail;
+                    console.log('📧 Using admin email from credentials:', adminEmail);
+                } else {
+                    console.warn('⚠️ No admin email found in credentials, using recipient email:', recipient.email);
+                }
+            }
+
             // Send email if configured
             if (this.emailEnabled && template.email) {
                 results.email = await this.sendEmail(recipient.email, template.email, data);
@@ -535,24 +594,43 @@ class NotificationService {
 
             // Send WhatsApp if configured
             if (this.whatsappEnabled && template.whatsapp) {
-                // Get admin phone number from admin user profile instead of CMS Contact
-                const adminUser = await User.findOne({ role: 'admin' }).select('phone');
-                if (adminUser && adminUser.phone) {
+                let recipientPhone = null;
+
+                // Determine recipient based on notification type
+                // For user-specific notifications, use the user's phone from recipient
+                // For admin notifications, get admin's phone from user profile
+                const userSpecificTemplates = ['welcome_message', 'booking_confirmation', 'booking_cancelled', 'session_reminder', 'session_reminder_24h', 'session_reminder_1h', 'appointment_rescheduled', 'payment_successful', 'payment_reminder'];
+
+                if (userSpecificTemplates.includes(template.whatsapp)) {
+                    // Use user's phone from the recipient parameter
+                    recipientPhone = recipient.phone;
+                } else {
+                    // For admin notifications, get admin phone from user profile (not credentials)
+                    const adminUser = await User.findOne({ role: 'admin' }).select('phone');
+                    if (adminUser && adminUser.phone) {
+                        recipientPhone = adminUser.phone;
+                        console.log('📱 Using admin phone from user profile:', adminUser.phone);
+                    } else {
+                        console.warn('⚠️ No admin phone found in user profile');
+                    }
+                }
+
+                if (recipientPhone) {
                     // Log the data being sent to the template
-                    console.log('📤 Sending WhatsApp template to admin:', {
+                    console.log('📤 Sending WhatsApp template:', {
                         templateName: template.whatsapp,
-                        recipientPhone: adminUser.phone,
+                        recipientPhone: recipientPhone,
                         dataKeys: Object.keys(data || {}),
                         data: data
                     });
 
                     results.whatsapp = await this.sendWhatsAppTemplate(
-                        adminUser.phone,
+                        recipientPhone,
                         template.whatsapp,
                         data
                     );
                 } else {
-                    console.warn('Admin phone number not configured in admin profile');
+                    console.warn(`No phone number available for WhatsApp template: ${template.whatsapp}`);
                 }
             }
 
@@ -609,11 +687,12 @@ class NotificationService {
             let subject;
 
             if (typeof template === 'string') {
-                // Map template names to EmailTemplates functions (without payment_received and new_booking)
+                // Map template names to EmailTemplates functions (without payment_received, new_booking template added)
                 const templateMap = {
                     'welcome_message': EmailTemplates.welcome,
                     'booking_confirmation': EmailTemplates.bookingConfirmed,
                     'booking_cancelled': EmailTemplates.bookingCancelled,
+                    'new_booking': EmailTemplates.adminNewBooking,  // Added for admin notifications
                     /* 'payment_reminder': EmailTemplates.paymentReminder, */
                     /* 'payment_successful': EmailTemplates.paymentSuccess, */
                     'session_reminder': EmailTemplates.sessionReminder,

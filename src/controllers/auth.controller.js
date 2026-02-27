@@ -4,6 +4,7 @@ const SubscriptionPlan = require('../models/SubscriptionPlan.model');
 const Booking = require('../models/Booking.model');
 const Session = require('../models/Session.model');
 const { generateToken } = require('../config/jwt');
+const { refreshTokens } = require('../services/jwt.service');
 const { hashPassword, comparePassword } = require('../utils/auth.utils');
 const ApiResponse = require('../utils/apiResponse');
 const crypto = require('crypto');
@@ -176,6 +177,57 @@ const logout = async (req, res, next) => {
     try {
         // In a real application, you might want to add the token to a blacklist
         res.status(200).json(ApiResponse.success(null, 'User logged out successfully'));
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Validate token and check app type compatibility
+const validateToken = async (req, res, next) => {
+    try {
+        const { appType } = req.body; // Optional: 'client' or 'admin'
+
+        // Token is already validated by authenticateToken middleware
+        // req.user is attached with userId and role
+
+        const user = await User.findById(req.user.userId);
+        if (!user) {
+            return res.status(401).json(ApiResponse.error("User not found", 401));
+        }
+
+        // Check if user is active
+        if (user.status !== 'active') {
+            return res.status(401).json(ApiResponse.error("Account is not active", 401));
+        }
+
+        // If appType is provided, validate role compatibility
+        if (appType) {
+            const validAppTypes = ['client', 'admin'];
+            if (!validAppTypes.includes(appType)) {
+                return res.status(400).json(ApiResponse.error("Invalid appType. Must be 'client' or 'admin'", 400));
+            }
+
+            // Strict role-based app type validation
+            if (appType === 'client' && user.role !== 'patient') {
+                return res.status(403).json(ApiResponse.error("Access denied. Admin users cannot access client portal", 403));
+            }
+
+            if (appType === 'admin' && user.role !== 'admin') {
+                return res.status(403).json(ApiResponse.error("Access denied. Patient users cannot access admin portal", 403));
+            }
+        }
+
+        // Token is valid and user has appropriate access
+        res.json(ApiResponse.success({
+            valid: true,
+            userId: user._id,
+            email: user.email,
+            role: user.role,
+            name: user.name,
+            appTypeCompatible: appType ? true : null,
+            message: appType ? `Token is valid for ${appType} application` : "Token is valid"
+        }, "Token validation successful"));
+
     } catch (error) {
         next(error);
     }
@@ -1111,10 +1163,41 @@ const updatePassword = async (req, res, next) => {
     }
 };
 
+// Refresh token (generate a new token with the same payload)
+const refreshToken = async (req, res, next) => {
+    try {
+        // Get token from header
+        const authHeader = req.headers["authorization"];
+        const token = authHeader && authHeader.split(" ")[1]; // Bearer TOKEN
+
+        if (!token) {
+            return res.status(401).json(ApiResponse.error("Access token required"));
+        }
+
+        try {
+            // Use the refreshTokens function from jwt.service
+            const newToken = refreshTokens(token);
+
+            return res.status(200).json(
+                ApiResponse.success(
+                    { token: newToken },
+                    "Token refreshed successfully"
+                )
+            );
+        } catch (error) {
+            return res.status(403).json(ApiResponse.error("Invalid token, please login again"));
+        }
+    } catch (error) {
+        console.error("Token refresh error:", error.message);
+        next(error);
+    }
+};
+
 module.exports = {
     register,
     login,
     logout,
+    validateToken,
     getProfile,
     getPublicProfile,
     getAllAdminProfiles,
@@ -1122,5 +1205,6 @@ module.exports = {
     createAdminUser,
     forgotPassword,
     resetPassword,
-    updatePassword
+    updatePassword,
+    refreshToken
 };
