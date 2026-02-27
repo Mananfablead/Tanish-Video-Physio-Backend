@@ -350,9 +350,9 @@ const getProfile = async (req, res, next) => {
             
             try {
                 // Count used services for this subscription (based on bookings)
+                // For subscription-based bookings, we count all bookings associated with the subscription
                 usedServices = await Booking.countDocuments({
                     subscriptionId: activeSubscription._id,
-                    serviceId: { $exists: true, $ne: null }, // Only bookings with a specific service
                     status: { $ne: "cancelled" }
                 });
             } catch (serviceError) {

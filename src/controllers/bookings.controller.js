@@ -1,4 +1,4 @@
-const Booking = require('../models/Booking.model');
+    const Booking = require('../models/Booking.model');
 const Service = require('../models/Service.model');
 const User = require('../models/User.model');
 const Payment = require('../models/Payment.model');
@@ -2082,10 +2082,44 @@ const createBookingWithSubscription = async (req, res, next) => {
 
         await booking.save();
 
-        // Don't create sessions automatically for subscription bookings
-        // Sessions will be created by admin after accepting the booking
-        console.log(`Subscription booking created with pending status. Admin will create session after acceptance.`);
-        console.log(`User has ${remainingSessions === 'unlimited' ? 'unlimited' : remainingSessions} sessions remaining.`);
+        // Create session document to track subscription usage
+        // This is essential for proper session counting in eligibility checks
+        const session = new Session({
+            subscriptionId: subscription._id,
+            bookingId: booking._id,
+            therapistId: therapist._id,
+            userId: req.user.userId,
+            date: date,
+            time: time,
+            startTime: new Date(`${date}T${time}:00`),
+            type: '1-on-1',
+            status: 'pending', // Session status matches booking status
+            notes: `Session created from subscription booking #${booking._id}`,
+            sessionId: `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        });
+        
+        // Calculate end time if service duration is available
+        if (service && service.duration) {
+            const durationMatch = service.duration.match(/(\d+)/);
+            if (durationMatch) {
+                const duration = parseInt(durationMatch[1]);
+                const endTime = new Date(session.startTime);
+                endTime.setMinutes(endTime.getMinutes() + duration);
+                session.endTime = endTime;
+                session.duration = duration;
+            }
+        }
+        
+        await session.save();
+        
+        console.log(`Subscription booking and session created successfully.`);
+        console.log(`Session ${session._id} linked to subscription ${subscription._id}`);
+        console.log(`User now has ${remainingSessions - 1} sessions remaining.`);
+        
+        // Also update the booking to link it properly with subscription
+        // This ensures both session and service counts are tracked correctly
+        booking.subscriptionId = subscription._id;
+        await booking.save();
 
         // Populate the response
         await booking.populate('serviceId', 'name price duration validity images');
@@ -2111,12 +2145,30 @@ const createBookingWithSubscription = async (req, res, next) => {
             );
         }
 
+        // Get updated counts for the response
+        const updatedUsedSessions = usedSessions + 1;
+        const updatedRemainingSessions = remainingSessions - 1;
+        
+        // Count used services for this subscription (all bookings associated with subscription)
+        const updatedUsedServices = await Booking.countDocuments({
+            $or: [
+                { subscriptionId: subscription._id },
+                { subscriptionId: subscription._id.toString() }
+            ],
+            status: { $ne: "cancelled" }
+        });
+        const updatedRemainingServices = plan.totalService ? plan.totalService - updatedUsedServices : 0;
+        
         res.status(201).json(ApiResponse.success({ 
             booking, 
+            session, // Include the created session
             subscriptionInfo: {
                 totalSessions: plan.sessions,
-                usedSessions: usedSessions,
-                remainingSessions: remainingSessions
+                usedSessions: updatedUsedSessions, // Incremented used sessions count
+                remainingSessions: updatedRemainingSessions, // Decremented remaining sessions
+                totalServices: plan.totalService || 0,
+                usedServices: updatedUsedServices, // Updated used services count
+                remainingServices: updatedRemainingServices // Updated remaining services
             }
         }, 'Session booked successfully with your subscription'));        
     } catch (error) {
