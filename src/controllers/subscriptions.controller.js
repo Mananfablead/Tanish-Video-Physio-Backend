@@ -831,12 +831,12 @@ const checkSubscriptionEligibility = async (req, res, next) => {
         });
         
         // Count used services for this subscription (based on bookings that have been created)
+        // For subscription-based bookings, we count all bookings associated with the subscription
         const usedServices = await Booking.countDocuments({
             $or: [
                 { subscriptionId: subscription._id },
                 { subscriptionId: subscription._id.toString() }
             ],
-            serviceId: { $exists: true, $ne: null },
             status: { $ne: "cancelled" }
         });
         
@@ -881,12 +881,12 @@ const checkSubscriptionEligibility = async (req, res, next) => {
             remainingSessions: remainingSessions
         });
         
-        // Calculate remaining services (affected by both session and service usage)
+        // Calculate remaining services (affected by service usage)
         let remainingServices = 0;
         if (totalServices === 'unlimited') {
             remainingServices = 'unlimited';
         } else {
-            remainingServices = Math.max(0, totalServices - totalUsed);
+            remainingServices = Math.max(0, totalServices - safeUsedServices);
         }
         
         // Log detailed information for debugging

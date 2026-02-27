@@ -12,7 +12,7 @@ const { generateToken } = require('../config/jwt');
 // Get all bookings for authenticated user
 const getAllBookings = async (req, res, next) => {
     try {
-        const bookings = await Booking.find({ 
+        const bookings = await Booking.find({
             userId: req.user.userId,
             paymentStatus: 'paid' // Only show bookings where payment has been completed
         })
@@ -66,17 +66,17 @@ const getBookingById = async (req, res, next) => {
 
         // For free consultation bookings, ensure service expiry is calculated
         const bookingObject = booking.toObject();
-        
+
         if (booking.bookingType === 'free-consultation' && !bookingObject.serviceExpiryDate) {
             // Calculate expiry date for free consultation if not already set
             const validityDays = booking.serviceValidityDays || 30; // Default to 30 days for free consultations
             // Use the scheduled date if available, otherwise fall back to purchase date
-            const baseDate = booking.scheduledDate ? 
-                new Date(`${booking.scheduledDate}T00:00:00`) : 
+            const baseDate = booking.scheduledDate ?
+                new Date(`${booking.scheduledDate}T00:00:00`) :
                 (booking.purchaseDate || booking.createdAt);
             const expiryDate = new Date(baseDate);
             expiryDate.setDate(baseDate.getDate() + validityDays);
-            
+
             bookingObject.serviceExpiryDate = expiryDate;
             bookingObject.serviceValidityDays = validityDays;
             bookingObject.isServiceExpired = new Date() > expiryDate;
@@ -141,17 +141,17 @@ const getBookingDetails = async (req, res, next) => {
 
         // For free consultation bookings, ensure service expiry is calculated
         const bookingObject = booking.toObject();
-        
+
         if (booking.bookingType === 'free-consultation' && !bookingObject.serviceExpiryDate) {
             // Calculate expiry date for free consultation if not already set
             const validityDays = booking.serviceValidityDays || 30; // Default to 30 days for free consultations
             // Use the scheduled date if available, otherwise fall back to purchase date
-            const baseDate = booking.scheduledDate ? 
-                new Date(`${booking.scheduledDate}T00:00:00`) : 
+            const baseDate = booking.scheduledDate ?
+                new Date(`${booking.scheduledDate}T00:00:00`) :
                 (booking.purchaseDate || booking.createdAt);
             const expiryDate = new Date(baseDate);
             expiryDate.setDate(baseDate.getDate() + validityDays);
-            
+
             bookingObject.serviceExpiryDate = expiryDate;
             bookingObject.serviceValidityDays = validityDays;
             bookingObject.isServiceExpired = new Date() > expiryDate;
@@ -188,11 +188,11 @@ const createBooking = async (req, res, next) => {
 
         // Check if user has an active subscription with remaining sessions
         // This allows users with active subscriptions to book services for free
-        const subscription = await Subscription.findOne({ 
-            userId: req.user.userId, 
-            status: 'active' 
+        const subscription = await Subscription.findOne({
+            userId: req.user.userId,
+            status: 'active'
         }).populate('planId');
-        
+
         let service = null;
         let serviceName = "Free Consultation";
         let amount = 0;
@@ -216,7 +216,7 @@ const createBooking = async (req, res, next) => {
                     plan = await SubscriptionPlan.findOne({ planId: subscription.planId });
                 }
             }
-            
+
             if (!plan) {
                 // No valid plan found, proceed with regular booking
                 // Validate required fields
@@ -240,14 +240,14 @@ const createBooking = async (req, res, next) => {
                     planType: typeof plan.sessions,
                     userId: req.user.userId
                 });
-            
+
                 // Check session limits - enforce actual session limit from subscription
                 // Only count actual Session documents, not Booking documents
                 const usedSessions = await Session.countDocuments({
                     subscriptionId: subscription._id,
                     status: { $ne: "cancelled" }
                 });
-                
+
                 // Get total sessions from subscription plan (consider both sessions and totalService fields)
                 // Some plans might use 'totalService' instead of 'sessions' field
                 let totalSessions = 0;
@@ -256,7 +256,7 @@ const createBooking = async (req, res, next) => {
                 } else if (plan && typeof plan.totalService === 'number') {
                     totalSessions = plan.totalService;
                 }
-                            
+
                 console.log(`Session check for subscription ${subscription._id}:`, {
                     planName: plan.name,
                     planSessions: plan.sessions,
@@ -265,16 +265,16 @@ const createBooking = async (req, res, next) => {
                     usedSessions: usedSessions,
                     remainingSessions: totalSessions - usedSessions
                 });
-                            
+
                 if (totalSessions <= 0) {
                     // No sessions in plan, proceed with regular paid booking
                     if (!serviceId) {
                         return res.status(400).json(ApiResponse.error('Service ID is required'));
                     }
-                
+
                     // Validate service exists
                     service = await Service.findById(serviceId);
-                
+
                     if (!service || service.status !== 'active') {
                         return res.status(404).json(ApiResponse.error('Service not found or not active'));
                     }
@@ -385,10 +385,10 @@ const createBooking = async (req, res, next) => {
             try {
                 // Get user details for notifications
                 const user = await User.findById(req.user.userId).select('email phone name');
-                
+
                 if (user) {
                     const notificationService = require('../services/notificationService');
-                    
+
                     // Prepare notification data
                     const notificationData = {
                         clientName: user.name,
@@ -398,7 +398,7 @@ const createBooking = async (req, res, next) => {
                         therapistName: booking.therapistName,
                         bookingId: booking._id
                     };
-                    
+
                     // Send email notification
                     if (user.email) {
                         try {
@@ -412,7 +412,7 @@ const createBooking = async (req, res, next) => {
                             console.error(`❌ Failed to send email for booking ${booking._id}:`, emailError);
                         }
                     }
-                    
+
                     // Send WhatsApp notification
                     if (user.phone) {
                         try {
@@ -532,15 +532,15 @@ async function checkTimeSlotAvailability(therapistId, date, time, timeSlot, book
         if (timeSlot) {
             // For booking type validation, we need to check if the slot duration matches the booking type
             const requestedSlot = availability.timeSlots.find(slot =>
-                slot.start === timeSlot.start && 
-                slot.end === timeSlot.end && 
+                slot.start === timeSlot.start &&
+                slot.end === timeSlot.end &&
                 slot.status !== 'booked'
             );
 
             if (!requestedSlot) {
                 return { available: false, message: 'Requested time slot is not available' };
             }
-            
+
             // Validate that the slot duration matches the expected duration for the booking type
             if (bookingType === 'free-consultation' && requestedSlot.duration !== 15) {
                 return { available: false, message: 'Free consultation requires 15-minute time slots' };
@@ -651,7 +651,7 @@ const checkSlotAvailability = async (req, res, next) => {
 
         if (availability) {
             // Check if the requested time slot exists in availability
-            const requestedSlot = availability.timeSlots.find(slot => 
+            const requestedSlot = availability.timeSlots.find(slot =>
                 slot.start === start && slot.end === end && slot.status !== 'booked'
             );
 
@@ -660,7 +660,7 @@ const checkSlotAvailability = async (req, res, next) => {
             }
         } else {
             // If no availability record exists for the date, assume slot is not available
-            return res.status(409).json(ApiResponse.error('No availability found for the selected date')); 
+            return res.status(409).json(ApiResponse.error('No availability found for the selected date'));
         }
 
         // Check if there's already a PAID booking for this therapist at the same time
@@ -675,10 +675,10 @@ const checkSlotAvailability = async (req, res, next) => {
         });
 
         if (existingPaidBooking) {
-            return res.status(409).json(ApiResponse.error('A booking already exists for this time slot')); 
+            return res.status(409).json(ApiResponse.error('A booking already exists for this time slot'));
         }
 
-        res.status(200).json(ApiResponse.success({ available: true }, 'Time slot is available')); 
+        res.status(200).json(ApiResponse.success({ available: true }, 'Time slot is available'));
     } catch (error) {
         next(error);
     }
@@ -717,24 +717,24 @@ const updateBookingWithSchedule = async (req, res, next) => {
                 updateData.scheduledTime = `${timeSlot.start}-${timeSlot.end}`;
             }
         }
-        
+
         // If status is being updated, validate permissions
         if (status) {
             if (req.user.role !== 'admin') {
                 // For regular users, allow certain status transitions
                 const allowedUserTransitions = ['pending', 'scheduled', 'cancelled'];
                 if (!allowedUserTransitions.includes(status)) {
-                    return res.status(403).json(ApiResponse.error('Users can only change status to pending, scheduled, or cancelled')); 
+                    return res.status(403).json(ApiResponse.error('Users can only change status to pending, scheduled, or cancelled'));
                 }
             }
             updateData.status = status;
         }
-        
+
         // Add coupon information if provided
         if (couponCode !== undefined) updateData.couponCode = couponCode;
         if (discountAmount !== undefined) updateData.discountAmount = discountAmount;
         if (finalAmount !== undefined) updateData.finalAmount = finalAmount;
-        
+
         // If scheduling now, update status to scheduled (unless status was already provided)
         if (scheduledDate && scheduledTime && !status) {
             updateData.status = 'scheduled';
@@ -746,22 +746,22 @@ const updateBookingWithSchedule = async (req, res, next) => {
             updateData,
             { new: true, runValidators: true }
         ).populate('serviceId', 'name price duration validity images')
-          .populate('therapistId', 'name email role profilePicture');
+            .populate('therapistId', 'name email role profilePicture');
 
         // For free consultation bookings, ensure service expiry is calculated
         if (booking.bookingType === 'free-consultation' && booking.paymentStatus === 'paid' && !booking.serviceExpiryDate) {
             // Calculate expiry date for free consultation if not already set
             const validityDays = booking.serviceValidityDays || 30; // Default to 30 days for free consultations
             // Use the scheduled date if available, otherwise fall back to purchase date
-            const baseDate = booking.scheduledDate ? 
-                new Date(`${booking.scheduledDate}T00:00:00`) : 
+            const baseDate = booking.scheduledDate ?
+                new Date(`${booking.scheduledDate}T00:00:00`) :
                 (booking.purchaseDate || booking.createdAt);
             const expiryDate = new Date(baseDate);
             expiryDate.setDate(baseDate.getDate() + validityDays);
-            
+
             booking.serviceExpiryDate = expiryDate;
             booking.serviceValidityDays = validityDays;
-            
+
             // Save the updated booking with expiry date
             await booking.save();
         }
@@ -833,9 +833,9 @@ const updateBooking = async (req, res, next) => {
                 // For regular users, allow certain status transitions
                 const allowedUserTransitions = ['pending', 'scheduled', 'cancelled'];
                 if (!allowedUserTransitions.includes(status)) {
-                    return res.status(403).json(ApiResponse.error('Users can only change status to pending, scheduled, or cancelled')); 
+                    return res.status(403).json(ApiResponse.error('Users can only change status to pending, scheduled, or cancelled'));
                 }
-                
+
                 // Ensure user can only update their own booking
                 if (!query.userId || !currentBooking.userId.equals(req.user.userId)) {
                     return res.status(403).json(ApiResponse.error('Unauthorized to change this booking status'));
@@ -858,7 +858,7 @@ const updateBooking = async (req, res, next) => {
 
         // Prepare update data
         const updateData = { date, time, notes };
-        
+
         // Add scheduling information if provided
         if (scheduledDate) updateData.scheduledDate = scheduledDate;
         if (scheduledTime) updateData.scheduledTime = scheduledTime;
@@ -869,7 +869,7 @@ const updateBooking = async (req, res, next) => {
                 updateData.scheduledTime = `${timeSlot.start}-${timeSlot.end}`;
             }
         }
-        
+
         // Add coupon information if provided
         if (couponCode !== undefined) updateData.couponCode = couponCode;
         if (discountAmount !== undefined) updateData.discountAmount = discountAmount;
@@ -888,13 +888,13 @@ const updateBooking = async (req, res, next) => {
                 if (currentBooking.bookingType === 'free-consultation') {
                     // For free consultations, create a session immediately
                     const Session = require('../models/Session.model');
-                    
+
                     // Calculate session time based on the booking time slot
-                    const sessionStartTime = currentBooking.timeSlot ? 
+                    const sessionStartTime = currentBooking.timeSlot ?
                         new Date(`${currentBooking.date}T${currentBooking.timeSlot.start}:00`) :
                         new Date(`${currentBooking.date}T${currentBooking.scheduledTime || currentBooking.time}:00`);
                     const sessionEndTime = new Date(sessionStartTime.getTime() + 15 * 60000); // 15 minutes
-                    
+
                     const sessionData = {
                         bookingId: currentBooking._id,
                         therapistId: currentBooking.therapistId,
@@ -907,18 +907,18 @@ const updateBooking = async (req, res, next) => {
                         status: "scheduled", // Schedule the session immediately
                         duration: 15,
                     };
-                    
+
                     await Session.create(sessionData);
-                    
+
                     // Calculate expiry date for free consultation
                     // Use the scheduled date if available, otherwise fall back to purchase date
-                    const baseDate = currentBooking.scheduledDate ? 
-                        new Date(`${currentBooking.scheduledDate}T00:00:00`) : 
+                    const baseDate = currentBooking.scheduledDate ?
+                        new Date(`${currentBooking.scheduledDate}T00:00:00`) :
                         (currentBooking.purchaseDate || currentBooking.createdAt);
                     const expiryDate = new Date(baseDate);
                     expiryDate.setDate(baseDate.getDate() + (currentBooking.serviceValidityDays || 30));
                     updateData.serviceExpiryDate = expiryDate;
-                    
+
                     // Update availability to mark slot as booked
                     const Availability = require('../models/Availability.model');
                     if (currentBooking.timeSlot && currentBooking.timeSlot.start && currentBooking.timeSlot.end) {
@@ -983,15 +983,15 @@ const updateBooking = async (req, res, next) => {
             // Calculate expiry date for free consultation if not already set
             const validityDays = booking.serviceValidityDays || 30; // Default to 30 days for free consultations
             // Use the scheduled date if available, otherwise fall back to purchase date
-            const baseDate = booking.scheduledDate ? 
-                new Date(`${booking.scheduledDate}T00:00:00`) : 
+            const baseDate = booking.scheduledDate ?
+                new Date(`${booking.scheduledDate}T00:00:00`) :
                 (booking.purchaseDate || booking.createdAt);
             const expiryDate = new Date(baseDate);
             expiryDate.setDate(baseDate.getDate() + validityDays);
-            
+
             booking.serviceExpiryDate = expiryDate;
             booking.serviceValidityDays = validityDays;
-            
+
             // Save the updated booking with expiry date
             await booking.save();
         }
@@ -1108,8 +1108,8 @@ const updateBookingStatus = async (req, res, next) => {
             updateData,
             { new: true, runValidators: true }
         )
-        .populate('serviceId', 'name price duration validity images')
-        .populate('therapistId', 'name email role profilePicture');
+            .populate('serviceId', 'name price duration validity images')
+            .populate('therapistId', 'name email role profilePicture');
 
         if (!booking) {
             return res.status(404).json(ApiResponse.error('Booking not found or unauthorized'));
@@ -1285,7 +1285,7 @@ const deleteBooking = async (req, res, next) => {
     try {
         // Get coupon information if provided
         const { couponCode, discountAmount, finalAmount } = req.body;
-        
+
         // Build query based on user role
         let query;
         if (req.user.role === 'admin') {
@@ -1301,7 +1301,7 @@ const deleteBooking = async (req, res, next) => {
         if (couponCode !== undefined) updateData.couponCode = couponCode;
         if (discountAmount !== undefined) updateData.discountAmount = discountAmount;
         if (finalAmount !== undefined) updateData.finalAmount = finalAmount;
-        
+
         const booking = await Booking.findOneAndUpdate(
             query,
             updateData,
@@ -1427,7 +1427,7 @@ const getAllBookingsForAdmin = async (req, res, next) => {
         } else {
             query.paymentStatus = paymentStatus; // Filter by specific paymentStatus if provided
         }
-        
+
         if (status) query.status = status;
         if (req.query.paymentStatus) query.paymentStatus = req.query.paymentStatus; // Override with specific paymentStatus if provided
 
@@ -1656,7 +1656,7 @@ const createGuestBooking = async (req, res, next) => {
         if (bookingType === 'free-consultation') {
             try {
                 const notificationService = require('../services/notificationService');
-                
+
                 // Prepare notification data
                 const notificationData = {
                     clientName: clientName,
@@ -1666,7 +1666,7 @@ const createGuestBooking = async (req, res, next) => {
                     therapistName: booking.therapistName,
                     bookingId: booking._id
                 };
-                
+
                 // Send email notification
                 if (clientEmail) {
                     try {
@@ -1680,7 +1680,7 @@ const createGuestBooking = async (req, res, next) => {
                         console.error(`❌ Failed to send email for guest booking ${booking._id}:`, emailError);
                     }
                 }
-                
+
                 // Send WhatsApp notification
                 if (clientPhone) {
                     try {
@@ -1761,8 +1761,8 @@ async function calculateServiceExpiryForBooking(bookingId) {
             // Expiration should be calculated from the scheduled date, not purchase date
             const validityDays = booking.serviceValidityDays || 30;
             // Use the scheduled date if available, otherwise fall back to purchase date
-            const baseDate = booking.scheduledDate ? 
-                new Date(`${booking.scheduledDate}T00:00:00`) : 
+            const baseDate = booking.scheduledDate ?
+                new Date(`${booking.scheduledDate}T00:00:00`) :
                 (booking.purchaseDate || booking.createdAt);
             const expiryDate = new Date(baseDate);
             expiryDate.setDate(baseDate.getDate() + validityDays);
@@ -1777,8 +1777,8 @@ async function calculateServiceExpiryForBooking(bookingId) {
             if (service && service.validity > 0) {
                 // Calculate expiry date based on service validity
                 // Use the scheduled date if available, otherwise fall back to purchase date
-                const baseDate = booking.scheduledDate ? 
-                    new Date(`${booking.scheduledDate}T00:00:00`) : 
+                const baseDate = booking.scheduledDate ?
+                    new Date(`${booking.scheduledDate}T00:00:00`) :
                     (booking.purchaseDate || booking.createdAt);
                 const expiryDate = new Date(baseDate);
                 expiryDate.setDate(baseDate.getDate() + service.validity);
@@ -1919,19 +1919,19 @@ const createBookingWithSubscription = async (req, res, next) => {
         const { serviceId, date, time, notes, clientName, scheduleType, scheduledDate, scheduledTime, timeSlot } = req.body;
 
         // Check if user has an active subscription with remaining sessions
-        const subscription = await Subscription.findOne({ 
-            userId: req.user.userId, 
-            status: 'active' 
+        const subscription = await Subscription.findOne({
+            userId: req.user.userId,
+            status: 'active'
         }).populate('planId');
-        
+
         if (!subscription) {
             return res.status(400).json(ApiResponse.error('No active subscription found'));
         }
-        
+
         if (subscription.isExpired) {
             return res.status(400).json(ApiResponse.error('Subscription has expired'));
         }
-        
+
         // Fetch the plan data manually since planId might be a string field
         let plan = null;
         if (subscription.planId) {
@@ -1945,12 +1945,12 @@ const createBookingWithSubscription = async (req, res, next) => {
                 plan = await SubscriptionPlan.findOne({ planId: subscription.planId });
             }
         }
-        
+
         if (!plan) {
             console.error(`Plan not found for subscription ${subscription._id}`);
             return res.status(400).json(ApiResponse.error('Subscription plan not found'));
         }
-        
+
         console.log(`Booking with subscription check:`, {
             subscriptionId: subscription._id,
             planName: plan.name,
@@ -1958,14 +1958,14 @@ const createBookingWithSubscription = async (req, res, next) => {
             planType: typeof plan.sessions,
             userId: req.user.userId
         });
-        
+
         // Check session limits - enforce actual session limit from subscription
         // Only count actual Session documents, not Booking documents
         const usedSessions = await Session.countDocuments({
             subscriptionId: subscription._id,
             status: { $ne: "cancelled" }
         });
-        
+
         // Get total sessions from subscription plan (consider both sessions and totalService fields)
         // Some plans might use 'totalService' instead of 'sessions' field
         let totalSessions = 0;
@@ -1975,7 +1975,7 @@ const createBookingWithSubscription = async (req, res, next) => {
             totalSessions = plan.totalService;
         }
         const remainingSessions = totalSessions - usedSessions;
-        
+
         console.log(`Session check for subscription ${subscription._id}:`, {
             planName: plan.name,
             planSessions: plan.sessions,
@@ -1984,7 +1984,7 @@ const createBookingWithSubscription = async (req, res, next) => {
             usedSessions: usedSessions,
             remainingSessions: remainingSessions
         });
-        
+
         if (totalSessions <= 0) {
             console.log(`NO_SESSIONS_IN_PLAN triggered:`, {
                 planSessions: plan.sessions,
@@ -1997,7 +1997,7 @@ const createBookingWithSubscription = async (req, res, next) => {
                 'NO_SESSIONS_IN_PLAN'
             ));
         }
-        
+
         if (remainingSessions <= 0) {
             return res.status(400).json(ApiResponse.error(
                 `Session limit reached. You have used all ${totalSessions} sessions in your plan.`
@@ -2007,14 +2007,14 @@ const createBookingWithSubscription = async (req, res, next) => {
         // Validate service exists
         let service = null;
         let serviceName = "Session with Subscription";
-        
+
         if (serviceId) {
             service = await Service.findById(serviceId);
-            
+
             if (!service || service.status !== 'active') {
                 return res.status(404).json(ApiResponse.error('Service not found or not active'));
             }
-            
+
             serviceName = service.name;
         }
 
@@ -2079,10 +2079,13 @@ const createBookingWithSubscription = async (req, res, next) => {
             booking, 
             subscriptionInfo: {
                 totalSessions: plan.sessions,
-                usedSessions: usedSessions,
-                remainingSessions: remainingSessions
+                usedSessions: updatedUsedSessions, // Incremented used sessions count
+                remainingSessions: updatedRemainingSessions, // Decremented remaining sessions
+                totalServices: plan.totalService || 0,
+                usedServices: updatedUsedServices, // Updated used services count
+                remainingServices: updatedRemainingServices // Updated remaining services
             }
-        }, 'Session booked successfully with your subscription'));        
+        }, 'Session booked successfully with your subscription'));
     } catch (error) {
         next(error);
     }
@@ -2092,17 +2095,17 @@ const createBookingWithSubscription = async (req, res, next) => {
 const checkSubscriptionBookingEligibility = async (req, res, next) => {
     try {
         const { serviceId } = req.query;
-        
+
         if (!req.user || !req.user.userId) {
             return res.status(401).json(ApiResponse.error('Authentication required'));
         }
-        
+
         // Check if user has an active subscription
-        const subscription = await Subscription.findOne({ 
-            userId: req.user.userId, 
-            status: 'active' 
+        const subscription = await Subscription.findOne({
+            userId: req.user.userId,
+            status: 'active'
         }).populate('planId');
-        
+
         if (!subscription) {
             return res.status(200).json(ApiResponse.success({
                 eligible: false,
@@ -2110,7 +2113,7 @@ const checkSubscriptionBookingEligibility = async (req, res, next) => {
                 message: 'You need an active subscription to book sessions'
             }));
         }
-        
+
         if (subscription.isExpired) {
             return res.status(200).json(ApiResponse.success({
                 eligible: false,
@@ -2118,21 +2121,21 @@ const checkSubscriptionBookingEligibility = async (req, res, next) => {
                 message: 'Your subscription has expired'
             }));
         }
-        
+
         const plan = subscription.planId;
-        
+
         // Check session limits (this is the primary constraint)
         let usedSessions = 0;
         let remainingSessions = 0;
-        
+
         if (plan && plan.sessions > 0) {
             usedSessions = await Session.countDocuments({
                 subscriptionId: subscription._id,
                 status: { $ne: "cancelled" }
             });
-            
+
             remainingSessions = plan.sessions - usedSessions;
-            
+
             if (remainingSessions <= 0) {
                 return res.status(200).json(ApiResponse.success({
                     eligible: false,
@@ -2147,7 +2150,7 @@ const checkSubscriptionBookingEligibility = async (req, res, next) => {
             // Unlimited sessions
             remainingSessions = 'unlimited';
         }
-        
+
         // Check if service exists and is active
         let service = null;
         if (serviceId) {
@@ -2160,7 +2163,7 @@ const checkSubscriptionBookingEligibility = async (req, res, next) => {
                 }));
             }
         }
-        
+
         res.status(200).json(ApiResponse.success({
             eligible: true,
             subscription: {
@@ -2181,7 +2184,7 @@ const checkSubscriptionBookingEligibility = async (req, res, next) => {
             } : null,
             message: `You can book this service. You have ${remainingSessions === 'unlimited' ? 'unlimited' : remainingSessions} sessions remaining.`
         }));
-        
+
     } catch (error) {
         next(error);
     }
