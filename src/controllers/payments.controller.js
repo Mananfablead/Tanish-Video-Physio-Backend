@@ -485,7 +485,7 @@ const verifyPayment = async (req, res, next) => {
                                 failureReason: 'Time slot already booked by another user'
                             }
                         );
-                        
+
                         return res.status(409).json(
                             ApiResponse.error('Time slot already booked by another user')
                         );
@@ -837,7 +837,7 @@ const verifyGuestPayment = async (req, res, next) => {
                 });
 
                 if (!existingUser) {
-                    // Create the user account with temporary password
+                    // Create the user account with temporary passwords
                     tempPassword = Math.random().toString(36).slice(-8) + 'Temp1!';
 
                     const newUser = new User({
@@ -930,7 +930,7 @@ const verifyGuestPayment = async (req, res, next) => {
                                 failureReason: 'Time slot already booked by another user'
                             }
                         );
-                        
+
                         return res.status(409).json(
                             ApiResponse.error('Time slot already booked by another user')
                         );
@@ -1421,7 +1421,7 @@ const createSubscriptionOrder = async (req, res, next) => {
         const sanitizedPlanId = planId.replace(/[^a-zA-Z0-9]/g, '_');
         console.log('📋 Original planId:', planId);
         console.log('📋 Sanitized planId:', sanitizedPlanId);
-        
+
         // Create receipt with max 40 characters
         let receipt = `sub_${sanitizedPlanId}_${req.user.userId}`;
         if (receipt.length > 40) {
@@ -1430,7 +1430,7 @@ const createSubscriptionOrder = async (req, res, next) => {
             const truncatedPlanId = sanitizedPlanId.substring(0, maxPlanIdLength);
             receipt = `sub_${truncatedPlanId}_${req.user.userId}`;
         }
-        
+
         const options = {
             amount: validatedAmount * 100, // Razorpay expects amount in paise
             currency: currency,
@@ -1784,7 +1784,7 @@ const verifySubscriptionPayment = async (req, res, next) => {
                                     failureReason: 'Time slot already booked by another user'
                                 }
                             );
-                            
+
                             return res.status(409).json(
                                 ApiResponse.error('Time slot already booked by another user')
                             );
@@ -1826,7 +1826,7 @@ const verifySubscriptionPayment = async (req, res, next) => {
             try {
                 // Get user information for notification
                 const user = await User.findById(subscription.userId).select('email phone name');
-            
+
                 if (user) {
                     // DISABLED: Send payment success notification to user (email and WhatsApp)
                     /*
@@ -1842,7 +1842,7 @@ const verifySubscriptionPayment = async (req, res, next) => {
                         }
                     );
                     */
-            
+
                     // DISABLED: Send payment received notification to admin
                     /*
                     const admins = await User.find({ role: 'admin' }).select('email phone name');
@@ -1879,7 +1879,7 @@ const verifySubscriptionPayment = async (req, res, next) => {
                     scheduledDate: { $exists: true, $ne: null },
                     scheduledTime: { $exists: true, $ne: null }
                 }).sort({ createdAt: -1 });
-                
+
                 // Process all pending bookings to create sessions
                 for (const pendingBooking of pendingBookings) {
                     if (pendingBooking.scheduledDate && pendingBooking.scheduledTime) {
