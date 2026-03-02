@@ -107,35 +107,35 @@ if (config.NODE_ENV === 'development') {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// WWW to non-WWW redirect (301 permanent redirect)
-// This helps with SEO by having a single canonical domain
-app.use((req, res, next) => {
-    const host = req.get('Host');
+// // WWW to non-WWW redirect (301 permanent redirect)
+// // This helps with SEO by having a single canonical domain
+// app.use((req, res, next) => {
+//     const host = req.get('Host');
 
-    // Check if request is coming to www version
-    if (host && host.startsWith('www.')) {
-        const newHost = host.replace('www.', '');
-        const newUrl = `${req.protocol}://${newHost}${req.originalUrl}`;
+//     // Check if request is coming to www version
+//     if (host && host.startsWith('www.')) {
+//         const newHost = host.replace('www.', '');
+//         const newUrl = `${req.protocol}://${newHost}${req.originalUrl}`;
 
-        console.log(`Redirecting from ${host} to ${newHost}`);
+//         console.log(`Redirecting from ${host} to ${newHost}`);
 
-        // Send 301 redirect
-        return res.redirect(301, newUrl);
-    }
+//         // Send 301 redirect
+//         return res.redirect(301, newUrl);
+//     }
 
-    // For non-www versions, or if already on correct host, continue
-    next();
-});
+//     // For non-www versions, or if already on correct host, continue
+//     next();
+// });
 
-// Enforce HTTPS redirect (301)
-app.use((req, res, next) => {
-    if (config.NODE_ENV === 'production' && !req.secure && req.get('X-Forwarded-Proto') !== 'https') {
-        const httpsUrl = `https://${req.get('Host')}${req.url}`;
-        console.log(`Redirecting to HTTPS: ${httpsUrl}`);
-        return res.redirect(301, httpsUrl);
-    }
-    next();
-});
+// // Enforce HTTPS redirect (301)
+// app.use((req, res, next) => {
+//     if (config.NODE_ENV === 'production' && !req.secure && req.get('X-Forwarded-Proto') !== 'https') {
+//         const httpsUrl = `https://${req.get('Host')}${req.url}`;
+//         console.log(`Redirecting to HTTPS: ${httpsUrl}`);
+//         return res.redirect(301, httpsUrl);
+//     }
+//     next();
+// });
 
 // Static file serving (must be before 404 handler)
 const UPLOADS_DIR = config.UPLOAD_PATH || path.join(__dirname, '..', 'public', 'uploads');
