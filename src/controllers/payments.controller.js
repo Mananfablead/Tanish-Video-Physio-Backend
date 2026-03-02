@@ -1302,6 +1302,39 @@ const handleWebhook = async (req, res) => {
                     // Send welcome email with login credentials to the user
                     await sendWelcomeEmailWithCredentials(subscription.guestEmail, subscription.guestName, subscription.guestEmail, tempPassword);
                 }
+
+                // Send plan booking confirmation notification for guest user
+                try {
+                    const guestUser = await User.findOne({ email: subscription.guestEmail });
+                    if (guestUser && guestUser.status === 'active') {
+                        const NotificationService = require('../services/notificationService');
+                        const notificationService = new NotificationService();
+
+                        await notificationService.sendNotification(
+                            {
+                                email: guestUser.email,
+                                phone: guestUser.phone ? `+91${guestUser.phone}` : null,
+                                name: guestUser.name
+                            },
+                            'plan_booking_confirmation',
+                            {
+                                clientName: guestUser.name,
+                                planName: updatedSubscription.planName,
+                                serviceName: 'Subscription Plan',
+                                date: updatedSubscription.startDate ? updatedSubscription.startDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                                time: 'Flexible',
+                                sessions: 'Multiple sessions included in subscription'
+                            }
+                        );
+
+                        console.log(`✅ Plan booking confirmation notification sent to guest user ${guestUser.email}`);
+                    } else {
+                        console.log(`⚠️ Guest user ${subscription.guestEmail} is not active or not found, skipping notification`);
+                    }
+                } catch (notificationError) {
+                    console.error('Error sending plan booking notification to guest user:', notificationError);
+                    // Don't fail the payment process if notifications fail
+                }
             }
         } else if (event === 'payment.failed') {
             // Payment failed
@@ -1721,6 +1754,41 @@ const verifySubscriptionPayment = async (req, res, next) => {
             // Activate the subscription with calculated end date
             const updatedSubscription = await activateSubscription(subscription._id);
 
+            // Send plan booking confirmation notification
+            try {
+                const User = require('../models/User.model');
+                const user = await User.findById(userId);
+
+                if (user && user.status === 'active') {
+                    const { NotificationService } = require('../services/notificationService');
+                    const notificationService = new NotificationService();
+
+                    await notificationService.sendNotification(
+                        {
+                            email: user.email,
+                            phone: user.phone ? `+91${user.phone}` : null,
+                            name: user.name
+                        },
+                        'plan_booking_confirmation',
+                        {
+                            clientName: user.name,
+                            planName: updatedSubscription.planName,
+                            serviceName: 'Subscription Plan',
+                            date: updatedSubscription.startDate ? updatedSubscription.startDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                            time: 'Flexible',
+                            sessions: 'Multiple sessions included in subscription'
+                        }
+                    );
+
+                    console.log(`✅ Plan booking confirmation notification sent to ${user.email}`);
+                } else {
+                    console.log(`⚠️ User ${userId} is not active or not found, skipping notification`);
+                }
+            } catch (notificationError) {
+                console.error('Error sending plan booking notification:', notificationError);
+                // Don't fail the payment process if notifications fail
+            }
+
             // If subscription has a therapist assigned, create a booking record
             if (subscription.therapistId) {
                 try {
@@ -1737,13 +1805,17 @@ const verifySubscriptionPayment = async (req, res, next) => {
                         therapistName = therapist ? therapist.name : 'Assigned Therapist';
                     }
 
+                    // Get user information for clientName
+                    const bookingUser = await User.findById(subscription.userId).select('name');
+                    const clientName = bookingUser ? bookingUser.name : 'Valued Customer';
+
                     const booking = new Booking({
                         serviceId: null, // Don't set serviceId for subscription bookings
                         serviceName: subscription.planName,
                         therapistId: subscription.therapistId,
                         therapistName: therapistName,
                         userId: subscription.userId,
-                        clientName: user?.name || '',
+                        clientName: clientName,
                         date: bookingDate,
                         time: bookingTime,
                         scheduleType: subscription.scheduleType || 'now', // Set schedule type based on subscription
@@ -1754,6 +1826,7 @@ const verifySubscriptionPayment = async (req, res, next) => {
                         purchaseDate: new Date(),
                         serviceExpiryDate: updatedSubscription.endDate,
                         serviceValidityDays: 30, // Default, can be adjusted based on plan
+                        bookingType: 'subscription-covered', // Mark as subscription covered booking
                         isServiceExpired: false,
                         createdAt: new Date(),
                         updatedAt: new Date()
@@ -1761,6 +1834,39 @@ const verifySubscriptionPayment = async (req, res, next) => {
 
                     await booking.save();
                     console.log(`✅ Booking created for subscription with therapist: ${subscription.therapistId}, Booking ID: ${booking._id}`);
+
+                    // Send plan booking confirmation notification for subscription purchase
+                    try {
+                        const User = require('../models/User.model');
+                        const user = await User.findById(subscription.userId).select('email phone name');
+
+                        if (user) {
+                            const { NotificationService } = require('../services/notificationService');
+                            const notificationService = new NotificationService();
+
+                            // Wait for notification service to initialize
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+
+                            const notificationData = {
+                                clientName: user.name,
+                                planName: subscription.planName,
+                                serviceName: subscription.planName,
+                                date: bookingDate,
+                                time: bookingTime
+                            };
+
+                            await notificationService.sendNotification(
+                                { email: user.email, phone: user.phone },
+                                'plan_booking_confirmation',
+                                notificationData
+                            );
+
+                            console.log(`✅ Plan booking confirmation notification sent for subscription purchase to ${user.email}`);
+                        }
+                    } catch (notificationError) {
+                        console.error('❌ Error sending plan booking confirmation notification for subscription purchase:', notificationError);
+                        // Don't fail the booking creation if notification fails
+                    }
 
                     // If the subscription has scheduled date and time slot, update the availability status to 'booked'
                     if (subscription.scheduledDate && subscription.timeSlot && subscription.timeSlot.start && subscription.timeSlot.end) {
@@ -2210,6 +2316,39 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
 
                         await booking.save();
                         console.log(`✅ Booking created for guest subscription with therapist: ${subscription.therapistId}, Booking ID: ${booking._id}`);
+
+                        // Send plan booking confirmation notification for guest subscription purchase
+                        try {
+                            const User = require('../models/User.model');
+                            const user = await User.findById(userIdToCheck).select('email phone name');
+
+                            if (user) {
+                                const NotificationService = require('../services/notificationService');
+                                const notificationService = new NotificationService();
+
+                                // Wait for notification service to initialize
+                                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                                const notificationData = {
+                                    clientName: user.name || subscription.guestName,
+                                    planName: subscription.planName,
+                                    serviceName: subscription.planName,
+                                    date: bookingDate,
+                                    time: bookingTime
+                                };
+
+                                await notificationService.sendNotification(
+                                    { email: user.email || subscription.guestEmail, phone: user.phone || subscription.guestPhone },
+                                    'plan_booking_confirmation',
+                                    notificationData
+                                );
+
+                                console.log(`✅ Plan booking confirmation notification sent for guest subscription purchase to ${user.email || subscription.guestEmail}`);
+                            }
+                        } catch (notificationError) {
+                            console.error('❌ Error sending plan booking confirmation notification for guest subscription purchase:', notificationError);
+                            // Don't fail the booking creation if notification fails
+                        }
                     } catch (bookingError) {
                         console.error('Error creating booking for guest subscription:', bookingError);
                     }

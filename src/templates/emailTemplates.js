@@ -3,13 +3,10 @@
 
 class EmailTemplates {
     // Utility method to generate consistent headers
-    static generateHeader(title, subtitle, backgroundColor, icon) {
+    static generateHeader(title, subtitle, backgroundColor) {
         return `
             <tr>
                 <td style="background: linear-gradient(135deg, ${backgroundColor.start} 0%, ${backgroundColor.end} 100%); padding: 40px 40px 30px 40px; text-align: center;">
-                    <div style="background-color: rgba(255,255,255,0.2); width: 70px; height: 70px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 20px;">
-                        <span style="font-size: 32px; color: white;">${icon}</span>
-                    </div>
                     <h1 style="color: #ffffff; margin: 0; font-size: 32px; font-weight: 700;">${title}</h1>
                     <p style="color: ${backgroundColor.text}; margin: 10px 0 0 0; font-size: 18px;">${subtitle}</p>
                 </td>
@@ -56,8 +53,7 @@ class EmailTemplates {
                     ${EmailTemplates.generateHeader(
                         data.title || 'Important Notification',
                         '',
-                        { start: '#1e3a8a', end: '#3b82f6', text: '#e0f2fe' },
-                        '📢'
+                        { start: '#1e3a8a', end: '#3b82f6', text: '#e0f2fe' }
                     )}
                     
                     <tr>
@@ -111,8 +107,7 @@ class EmailTemplates {
                     ${EmailTemplates.generateHeader(
                         'Welcome to Tanish Physio',
                         'Your recovery journey starts here',
-                        { start: '#4f46e5', end: '#6366f1', text: '#e0e7ff' },
-                        '✨'
+                        { start: '#4f46e5', end: '#6366f1', text: '#e0e7ff' }
                     )}
                     
                     <tr>
@@ -157,7 +152,7 @@ class EmailTemplates {
     // Template 2: Booking Created
     static bookingCreated(data) {
         return `
-<!DOCTYPE html>
+<!DOCTYPE html>s
 <html>
 <head>
     <meta charset="UTF-8">
@@ -172,8 +167,7 @@ class EmailTemplates {
                     ${EmailTemplates.generateHeader(
                         'Booking Request Submitted!',
                         "We've received your request",
-                        { start: '#0ea5e9', end: '#0284c7', text: '#e0f2fe' },
-                        '📋'
+                        { start: '#0ea5e9', end: '#0284c7', text: '#e0f2fe' }
                     )}
                     
                     <tr>
@@ -250,8 +244,7 @@ class EmailTemplates {
                     ${EmailTemplates.generateHeader(
                         'Booking Confirmed!',
                         'Your appointment is secured',
-                        { start: '#16a34a', end: '#15803d', text: '#dcfce7' },
-                        '🎉'
+                        { start: '#16a34a', end: '#15803d', text: '#dcfce7' }
                     )}
                     
                     <tr>
@@ -342,8 +335,7 @@ class EmailTemplates {
                     ${EmailTemplates.generateHeader(
                         'Booking Cancelled',
                         'We sincerely apologize',
-                        { start: '#dc2626', end: '#b91c1c', text: '#fecaca' },
-                        '⚠️'
+                        { start: '#dc2626', end: '#b91c1c', text: '#fecaca' }
                     )}
                     
                     <tr>
@@ -499,8 +491,7 @@ class EmailTemplates {
                     ${EmailTemplates.generateHeader(
                         'Payment Successful!',
                         'Transaction confirmed',
-                        { start: '#16a34a', end: '#15803d', text: '#dcfce7' },
-                        '✅'
+                        { start: '#16a34a', end: '#15803d', text: '#dcfce7' }
                     )}
                     
                     <tr>
@@ -575,8 +566,7 @@ class EmailTemplates {
                     ${EmailTemplates.generateHeader(
                         'Session Reminder',
                         'Your appointment is coming up',
-                        { start: '#0284c7', end: '#0369a1', text: '#bae6fd' },
-                        '⏰'
+                        { start: '#0284c7', end: '#0369a1', text: '#bae6fd' }
                     )}
                     
                     <tr>
@@ -591,7 +581,7 @@ class EmailTemplates {
                                 <div style="display: grid; gap: 15px;">
                                     <div style="display: flex; align-items: center; gap: 15px; padding: 15px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
                                         <div style="background-color: #0284c7; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;">
-                                            📋
+                                            S
                                         </div>
                                         <div>
                                             <div style="font-weight: 600; color: #083344;">${data.serviceName || 'Service'}</div>
@@ -601,7 +591,7 @@ class EmailTemplates {
                                     
                                     <div style="display: flex; align-items: center; gap: 15px; padding: 15px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
                                         <div style="background-color: #0ea5e9; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;">
-                                            👤
+                                            T
                                         </div>
                                         <div>
                                             <div style="font-weight: 600; color: #083344;">${data.therapistName || 'Therapist'}</div>
@@ -611,7 +601,7 @@ class EmailTemplates {
                                     
                                     <div style="display: flex; align-items: center; gap: 15px; padding: 15px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
                                         <div style="background-color: #3b82f6; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;">
-                                            📅
+                                            D
                                         </div>
                                         <div>
                                             <div style="font-weight: 600; color: #083344;">${data.date || 'Date'}</div>
@@ -621,7 +611,7 @@ class EmailTemplates {
                                     
                                     <div style="display: flex; align-items: center; gap: 15px; padding: 15px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
                                         <div style="background-color: #6366f1; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;">
-                                            ⏰
+                                            T
                                         </div>
                                         <div>
                                             <div style="font-weight: 600; color: #083344;">${data.time || 'Time'}</div>
@@ -752,8 +742,7 @@ class EmailTemplates {
                     ${EmailTemplates.generateHeader(
                         'Payment Received',
                         'Transaction confirmed',
-                        { start: '#16a34a', end: '#15803d', text: '#dcfce7' },
-                        '💰'
+                        { start: '#16a34a', end: '#15803d', text: '#dcfce7' }
                     )}
                     
                     <tr>
@@ -845,8 +834,7 @@ class EmailTemplates {
                     ${EmailTemplates.generateHeader(
             'Appointment Rescheduled',
             'Your session has been moved',
-            { start: '#f59e0b', end: '#d97706', text: '#fed7aa' },
-            '📅'
+            { start: '#f59e0b', end: '#d97706', text: '#fed7aa' }
         )}
                     
                     <tr>
@@ -861,7 +849,7 @@ class EmailTemplates {
                                 <div style="display: grid; gap: 20px;">
                                     <div style="display: flex; align-items: center; gap: 15px; padding: 15px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
                                         <div style="background-color: #f59e0b; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;">
-                                            📋
+                                            S
                                         </div>
                                         <div>
                                             <div style="font-weight: 600; color: #92400e;">${data.serviceName || 'Service'}</div>
@@ -871,7 +859,7 @@ class EmailTemplates {
                                     
                                     <div style="display: flex; align-items: center; gap: 15px; padding: 15px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
                                         <div style="background-color: #0ea5e9; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;">
-                                            📅
+                                            D
                                         </div>
                                         <div>
                                             <div style="font-weight: 600; color: #92400e;">${data.newDate || 'New Date'}</div>
@@ -881,7 +869,7 @@ class EmailTemplates {
                                     
                                     <div style="display: flex; align-items: center; gap: 15px; padding: 15px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
                                         <div style="background-color: #6366f1; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;">
-                                            ⏰
+                                            T
                                         </div>
                                         <div>
                                             <div style="font-weight: 600; color: #92400e;">${data.newTime || 'New Time'}</div>
@@ -957,8 +945,7 @@ class EmailTemplates {
                     ${EmailTemplates.generateHeader(
                         'Upcoming Session',
                         'Scheduled for tomorrow',
-                        { start: '#0284c7', end: '#0369a1', text: '#bae6fd' },
-                        '📅'
+                        { start: '#0284c7', end: '#0369a1', text: '#bae6fd' }
                     )}
                     
                     <tr>
@@ -973,7 +960,7 @@ class EmailTemplates {
                                 <div style="display: grid; gap: 15px;">
                                     <div style="display: flex; align-items: center; gap: 15px; padding: 15px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
                                         <div style="background-color: #0284c7; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;">
-                                            👤
+                                            C
                                         </div>
                                         <div>
                                             <div style="font-weight: 600; color: #083344;">${data.clientName || 'Client Name'}</div>
@@ -983,7 +970,7 @@ class EmailTemplates {
                                     
                                     <div style="display: flex; align-items: center; gap: 15px; padding: 15px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
                                         <div style="background-color: #0ea5e9; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;">
-                                            📋
+                                            S
                                         </div>
                                         <div>
                                             <div style="font-weight: 600; color: #083344;">${data.serviceName || 'Service Name'}</div>
@@ -993,7 +980,7 @@ class EmailTemplates {
                                     
                                     <div style="display: flex; align-items: center; gap: 15px; padding: 15px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
                                         <div style="background-color: #3b82f6; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;">
-                                            👨‍⚕️
+                                            T
                                         </div>
                                         <div>
                                             <div style="font-weight: 600; color: #083344;">${data.therapistName || 'Therapist Name'}</div>
@@ -1003,7 +990,7 @@ class EmailTemplates {
                                     
                                     <div style="display: flex; align-items: center; gap: 15px; padding: 15px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
                                         <div style="background-color: #6366f1; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;">
-                                            ⏰
+                                            T
                                         </div>
                                         <div>
                                             <div style="font-weight: 600; color: #083344;">${data.time || 'Time'}</div>
@@ -1042,6 +1029,97 @@ class EmailTemplates {
                         { light: '#bae6fd', accent: '#7dd3fc', border: '#0c4a6e' },
                         'Tanish Physio Operations Management'
                     )}
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+        `;
+    }
+
+    // Template 12: Plan Booking Confirmation
+    static planBookingConfirmation(data) {
+        return `
+<!DOCTYPE html>
+<html>
+<head>s
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0fdf4;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f0fdf4; padding: 20px 0;">
+        <tr>
+            <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #bbf7d0;">
+                    ${EmailTemplates.generateHeader(
+            'Plan Booking Confirmed!',
+            'Your subscription session is secured',
+            { start: '#16a34a', end: '#15803d', text: '#dcfce7' }
+        )}
+                    
+                    <tr>
+                        <td style="padding: 40px;">
+                            <p style="font-size: 20px; color: #14532d; margin: 0 0 25px 0; font-weight: 600;">
+                                Congratulations ${data.clientName || 'Valued Customer'},
+                            </p>
+                            
+                            <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-radius: 12px; padding: 25px; margin: 25px 0; border: 1px solid #bbf7d0;">
+                                <h2 style="color: #14532d; margin: 0 0 20px 0; font-size: 24px;">📋 Plan Session Details</h2>
+                                
+                                <div style="display: grid; grid-template-columns: auto 1fr; gap: 15px; align-items: center;">
+                                    <div style="background-color: #16a34a; color: white; padding: 12px; border-radius: 8px; text-align: center; min-width: 100px;">
+                                        <div style="font-size: 24px; font-weight: bold;">${new Date(data.date).getDate()}</div>
+                                        <div style="font-size: 14px;">${new Date(data.date).toLocaleDateString('en-US', { month: 'short' })}</div>
+                                    </div>
+                                    <div>
+                                        <p style="font-size: 18px; color: #15803d; margin: 0; line-height: 1.5;">
+                                            <strong>Plan:</strong> ${data.planName || 'Subscription Plan'}<br>
+                                            <strong>Date:</strong> ${data.date ? new Date(data.date).toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'Not specified'}<br>
+                                            <strong>Time:</strong> ${data.time || 'Not specified'}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div style="background-color: #f0f9ff; border-left: 4px solid #0ea5e9; padding: 25px; margin: 25px 0; border-radius: 0 12px 12px 0;">
+                                <h3 style="color: #0c4a6e; margin: 0 0 15px 0; font-size: 20px;">📊 Subscription Benefits</h3>
+                                <ul style="color: #083344; margin: 0; padding-left: 20px; line-height: 1.6;">
+                                    <li>This session is covered by your subscription plan</li>
+                                    <li>No additional payment required for this booking</li>
+                                    <li>You can book more sessions using your remaining plan credits</li>
+                                    <li>Enjoy priority scheduling and dedicated therapist support</li>
+                                </ul>
+                            </div>
+                            
+                            <div style="background-color: #fff7ed; border-left: 4px solid #f97316; padding: 25px; margin: 25px 0; border-radius: 0 12px 12px 0;">
+                                <h3 style="color: #c2410c; margin: 0 0 15px 0; font-size: 20px;">⚠️ Important Notes</h3>
+                                <ul style="color: #92400e; margin: 0; padding-left: 20px; line-height: 1.6;">
+                                    <li>Please arrive 10-15 minutes early for your session</li>
+                                    <li>Bring any relevant medical documents or reports</li>
+                                    <li>Contact us if you need to reschedule this appointment</li>
+                                    <li>Check your subscription dashboard for remaining session credits</li>
+                                </ul>
+                            </div>
+                            
+                            <div style="background-color: #f0fdf4; border-radius: 12px; padding: 20px; margin: 25px 0; border: 1px solid #bbf7d0; text-align: center;">
+                                <h3 style="color: #15803d; margin: 0 0 15px 0; font-size: 18px;">✅ Session Confirmed</h3>
+                                <p style="color: #16a34a; margin: 0; font-size: 16px; line-height: 1.6;">
+                                    Your subscription session has been successfully booked and confirmed. We're excited to support your health journey!
+                                </p>
+                            </div>
+                            
+                            <p style="font-size: 16px; color: #475569; margin: 30px 0 0 0; line-height: 1.6;">
+                                Thank you for choosing <strong>Tanish Physio</strong>. Your subscription gives you access to premium healthcare services and personalized attention from our expert team.
+                            </p>
+                        </td>
+                    </tr>
+                    
+                    ${EmailTemplates.generateFooter(
+            '#14532d',
+            { light: '#bbf7d0', accent: '#86efac', border: '#166534' },
+            'Need to manage your subscription or book another session?'
+        )}
                 </table>
             </td>
         </tr>

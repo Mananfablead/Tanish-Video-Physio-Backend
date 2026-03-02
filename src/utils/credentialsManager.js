@@ -47,6 +47,7 @@ const getEmailCredentials = async () => {
       return null;
     }
 
+    console.log('📧 Email credentials retrieved - Admin Email:', credential.adminEmail || 'NOT SET');
     return {
       host: credential.emailHost,
       port: credential.emailPort,

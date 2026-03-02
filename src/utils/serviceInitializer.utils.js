@@ -32,19 +32,14 @@ const initializeServices = async () => {
             await initializeContactTransporter();
             logger.info('✓ Contact email service transporter initialized successfully');
         } catch (contactEmailError) {
-            logger.warn('⚠ Contact email service initialization failed - contact functionality may be unavailable');
-            logger.error('Contact email error details:', contactEmailError.message);
         }
-
-        logger.info('External services initialization completed');
         
         // Initialize reminder service
         try {
             ReminderService.initialize();
             logger.info('✓ Reminder service initialized successfully');
         } catch (reminderError) {
-            logger.warn('⚠ Reminder service initialization failed');
-            logger.error('Reminder service error details:', reminderError.message);
+             logger.error('Reminder service error details:', reminderError.message);
         }
     } catch (error) {
         logger.error('Error initializing services:', error);

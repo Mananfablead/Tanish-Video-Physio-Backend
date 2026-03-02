@@ -13,6 +13,70 @@ const { validateWhatsAppToken, addCountryCode } = require('../utils/whatsapp.uti
 const User = require('../models/User.model'); // Import User model for admin profile
 
 class NotificationService {
+    // Static templates mapping for direct access
+    static TEMPLATES = {
+        // User notifications
+        welcome_message: {
+            email: {
+                subject: (data) => `Welcome to Tanish Physio, ${data.clientName || 'there'}!`,
+                template: EmailTemplates.welcome
+            },
+            whatsapp: 'welcome_message'
+        },
+
+        // Booking notifications
+        booking_confirmation: {
+            email: {
+                subject: 'Booking Confirmed - Tanish Physio',
+                template: EmailTemplates.bookingConfirmed
+            },
+            whatsapp: 'booking_confirmation'
+        },
+
+        plan_booking_confirmation: {
+            email: {
+                subject: 'Plan Session Booked - Tanish Physio',
+                template: EmailTemplates.planBookingConfirmation
+            }
+            // whatsapp: 'plan_booking_confirmation' - Disabled as requested
+        },
+
+
+
+        booking_cancelled: {
+            email: {
+                subject: 'Booking Cancelled - Tanish Physio',
+                template: EmailTemplates.bookingCancelled
+            },
+            whatsapp: 'booking_cancelled'
+        },
+
+        // Admin notifications
+        new_booking: {
+            email: {
+                subject: 'New Booking Request - Admin',
+                template: EmailTemplates.adminNewBooking
+            },
+            whatsapp: 'new_booking_request'
+        },
+
+        appointment_rescheduled: {
+            email: {
+                subject: 'Appointment Rescheduled - Tanish Physio',
+                template: EmailTemplates.appointmentRescheduled
+            },
+            whatsapp: 'appointment_rescheduled'
+        },
+
+        admin_session_reminder: {
+            email: {
+                subject: 'Upcoming Session Reminder - Admin',
+                template: EmailTemplates.adminUpcomingSession
+            },
+            whatsapp: 'upcoming_session'
+        }
+    };
+
     // WhatsApp Templates (Approved templates from Facebook Business Manager)
     static whatsappTemplates = {
         welcome_message: {
@@ -40,6 +104,23 @@ class NotificationService {
                         { type: 'text', text: '{{2}}' },  // Service name
                         { type: 'text', text: '{{3}}' },  // Date
                         { type: 'text', text: '{{4}}' },  // Time
+                    ]
+                }
+            ]
+        },
+
+        plan_booking_confirmation: {
+            name: 'plan_booking_confirmation',
+            language: 'en',
+            components: [
+                {
+                    type: 'body',
+                    parameters: [
+                        { type: 'text', text: '{{1}}' },  // Client name
+                        { type: 'text', text: '{{2}}' },  // Plan name
+                        { type: 'text', text: '{{3}}' },  // Service name
+                        { type: 'text', text: '{{4}}' },  // Date
+                        { type: 'text', text: '{{5}}' }   // Time
                     ]
                 }
             ]
@@ -168,6 +249,29 @@ class NotificationService {
                             { type: 'text', text: serviceName },     // Parameter 2
                             { type: 'text', text: date },            // Parameter 3
                             { type: 'text', text: time }             // Parameter 4
+                        ]
+                    }
+                ];
+                break;
+
+            case 'plan_booking_confirmation':
+                // Ensure we have all required data - template expects exactly 5 parameters
+                const planClientName = data.clientName || 'Valued Customer';
+                const planName = data.planName || 'Subscription Plan';
+                const planServiceName = data.serviceName || 'Service';
+                const planDate = data.date || 'TBD';
+                const planTime = data.time || 'TBD';
+
+                // Ensure we provide exactly 5 parameters as expected by the template
+                preparedTemplate.components = [
+                    {
+                        type: 'body',
+                        parameters: [
+                            { type: 'text', text: planClientName },      // Parameter 1
+                            { type: 'text', text: planName },           // Parameter 2
+                            { type: 'text', text: planServiceName },    // Parameter 3
+                            { type: 'text', text: planDate },           // Parameter 4
+                            { type: 'text', text: planTime }            // Parameter 5
                         ]
                     }
                 ];
@@ -303,7 +407,9 @@ class NotificationService {
     static async getAdminEmail() {
         try {
             const emailCreds = await getEmailCredentials();
-            return emailCreds?.adminEmail || null;
+            const adminEmail = emailCreds?.adminEmail || null;
+            logger.info('📧 Admin Email Retrieved:', adminEmail || 'NOT CONFIGURED');
+            return adminEmail;
         } catch (error) {
             console.error('Error getting admin email from credentials:', error);
             return null;
@@ -327,6 +433,9 @@ class NotificationService {
         this.whatsappConfig = null;
         this.whatsappEnabled = false;
         this.emailEnabled = false;
+
+        // Initialize templates with static templates as fallback
+        this.templates = { ...NotificationService.TEMPLATES };
 
         // Initialize credentials asynchronously
         this.init();
@@ -422,7 +531,9 @@ class NotificationService {
             }
 
             // Initialize notification templates (without payment_received only, new_booking added)
+            // Merge with existing templates to preserve any already loaded templates
             this.templates = {
+                ...this.templates, // Preserve existing templates
                 // User notifications
                 welcome_message: {
                     email: {
@@ -437,7 +548,16 @@ class NotificationService {
                     email: {
                         subject: 'Booking Confirmed - Tanish Physio',
                         template: EmailTemplates.bookingConfirmed
+                    },
+                    whatsapp: 'booking_confirmation'
+                },
+
+                plan_booking_confirmation: {
+                    email: {
+                        subject: 'Plan Session Booked - Tanish Physio',
+                        template: EmailTemplates.planBookingConfirmation
                     }
+                    // whatsapp: 'plan_booking_confirmation' - Disabled as requested
                 },
 
                 booking_cancelled: {
@@ -503,6 +623,12 @@ class NotificationService {
     // Main notification dispatcher
     async sendNotification(recipient, type, data) {
         try {
+            // Ensure templates are initialized
+            if (!this.templates) {
+                console.log('Templates not initialized, calling init...');
+                await this.init();
+            }
+
             const template = this.templates[type];
             if (!template) {
                 throw new Error(`Notification template '${type}' not found`);
@@ -516,24 +642,65 @@ class NotificationService {
             // For admin notifications, get admin email from credentials instead of recipient
             const isAdminNotification = ['new_booking', 'admin_session_reminder'].includes(type);
 
+            // Check user status if this is a user notification (not admin notification)
+            if (!isAdminNotification && recipient.email) {
+                const User = require('../models/User.model');
+                const Subscription = require('../models/Subscription.model');
+
+                const user = await User.findOne({ email: recipient.email }).select('status');
+
+                if (user && user.status !== 'active') {
+                    console.log(`⚠️ User ${recipient.email} has status '${user.status}', skipping notifications`);
+                    return {
+                        email: { success: false, error: `User status is ${user.status}` },
+                        whatsapp: { success: false, error: `User status is ${user.status}` }
+                    };
+                }
+
+                // Check if user has active subscription for plan-related notifications
+                if (type === 'plan_booking_confirmation') {
+                    const activeSubscription = await Subscription.findOne({
+                        userId: user._id,
+                        status: 'active'
+                    });
+
+                    if (!activeSubscription) {
+                        console.log(`⚠️ User ${recipient.email} has no active subscription, skipping plan booking notifications`);
+                        return {
+                            email: { success: false, error: 'No active subscription found' },
+                            whatsapp: { success: false, error: 'No active subscription found' }
+                        };
+                    }
+
+                    console.log(`✅ User ${recipient.email} has active subscription, proceeding with plan booking notification`);
+                }
+            }
+
             if (isAdminNotification) {
                 // Get admin email from credentials
                 const adminEmail = await NotificationService.getAdminEmail();
                 if (adminEmail) {
                     recipient.email = adminEmail;
-                    console.log('📧 Using admin email from credentials:', adminEmail);
+                     console.log('📧 Admin notification being sent to:', adminEmail);
                 } else {
-                    console.warn('⚠️ No admin email found in credentials, using recipient email:', recipient.email);
-                }
+                  }
             }
 
             // Send email if configured
             if (this.emailEnabled && template.email) {
+                console.log('📧 Sending email notification to:', recipient.email);
                 results.email = await this.sendEmail(recipient.email, template.email, data);
             }
 
-            // Send WhatsApp if configured
-            if (this.whatsappEnabled && template.whatsapp) {
+            // Check if WhatsApp is enabled and active before sending
+            const Credentials = require('../models/Credentials.model');
+            const whatsappCredential = await Credentials.findOne({
+                credentialType: 'whatsapp',
+                isActive: true
+            });
+
+            // Send WhatsApp if configured and active
+            if (this.whatsappEnabled && template.whatsapp && whatsappCredential) {
                 let recipientPhone = null;
 
                 // Determine recipient based on notification type
@@ -572,6 +739,9 @@ class NotificationService {
                 } else {
                     console.warn(`No phone number available for WhatsApp template: ${template.whatsapp}`);
                 }
+            } else if (template.whatsapp && !whatsappCredential) {
+                console.log('⚠️ WhatsApp credential is not active, skipping WhatsApp notification');
+                results.whatsapp = { success: false, error: 'WhatsApp credential is not active' };
             }
 
             return results;
@@ -621,6 +791,31 @@ class NotificationService {
             if (!data || typeof data !== 'object') {
                 console.warn('📧 Invalid data provided, using empty object');
                 data = {};
+            }
+
+            // Check user status before sending email
+            const User = require('../models/User.model');
+            const Subscription = require('../models/Subscription.model');
+            const user = await User.findOne({ email: to }).select('status');
+
+            if (user && user.status !== 'active') {
+                console.log(`⚠️ User ${to} has status '${user.status}', skipping email notification`);
+                return { success: false, error: `User status is ${user.status}` };
+            }
+
+            // For plan booking notifications, check if user has active subscription
+            if (typeof template === 'string' && template === 'plan_booking_confirmation') {
+                const activeSubscription = await Subscription.findOne({
+                    userId: user._id,
+                    status: 'active'
+                });
+
+                if (!activeSubscription) {
+                    console.log(`⚠️ User ${to} has no active subscription, skipping plan booking email notification`);
+                    return { success: false, error: 'No active subscription found' };
+                }
+
+                console.log(`✅ User ${to} has active subscription, proceeding with plan booking email notification`);
             }
 
             // Handle template mapping - if template is a string, map to EmailTemplates function
@@ -708,7 +903,8 @@ class NotificationService {
             }
 
             const result = await this.emailTransporter.sendMail(mailOptions);
-            console.log('Email sent successfully:', result.messageId);
+            console.log('📧 Email sent successfully to:', to);
+            console.log('📧 Email message ID:', result.messageId);
             return { success: true, messageId: result.messageId };
         } catch (error) {
             console.error('❌ Email sending failed:', {
@@ -737,6 +933,42 @@ class NotificationService {
         let response = null;
 
         try {
+            // Check if WhatsApp is configured AND active in real-time
+            const Credentials = require('../models/Credentials.model');
+            const whatsappCredential = await Credentials.findOne({
+                credentialType: 'whatsapp',
+                isActive: true
+            });
+
+            if (!this.whatsappEnabled || !whatsappCredential) {
+                console.log('⚠️ WhatsApp not configured or not active, skipping notification');
+                return { success: false, error: 'WhatsApp not configured or not active' };
+            }
+
+            // Check user status before sending WhatsApp
+            const User = require('../models/User.model');
+            const Subscription = require('../models/Subscription.model');
+            const user = await User.findOne({ phone: to.replace('+', '') }).select('status');
+
+            if (user && user.status !== 'active') {
+                console.log(`⚠️ User with phone ${to} has status '${user.status}', skipping WhatsApp notification`);
+                return { success: false, error: `User status is ${user.status}` };
+            }
+
+            // For plan booking notifications, check if user has active subscription
+            if (typeof template === 'string' && template.includes('plan_booking')) {
+                const activeSubscription = await Subscription.findOne({
+                    userId: user._id,
+                    status: 'active'
+                });
+
+                if (!activeSubscription) {
+                    console.log(`⚠️ User with phone ${to} has no active subscription, skipping plan booking WhatsApp notification`);
+                    return { success: false, error: 'No active subscription found' };
+                }
+
+                console.log(`✅ User with phone ${to} has active subscription, proceeding with plan booking WhatsApp notification`);
+            }
             // Get admin phone number from admin user profile instead of CMS Contact
             const adminUser = await User.findOne({ role: 'admin' }).select('phone');
             if (!adminUser || !adminUser.phone) {
@@ -871,8 +1103,41 @@ class NotificationService {
         let response = null;
 
         try {
-            if (!this.whatsappEnabled) {
-                throw new Error('WhatsApp not configured');
+            // Check if WhatsApp is configured AND active in real-time
+            const Credentials = require('../models/Credentials.model');
+            const whatsappCredential = await Credentials.findOne({
+                credentialType: 'whatsapp',
+                isActive: true
+            });
+
+            if (!this.whatsappEnabled || !whatsappCredential) {
+                console.log('⚠️ WhatsApp not configured or not active, skipping notification');
+                throw new Error('WhatsApp not configured or not active');
+            }
+
+            // Check user status before sending WhatsApp template
+            const User = require('../models/User.model');
+            const Subscription = require('../models/Subscription.model');
+            const user = await User.findOne({ phone: to.replace('+', '') }).select('status');
+
+            if (user && user.status !== 'active') {
+                console.log(`⚠️ User with phone ${to} has status '${user.status}', skipping WhatsApp template notification`);
+                return { success: false, error: `User status is ${user.status}` };
+            }
+
+            // For plan booking notifications, check if user has active subscription
+            if (templateName === 'plan_booking_confirmation') {
+                const activeSubscription = await Subscription.findOne({
+                    userId: user._id,
+                    status: 'active'
+                });
+
+                if (!activeSubscription) {
+                    console.log(`⚠️ User with phone ${to} has no active subscription, skipping plan booking WhatsApp template notification`);
+                    return { success: false, error: 'No active subscription found' };
+                }
+
+                console.log(`✅ User with phone ${to} has active subscription, proceeding with plan booking WhatsApp template notification`);
             }
 
             // Format phone number with country code if needed

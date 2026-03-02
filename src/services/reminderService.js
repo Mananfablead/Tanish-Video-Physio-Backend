@@ -59,14 +59,10 @@ class ReminderService {
         this.cronJobs.set('sessionReminders', job);
     }
 
-    // Schedule daily summary (9 AM daily)
+    // Daily summary disabled as requested
     scheduleDailySummary() {
-        const job = cron.schedule('0 9 * * *', async () => {
-            console.log('Running daily summary job...');
-            await this.processDailySummary();
-        });
-
-        this.cronJobs.set('dailySummary', job);
+        console.log('Daily summary scheduling disabled');
+        // No job scheduled
     }
 
     // Process session reminders
@@ -91,20 +87,23 @@ class ReminderService {
               .populate('therapistId', 'name email phone')
               .populate('bookingId');
             
-            // Find sessions that are starting within the next 1-2 hours (for 1-hour reminder)
-            const sessionsFor1HourReminder = await Session.find({
-                startTime: { 
-                    $gte: in1Hour,
-                    $lt: new Date(in1Hour.getTime() + 60 * 60 * 1000) // 1 hour window
-                },
-                status: { $in: ['scheduled', 'pending'] },
-                last1HourReminderSent: { $exists: false }
-            }).populate('userId', 'name email phone')
+            // Find sessions that are starting within the next 5-6 minutes (for 1-hour reminder - now 5 min)
+          // Find sessions that are starting within the next 5-6 minutes (for 1-hour reminder - now 5 min)
+// Find sessions that are starting within the next 5-6 minutes (for 1-hour reminder - now 5 min)
+ const in5Minutes = new Date(now.getTime() + 5 * 60 * 1000);
+const sessionsFor1HourReminder = await Session.find({
+    startTime: { 
+        $gte: in5Minutes,
+        $lt: new Date(in5Minutes.getTime() + 60 * 1000) // 1 minute window
+    },
+    status: { $in: ['scheduled', 'pending'] },
+    last1HourReminderSent: { $exists: false }
+}).populate('userId', 'name email phone')
               .populate('therapistId', 'name email phone')
               .populate('bookingId');
             
             console.log(`Found ${sessionsFor24HourReminder.length} sessions for 24-hour reminders`);
-            console.log(`Found ${sessionsFor1HourReminder.length} sessions for 1-hour reminders`);
+            console.log(`Found ${sessionsFor1HourReminder.length} sessions for 5-minute reminders`);
             
             // Send 24-hour reminders
             for (const session of sessionsFor24HourReminder) {
@@ -122,9 +121,9 @@ class ReminderService {
                 try {
                     await this.sendSessionReminder(session, '1hour');
                     await this.updateSessionReminderSent(session, '1hour');
-                    console.log(`✅ 1-hour reminder sent for session ${session._id}`);
+                    console.log(`✅ 5-minute reminder sent for session ${session._id}`);
                 } catch (error) {
-                    console.error(`❌ Error sending 1-hour reminder for session ${session._id}:`, error);
+                    console.error(`❌ Error sending 5-minute reminder for session ${session._id}:`, error);
                 }
             }
             
@@ -133,49 +132,10 @@ class ReminderService {
         }
     }
 
-    // Process daily summary for admins
+    // Daily summary processing disabled as requested
     async processDailySummary() {
-        try {
-            // Get today's statistics
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-
-            const tomorrow = new Date(today);
-            tomorrow.setDate(tomorrow.getDate() + 1);
-
-            const stats = {
-                newBookings: await Booking.countDocuments({
-                    createdAt: { $gte: today, $lt: tomorrow }
-                }),
-                confirmedBookings: await Booking.countDocuments({
-                    status: BookingStatusHandler.BOOKING_STATUS.CONFIRMED,
-                    date: { $gte: today, $lt: tomorrow }
-                }),
-                completedPayments: await Payment.countDocuments({
-                    status: BookingStatusHandler.PAYMENT_MODEL_STATUS.PAID,
-                    createdAt: { $gte: today, $lt: tomorrow }
-                }),
-                totalRevenue: await Payment.aggregate([
-                    {
-                        $match: {
-                            status: BookingStatusHandler.PAYMENT_MODEL_STATUS.PAID,
-                            createdAt: { $gte: today, $lt: tomorrow }
-                        }
-                    },
-                    {
-                        $group: {
-                            _id: null,
-                            total: { $sum: '$amount' }
-                        }
-                    }
-                ])
-            };
-
-            // Send summary to admins
-            await this.sendDailySummary(stats);
-        } catch (error) {
-            console.error('Error in daily summary processing:', error);
-        }
+        console.log('Daily summary processing disabled');
+        // No processing performed
     }
 
     // Helper methods for reminder logic
@@ -295,28 +255,10 @@ class ReminderService {
         });
     }
 
+    // Daily summary sending disabled as requested
     async sendDailySummary(stats) {
-        // Get all admin users
-        const User = require('../models/User.model');
-        const admins = await User.find({ role: 'admin' }).select('email phone name');
-
-        const data = {
-            date: new Date().toDateString(),
-            newBookings: stats.newBookings,
-            confirmedSessions: stats.confirmedBookings,
-            completedPayments: stats.completedPayments,
-            totalRevenue: stats.totalRevenue[0]?.total || 0
-        };
-
-        // Send to all admins
-        for (const admin of admins) {
-            const recipient = {
-                email: admin.email,
-                phone: admin.phone
-            };
-
-            await NotificationService.sendNotification(recipient, 'daily_summary', data);
-        }
+        console.log('Daily summary sending disabled');
+        // No emails sent
     }
 
     async updateLastReminderSent(booking, reminderType) {
@@ -338,8 +280,10 @@ class ReminderService {
         await this.processSessionReminders();
     }
 
+    // Daily summary trigger disabled as requested
     async triggerDailySummary() {
-        await this.processDailySummary();
+        console.log('Daily summary trigger disabled');
+        // No action performed
     }
 
     // Status and monitoring
