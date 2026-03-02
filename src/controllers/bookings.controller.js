@@ -171,15 +171,17 @@ const createBooking = async (req, res, next) => {
             return res.status(401).json(ApiResponse.error('Authentication required'));
         }
 
-        const { serviceId, date, time, notes, clientName, scheduleType, scheduledDate, scheduledTime, timeSlot, couponCode, discountAmount, finalAmount, bookingType } = req.body;
+        const { serviceId, date, time, notes, clientName, scheduleType, scheduledDate, scheduledTime, timeSlot, couponCode, discountAmount, finalAmount, bookingType, isScheduledLater } = req.body;
 
         // Check for duplicate booking to prevent multiple submissions
+        // Only check for bookings that are confirmed or completed (not pending payment)
         const existingBooking = await Booking.findOne({
             userId: req.user.userId,
             date: date,
             time: time,
             bookingType: bookingType || 'regular',
-            status: { $in: ['pending', 'confirmed', 'scheduled'] } // Don't allow duplicates for active bookings
+            status: { $in: ['confirmed', 'scheduled', 'completed'] }, // Only block if booking is confirmed/active
+            paymentStatus: 'paid' // Only consider bookings that have been paid
         });
 
         if (existingBooking) {
@@ -335,8 +337,8 @@ const createBooking = async (req, res, next) => {
             return res.status(404).json(ApiResponse.error('No active therapists available'));
         }
 
-        // If scheduling now, validate the scheduled date and time
-        if (scheduleType === 'now' && scheduledDate && scheduledTime) {
+        // Always validate the scheduled date and time if provided, regardless of schedule type
+        if (scheduledDate && scheduledTime) {
             // Check if the requested time slot is available
             const slotAvailability = await checkTimeSlotAvailability(therapist._id, scheduledDate, scheduledTime, timeSlot, bookingType);
 
@@ -365,7 +367,7 @@ const createBooking = async (req, res, next) => {
             discountAmount: discountAmount || 0,
             paymentStatus: bookingType === 'free-consultation' ? 'paid' : (req.user.role === 'admin' && bookingType !== 'subscription-covered' ? 'paid' : paymentStatus),
             // For admin booking creation, default to 'pending' status initially
-            status: req.user.role === 'admin' && !bookingType ? 'pending' : (bookingType === 'subscription-covered' ? 'pending' : (bookingType === 'free-consultation' ? 'pending' : ((scheduledDate && scheduledTime) ? 'pending' : (scheduleType === 'later' ? 'pending' : 'pending')))),
+            status: req.user.role === 'admin' && !bookingType ? 'pending' : (bookingType === 'subscription-covered' ? 'pending' : (bookingType === 'free-consultation' ? 'pending' : (isScheduledLater ? 'to-be-scheduled' : ((scheduledDate && scheduledTime) ? 'pending' : 'pending')))),
             serviceValidityDays: bookingType === 'free-consultation' ? 30 : service?.validity, // Free consultation has 30 days validity
             purchaseDate: new Date(),
             scheduleType: scheduleType || 'now',
@@ -375,7 +377,9 @@ const createBooking = async (req, res, next) => {
                 start: time.split('-')[0],
                 end: time.split('-')[1]
             } : null),
-            bookingType: bookingTypeFinal
+            bookingType: bookingTypeFinal,
+            // For schedule later option, add metadata to indicate it's not yet scheduled
+            ...(isScheduledLater && { isScheduledLater: true, scheduledDate: null, scheduledTime: null, timeSlot: null })
         });
 
         await booking.save();
@@ -904,7 +908,7 @@ const updateBooking = async (req, res, next) => {
                         startTime: sessionStartTime,
                         endTime: sessionEndTime,
                         type: "1-on-1",
-                        status: "scheduled", // Schedule the session immediately
+                        status: "pending", // Schedule the session immediately
                         duration: 15,
                     };
 
@@ -1534,6 +1538,7 @@ const createGuestBooking = async (req, res, next) => {
         }
 
         // Check for duplicate booking to prevent multiple submissions
+        // Only check for bookings that are confirmed or completed (not pending payment)
         const existingUser = await User.findOne({ email: clientEmail });
         if (existingUser) {
             const existingBooking = await Booking.findOne({
@@ -1541,7 +1546,8 @@ const createGuestBooking = async (req, res, next) => {
                 date: date,
                 time: time,
                 bookingType: bookingType || 'regular',
-                status: { $in: ['pending', 'confirmed', 'scheduled'] }
+                status: { $in: ['confirmed', 'scheduled', 'completed'] }, // Only block if booking is confirmed/active
+                paymentStatus: 'paid' // Only consider bookings that have been paid
             });
 
             if (existingBooking) {
@@ -1612,8 +1618,8 @@ const createGuestBooking = async (req, res, next) => {
             return res.status(404).json(ApiResponse.error('No active therapists available'));
         }
 
-        // If scheduling now, validate the scheduled date and time
-        if (scheduleType === 'now' && scheduledDate && scheduledTime) {
+        // Always validate the scheduled date and time if provided, regardless of schedule type
+        if (scheduledDate && scheduledTime) {
             // Check if the requested time slot is available
             const slotAvailability = await checkTimeSlotAvailability(therapist._id, scheduledDate, scheduledTime, timeSlot, bookingType);
 
@@ -1647,7 +1653,7 @@ const createGuestBooking = async (req, res, next) => {
                 end: time.split('-')[1]
             } : null),
             bookingType: bookingType || 'regular',
-            status: bookingType === 'free-consultation' ? 'pending' : ((scheduledDate && scheduledTime) ? 'scheduled' : (scheduleType === 'later' ? 'pending' : 'scheduled'))
+            status: bookingType === 'free-consultation' ? 'pending' : ((scheduledDate && scheduledTime) ? 'pending' : (scheduleType === 'later' ? 'pending' : 'scheduled'))
         });
 
         await booking.save();
