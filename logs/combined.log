@@ -5224,3 +5224,11 @@
 {"level":"info","message":"✓ Email service transporter initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-09T06:23:22.314Z"}
 {"level":"info","message":"✓ Reminder service initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-09T06:23:22.368Z"}
 {"level":"info","message":"Admin 69a02c74648e5f698902ac63 joined admin notification room","service":"tanish-physio-backend","timestamp":"2026-03-09T06:23:22.450Z"}
+{"level":"info","message":"User 69a02c74648e5f698902ac63 disconnected from chat","service":"tanish-physio-backend","timestamp":"2026-03-09T06:52:12.838Z"}
+{"level":"info","message":"Socket tKpMwEiHtnT26Bq3AAAB disconnected","service":"tanish-physio-backend","timestamp":"2026-03-09T06:52:12.852Z"}
+{"level":"info","message":"Admin socket tKpMwEiHtnT26Bq3AAAB disconnected","service":"tanish-physio-backend","timestamp":"2026-03-09T06:52:12.854Z"}
+{"level":"info","message":"Admin 69a02c74648e5f698902ac63 joined admin notification room","service":"tanish-physio-backend","timestamp":"2026-03-09T06:52:22.568Z"}
+{"level":"info","message":"User 69a02c74648e5f698902ac63 disconnected from chat","service":"tanish-physio-backend","timestamp":"2026-03-09T06:57:09.090Z"}
+{"level":"info","message":"Socket -vyhkQKKIzsctKTcAAAF disconnected","service":"tanish-physio-backend","timestamp":"2026-03-09T06:57:09.105Z"}
+{"level":"info","message":"Admin socket -vyhkQKKIzsctKTcAAAF disconnected","service":"tanish-physio-backend","timestamp":"2026-03-09T06:57:09.115Z"}
+{"level":"info","message":"Admin 69a02c74648e5f698902ac63 joined admin notification room","service":"tanish-physio-backend","timestamp":"2026-03-09T06:57:09.153Z"}
