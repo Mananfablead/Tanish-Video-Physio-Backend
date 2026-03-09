@@ -596,8 +596,6 @@ class NotificationService {
                     whatsapp: 'new_booking_request'
                 },
 
-
-
                 appointment_rescheduled: {
                     email: {
                         subject: 'Appointment Rescheduled - Tanish Physio',
@@ -628,10 +626,8 @@ class NotificationService {
                         subject: 'Upcoming Session Reminder - Admin',
                         template: EmailTemplates.adminUpcomingSession
                     },
-                    whatsapp: 'upcoming_session'
+                    whatsapp: 'admin_session_reminder'
                 },
-
-
             };
         } catch (error) {
             console.error('Error initializing notification service credentials:', error);

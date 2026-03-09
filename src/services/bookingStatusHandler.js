@@ -246,11 +246,6 @@ class BookingStatusHandler {
         }
 
         if (payment?.status === this.PAYMENT_MODEL_STATUS.PAID) {
-            triggers.push({
-                type: 'admin',
-                template: 'payment_received',
-                data: { bookingId: booking._id, amount: payment.amount }
-            });
             // Send new booking notification when payment is made to ensure admin gets notified
             triggers.push({
                 type: 'admin',

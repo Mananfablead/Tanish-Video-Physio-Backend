@@ -271,15 +271,7 @@ const createUser = async (req, res, next) => {
                     <p>Thank you for choosing Tanish Physio & Fitness!</p>
                 `;
             } else {
-                emailContent = `
-                    <h2>Welcome to Tanish Physio!</h2>
-                    <p>Your account has been created successfully by an administrator.</p>
-                    <p><strong>Login Email:</strong> ${email}</p>
-                    <p>Please use the password you provided during account creation.</p>
-                    ${processedSubscriptionInfo ? `<p><strong>Assigned Plan:</strong> ${processedSubscriptionInfo.planName}</p>` : ''}
-                    ${assignedServices.length > 0 ? `<p><strong>Assigned Services:</strong> ${assignedServices.length} service(s)</p>` : ''}
-                    <p>Thank you for choosing Tanish Physio & Fitness!</p>
-                `;
+
             }
 
             await sendEmail({

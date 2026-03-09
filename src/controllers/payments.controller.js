@@ -77,11 +77,7 @@ async function sendWelcomeEmailWithCredentials(email, name, username, password) 
     const { getEmailCredentials } = require('../utils/credentialsManager');
 
     try {
-        console.log('📧 sendWelcomeEmailWithCredentials called', {
-            email,
-            name,
-            username
-        });
+
 
         // Get email credentials from database
         const emailCreds = await getEmailCredentials();
@@ -205,12 +201,7 @@ async function sendWelcomeEmailWithCredentials(email, name, username, password) 
 
         // Send email
         const info = await transporter.sendMail(mailOptions);
-        console.log('✅ Welcome email sent', {
-            messageId: info.messageId,
-            response: info.response,
-            accepted: info.accepted,
-            rejected: info.rejected
-        });
+
     } catch (error) {
         console.error('❌ Error sending welcome email', {
             message: error.message,
@@ -858,26 +849,9 @@ const verifyGuestPayment = async (req, res, next) => {
                     // Update the booking to assign the new user
                     await Booking.findByIdAndUpdate(payment.bookingId, { userId: newUser._id });
 
-                    console.log('📧 Sending welcome email to guest user (new account)', {
-                        email: payment.guestEmail,
-                        name: payment.guestName
-                    });
                     await sendWelcomeEmailWithCredentials(payment.guestEmail, payment.guestName, payment.guestEmail, tempPassword);
-                } else {
-                    console.log('ℹ️ Guest email already has an account; sending standard welcome email only', {
-                        email: payment.guestEmail,
-                        userId: existingUser._id
-                    });
-                    await sendWelcomeEmail({
-                        email: payment.guestEmail,
-                        name: payment.guestName
-                    });
-                    NotificationService.sendNotification(
-                        { email: payment.guestEmail, phone: payment.guestPhone },
-                        'welcome_message',
-                        { clientName: payment.guestName }
-                    ).catch(err => console.error('Welcome notification (existing user) failed:', err.message));
                 }
+                // For existing users, no notification is sent as requested
             }
 
             await Payment.findOneAndUpdate(
@@ -977,49 +951,6 @@ const verifyGuestPayment = async (req, res, next) => {
 
                 await booking.save();
 
-                // Send payment success notifications to user and admin
-                try {
-                    // Get user information for notification
-                    const user = await User.findById(booking.userId).select('email phone name');
-
-                    if (user) {
-                        // DISABLED: Send payment success notification to user (email and WhatsApp)
-                        /*
-                        await NotificationService.sendNotification(
-                            { email: user.email, phone: user.phone },
-                            'payment_successful',
-                            {
-                                clientName: user.name,
-                                amount: payment.amount,
-                                serviceName: service?.name || 'Service',
-                                transactionId: paymentId,
-                                orderId: orderId
-                            }
-                        );
-                        */
-
-                        // DISABLED: Send payment received notification to admin
-                        /*
-                        const admins = await User.find({ role: 'admin' }).select('email phone name');
-                        for (const admin of admins) {
-                            await NotificationService.sendNotification(
-                                { email: admin.email, phone: admin.phone },
-                                'payment_received',
-                                {
-                                    amount: payment.amount,
-                                    serviceName: service?.name || 'Service',
-                                    transactionId: paymentId,
-                                    orderId: orderId,
-                                    clientName: user.name
-                                }
-                            );
-                        }
-                        */
-                    }
-                } catch (notificationError) {
-                    console.error('Error sending payment notifications:', notificationError);
-                    // Don't fail the payment process if notifications fail
-                }
 
                 // Create session if booking has scheduling information
                 if (booking.scheduledDate && booking.scheduledTime) {
