@@ -13,8 +13,6 @@ const errorHandler = require('./src/middlewares/error.middleware');
 const fs = require('fs');
 const logger = require('./src/utils/logger');
 const { initializeServices } = require('./src/utils/serviceInitializer.utils');
-const csrf = require('csurf');
-const cookieParser = require('cookie-parser');
 
 // Server restart trigger
 const app = express();
@@ -95,7 +93,7 @@ const corsOptions = {
     credentials: true,
     optionsSuccessStatus: 200, // For legacy browser support
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 'X-CSRF-Token']
+    allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
 };
 
 app.use(cors(corsOptions));
@@ -109,44 +107,7 @@ if (config.NODE_ENV === 'development') {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Cookie parser - REQUIRED for CSRF
-app.use(cookieParser());
-
-// Debug: Log all cookies on every request
-app.use((req, res, next) => {
-    if (req.path.includes('/auth/') || req.path === '/csrf-token') {
-        console.log('🍪 [DEBUG]', req.method, req.path);
-        console.log('   Origin:', req.get('origin'));
-        console.log('   Cookies received:', JSON.stringify(req.cookies));
-        console.log('   Cookie header:', req.headers.cookie ? 'Present' : 'Missing');
-        console.log('   X-CSRF-Token header:', req.headers['x-csrf-token'] || 'Not present');
-    }
-    next();
-});
-
-// CSRF Protection - Configure with explicit cookie options
-const csrfProtection = csrf({
-    cookie: {
-        // Don't specify domain for localhost - let browser use default (current host)
-        path: '/',
-        httpOnly: true,
-        secure: config.NODE_ENV === 'production',
-        sameSite: 'lax'
-    },
-    // Only validate on state-changing methods
-    ignoreMethods: ['GET', 'HEAD', 'OPTIONS'],
-    // Use custom value retrieval for better control
-    value: (req) => req.headers['x-csrf-token']
-});
-
-// Apply CSRF to all requests EXCEPT /csrf-token endpoint
-app.use((req, res, next) => {
-    // Skip CSRF validation for token generation endpoint
-    if (req.path === '/csrf-token') {
-        return next();
-    }
-    csrfProtection(req, res, next);
-});
+// Debug: Log requests
 
 // // WWW to non-WWW redirect (301 permanent redirect)
 // // This helps with SEO by having a single canonical domain

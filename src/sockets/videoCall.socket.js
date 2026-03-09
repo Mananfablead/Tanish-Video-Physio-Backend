@@ -1405,7 +1405,9 @@ const setupVideoCallHandlers = (io, socket) => {
 
                 // Clean up waiting room entries
                 for (const [sessionId, waitingRoom] of waitingRooms) {
-                    if (waitingRoom.has(socket.id)) {
+                    // Check if any patient in this waiting room matches this socket
+                    const patientInWaitingRoom = waitingRoom.find(p => p.socketId === socket.id);
+                    if (patientInWaitingRoom) {
                         const removedPatient = removePatientFromWaitingRoom(sessionId, socket.id);
                         if (removedPatient) {
                             logger.info(`Removed disconnected patient ${userId} from waiting room ${sessionId}`);
