@@ -447,37 +447,8 @@ Looking forward to helping you!
             }
         }
 
-        // Create session for subscription-covered bookings
-        if (bookingTypeFinal === 'subscription-covered' && subscription) {
-            const Session = require('../models/Session.model');
-            const session = new Session({
-                therapistId: booking.therapistId,
-                userId: booking.userId,
-                date: booking.scheduledDate || booking.date,
-                time: booking.scheduledTime || booking.time,
-                startTime: new Date(`${booking.scheduledDate || booking.date}T${booking.scheduledTime || booking.time}`),
-                type: '1-on-1',
-                status: 'pending',
-                notes: `Session created automatically from subscription-covered booking #${booking._id}`,
-                bookingId: booking._id,
-                subscriptionId: subscription._id
-            });
-
-            // Calculate end time if duration is available
-            if (service && service.duration) {
-                const durationMatch = service.duration.match(/(\d+)/);
-                if (durationMatch) {
-                    const duration = parseInt(durationMatch[0]);
-                    const endTime = new Date(session.startTime);
-                    endTime.setMinutes(endTime.getMinutes() + duration);
-                    session.endTime = endTime;
-                    session.duration = duration;
-                }
-            }
-
-            await session.save();
-            console.log(`✅ Session created for subscription-covered booking ${booking._id}: Session ID ${session._id}`);
-        }
+        // ⚠️ NOTE: Session creation for subscription-covered bookings is now handled in updateBookingStatus
+        // when status changes to 'confirmed' to avoid duplicate sessions
 
         // If scheduling now, update availability to mark the slot as tentative until payment is confirmed
         if (scheduleType === 'now' && scheduledDate && scheduledTime && timeSlot) {
@@ -1154,34 +1125,42 @@ const updateBookingStatus = async (req, res, next) => {
            ✅ 1️⃣ AUTO CREATE SESSION (Subscription Covered)
         ========================================================== */
         if (status === 'confirmed' && booking.bookingType === 'subscription-covered') {
-
             const Session = require('../models/Session.model');
 
-            const sessionDate = booking.scheduledDate || booking.date;
-            // Use only the start time for session creation, not the time range
-            const sessionTime = booking.timeSlot?.start || booking.scheduledTime || booking.time || '09:00';
-
-            const startTime = new Date(`${sessionDate}T${sessionTime}`);
-
-            const session = new Session({
-                bookingId: booking._id,
-                therapistId: booking.therapistId,
-                userId: booking.userId,
-                date: sessionDate,
-                time: sessionTime,
-                startTime,
-                type: '1-on-1',
-                status: 'pending',
-                duration: 45,
-                notes: `Auto-created from confirmed subscription booking #${booking._id}`
+            // Check if session already exists for this booking to prevent duplicates
+            const existingSession = await Session.findOne({
+                bookingId: booking._id
             });
 
-            const endTime = new Date(startTime);
-            endTime.setMinutes(endTime.getMinutes() + session.duration);
-            session.endTime = endTime;
+            if (existingSession) {
+                console.log(`ℹ️ Session already exists for subscription booking ${booking._id}, skipping creation`);
+            } else {
+                const sessionDate = booking.scheduledDate || booking.date;
+                // Use only the start time for session creation, not the time range
+                const sessionTime = booking.timeSlot?.start || booking.scheduledTime || booking.time || '09:00';
 
-            await session.save();
-            console.log(`✅ Session created for subscription booking ${booking._id}`);
+                const startTime = new Date(`${sessionDate}T${sessionTime}`);
+
+                const session = new Session({
+                    bookingId: booking._id,
+                    therapistId: booking.therapistId,
+                    userId: booking.userId,
+                    date: sessionDate,
+                    time: sessionTime,
+                    startTime,
+                    type: '1-on-1',
+                    status: 'pending',
+                    duration: 45,
+                    notes: `Auto-created from confirmed subscription booking #${booking._id}`
+                });
+
+                const endTime = new Date(startTime);
+                endTime.setMinutes(endTime.getMinutes() + session.duration);
+                session.endTime = endTime;
+
+                await session.save();
+                console.log(`✅ Session created for subscription booking ${booking._id}`);
+            }
         }
 
         /* =========================================================
@@ -1190,31 +1169,40 @@ const updateBookingStatus = async (req, res, next) => {
         if (status === 'confirmed' && booking.scheduleType === 'now' && booking.bookingType !== 'subscription-covered') {
             const Session = require('../models/Session.model');
 
-            const sessionDate = booking.scheduledDate || booking.date;
-            // Use only the start time for session creation, not the time range
-            const sessionTime = booking.timeSlot?.start || booking.scheduledTime || booking.time || '09:00';
-
-            const startTime = new Date(`${sessionDate}T${sessionTime}`);
-
-            const session = new Session({
-                bookingId: booking._id,
-                therapistId: booking.therapistId,
-                userId: booking.userId,
-                date: sessionDate,
-                time: sessionTime,
-                startTime,
-                type: '1-on-1',
-                status: 'pending',
-                duration: 45,
-                notes: `Auto-created from confirmed booking #${booking._id}`
+            // Check if session already exists for this booking to prevent duplicates
+            const existingSession = await Session.findOne({
+                bookingId: booking._id
             });
 
-            const endTime = new Date(startTime);
-            endTime.setMinutes(endTime.getMinutes() + session.duration);
-            session.endTime = endTime;
+            if (existingSession) {
+                console.log(`ℹ️ Session already exists for booking ${booking._id}, skipping creation`);
+            } else {
+                const sessionDate = booking.scheduledDate || booking.date;
+                // Use only the start time for session creation, not the time range
+                const sessionTime = booking.timeSlot?.start || booking.scheduledTime || booking.time || '09:00';
 
-            await session.save();
-            console.log(`✅ Session created for regular booking ${booking._id}`);
+                const startTime = new Date(`${sessionDate}T${sessionTime}`);
+
+                const session = new Session({
+                    bookingId: booking._id,
+                    therapistId: booking.therapistId,
+                    userId: booking.userId,
+                    date: sessionDate,
+                    time: sessionTime,
+                    startTime,
+                    type: '1-on-1',
+                    status: 'pending',
+                    duration: 45,
+                    notes: `Auto-created from confirmed booking #${booking._id}`
+                });
+
+                const endTime = new Date(startTime);
+                endTime.setMinutes(endTime.getMinutes() + session.duration);
+                session.endTime = endTime;
+
+                await session.save();
+                console.log(`✅ Session created for regular booking ${booking._id}`);
+            }
         }
 
         /* =========================================================
