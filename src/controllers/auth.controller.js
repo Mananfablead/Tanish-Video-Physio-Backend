@@ -67,13 +67,6 @@ const register = async (req, res, next) => {
 // Login user
 const login = async (req, res, next) => {
     try {
-        // Debug: Log CSRF token details
-        console.log('🔍 Login Request - CSRF Debug:');
-        console.log('  - X-CSRF-Token header:', req.headers['x-csrf-token']);
-        console.log('  - Cookie (csrftoken):', req.cookies?.csrftoken);
-        console.log('  - All cookies:', req.cookies);
-        console.log('  - Match?', req.headers['x-csrf-token'] === req.cookies?.csrftoken ? '✅ YES' : '❌ NO');
-
         const { email, password, appType } = req.body; // appType can be 'client' or 'admin'
 
         // Find user by email
