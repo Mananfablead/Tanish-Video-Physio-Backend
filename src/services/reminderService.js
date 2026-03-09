@@ -69,42 +69,42 @@ class ReminderService {
     async processSessionReminders() {
         try {
             console.log('Running session reminder job...');
-            
+
             // Find upcoming sessions that need reminders
             const now = new Date();
             const in24Hours = new Date(now.getTime() + 24 * 60 * 60 * 1000);
             const in1Hour = new Date(now.getTime() + 60 * 60 * 1000);
-            
+
             // Find sessions that are starting within the next 24-25 hours (for 24-hour reminder)
             const sessionsFor24HourReminder = await Session.find({
-                startTime: { 
+                startTime: {
                     $gte: in24Hours,
                     $lt: new Date(in24Hours.getTime() + 60 * 60 * 1000) // 1 hour window
                 },
                 status: { $in: ['scheduled', 'pending'] },
                 last24HourReminderSent: { $exists: false }
             }).populate('userId', 'name email phone')
-              .populate('therapistId', 'name email phone')
-              .populate('bookingId');
-            
+                .populate('therapistId', 'name email phone')
+                .populate('bookingId');
+
             // Find sessions that are starting within the next 5-6 minutes (for 1-hour reminder - now 5 min)
-          // Find sessions that are starting within the next 5-6 minutes (for 1-hour reminder - now 5 min)
-// Find sessions that are starting within the next 5-6 minutes (for 1-hour reminder - now 5 min)
- const in5Minutes = new Date(now.getTime() + 5 * 60 * 1000);
-const sessionsFor1HourReminder = await Session.find({
-    startTime: { 
-        $gte: in5Minutes,
-        $lt: new Date(in5Minutes.getTime() + 60 * 1000) // 1 minute window
-    },
-    status: { $in: ['scheduled', 'pending'] },
-    last1HourReminderSent: { $exists: false }
-}).populate('userId', 'name email phone')
-              .populate('therapistId', 'name email phone')
-              .populate('bookingId');
-            
+            // Find sessions that are starting within the next 5-6 minutes (for 1-hour reminder - now 5 min)
+            // Find sessions that are starting within the next 5-6 minutes (for 1-hour reminder - now 5 min)
+            const in5Minutes = new Date(now.getTime() + 5 * 60 * 1000);
+            const sessionsFor1HourReminder = await Session.find({
+                startTime: {
+                    $gte: in5Minutes,
+                    $lt: new Date(in5Minutes.getTime() + 60 * 1000) // 1 minute window
+                },
+                status: { $in: ['scheduled', 'pending'] },
+                last1HourReminderSent: { $exists: false }
+            }).populate('userId', 'name email phone')
+                .populate('therapistId', 'name email phone')
+                .populate('bookingId');
+
             console.log(`Found ${sessionsFor24HourReminder.length} sessions for 24-hour reminders`);
             console.log(`Found ${sessionsFor1HourReminder.length} sessions for 5-minute reminders`);
-            
+
             // Send 24-hour reminders
             for (const session of sessionsFor24HourReminder) {
                 try {
@@ -115,7 +115,7 @@ const sessionsFor1HourReminder = await Session.find({
                     console.error(`❌ Error sending 24-hour reminder for session ${session._id}:`, error);
                 }
             }
-            
+
             // Send 1-hour reminders
             for (const session of sessionsFor1HourReminder) {
                 try {
@@ -126,7 +126,7 @@ const sessionsFor1HourReminder = await Session.find({
                     console.error(`❌ Error sending 5-minute reminder for session ${session._id}:`, error);
                 }
             }
-            
+
         } catch (error) {
             console.error('Error in session reminder processing:', error);
         }
@@ -185,12 +185,12 @@ const sessionsFor1HourReminder = await Session.find({
             email: session.userId?.email,
             phone: session.userId?.phone
         };
-        
+
         // Get booking information if available
         const booking = session.bookingId;
         const serviceName = booking?.serviceName || 'Physiotherapy Session';
         const therapistName = session.therapistId?.name || 'Your Therapist';
-        
+
         // Format session time
         const sessionDate = session.startTime.toLocaleDateString('en-US', {
             weekday: 'long',
@@ -198,13 +198,13 @@ const sessionsFor1HourReminder = await Session.find({
             month: 'long',
             day: 'numeric'
         });
-        
+
         const sessionTime = session.startTime.toLocaleTimeString('en-US', {
             hour: '2-digit',
             minute: '2-digit',
             hour12: true
         });
-        
+
         const userData = {
             clientName: session.userId?.name || 'Valued Patient',
             serviceName: serviceName,
@@ -216,7 +216,7 @@ const sessionsFor1HourReminder = await Session.find({
             sessionId: session._id,
             reminderType: reminderType
         };
-        
+
         // Use different template based on reminder type
         let templateName = 'session_reminder';
         if (reminderType === '24hour') {
@@ -224,14 +224,15 @@ const sessionsFor1HourReminder = await Session.find({
         } else if (reminderType === '1hour') {
             templateName = 'session_reminder_1h';
         }
-        
+
         // Send to user/patient
         await NotificationService.sendNotification(userRecipient, templateName, userData);
-        
-        // Send to admin as well
+
+        // Send to admin as well - using admin_session_reminder for both 24h and 1h reminders
         const adminData = {
             ...userData,
             patientName: session.userId?.name || 'Patient',
+            phone: session.userId?.phone || 'N/A',
             serviceName: serviceName,
             date: sessionDate,
             time: sessionTime,
@@ -240,16 +241,16 @@ const sessionsFor1HourReminder = await Session.find({
             sessionId: session._id,
             reminderType: reminderType
         };
-        
-        // Send admin-specific notification
+
+        // Send admin-specific notification with admin_session_reminder template
         await NotificationService.sendNotification({}, 'admin_session_reminder', adminData);
     }
-    
+
     async updateSessionReminderSent(session, reminderType) {
-        const updateField = reminderType === '24hour' 
-            ? 'last24HourReminderSent' 
+        const updateField = reminderType === '24hour'
+            ? 'last24HourReminderSent'
             : 'last1HourReminderSent';
-        
+
         await Session.findByIdAndUpdate(session._id, {
             [updateField]: new Date()
         });

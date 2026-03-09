@@ -210,6 +210,21 @@ class NotificationService {
             ]
         },
 
+        session_reminder: {
+            name: 'session_reminder',
+            language: 'en',
+            components: [
+                {
+                    type: 'body',
+                    parameters: [
+                        { type: 'text', text: '{{1}}' },  // Client name
+                        { type: 'text', text: '{{2}}' },  // Service name
+                        { type: 'text', text: '{{3}}' },  // Date
+                        { type: 'text', text: '{{4}}' }   // Time
+                    ]
+                }
+            ]
+        },
 
     };
 
@@ -325,21 +340,7 @@ class NotificationService {
 
 
 
-            case 'session_reminder_24h':
-                preparedTemplate.components = [
-                    {
-                        type: 'body',
-                        parameters: [
-                            { type: 'text', text: data.clientName || 'Patient' },     // 1
-                            { type: 'text', text: data.serviceName || 'Service' },    // 2
-                            { type: 'text', text: data.date || 'Date' },             // 3
-                            { type: 'text', text: data.time || 'Time' }              // 4
-                        ]
-                    }
-                ];
-                break;
-
-            case 'session_reminder_1h':
+            case 'session_reminder':
                 preparedTemplate.components = [
                     {
                         type: 'body',
@@ -595,8 +596,6 @@ class NotificationService {
                     whatsapp: 'new_booking_request'
                 },
 
-
-
                 appointment_rescheduled: {
                     email: {
                         subject: 'Appointment Rescheduled - Tanish Physio',
@@ -605,15 +604,30 @@ class NotificationService {
                     whatsapp: 'appointment_rescheduled'
                 },
 
+                // Session reminders for patients - Email + WhatsApp (using same template for both)
+                session_reminder_24h: {
+                    email: {
+                        subject: 'Session Reminder - 24 Hours',
+                        template: SessionReminderTemplates.sessionReminder24hEmail
+                    },
+                    whatsapp: 'session_reminder'
+                },
+
+                session_reminder_1h: {
+                    email: {
+                        subject: 'Session Reminder - 1 Hour',
+                        template: SessionReminderTemplates.sessionReminder1hEmail
+                    },
+                    whatsapp: 'session_reminder'
+                },
+
                 admin_session_reminder: {
                     email: {
                         subject: 'Upcoming Session Reminder - Admin',
                         template: EmailTemplates.adminUpcomingSession
                     },
-                    whatsapp: 'upcoming_session'
+                    whatsapp: 'admin_session_reminder'
                 },
-
-
             };
         } catch (error) {
             console.error('Error initializing notification service credentials:', error);
