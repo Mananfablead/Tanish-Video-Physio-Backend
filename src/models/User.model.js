@@ -112,6 +112,26 @@ const userSchema = new mongoose.Schema(
       fee: String,
       availability: String,
     },
+    assignedServices: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Service',
+      default: []
+    }],
+    subscriptionInfo: {
+      planId: String,
+      planName: String,
+      status: {
+        type: String,
+        enum: ['active', 'inactive', 'expired'],
+        default: 'inactive'
+      },
+      startDate: Date,
+      endDate: Date,
+      isExpired: {
+        type: Boolean,
+        default: false
+      }
+    }
   },
   {
     timestamps: true,

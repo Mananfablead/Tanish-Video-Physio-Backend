@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const User = require('../models/User.model');
 const Booking = require('../models/Booking.model');
 const Subscription = require('../models/Subscription.model');
@@ -128,7 +129,7 @@ const updateUser = async (req, res, next) => {
 // Create user (admin only)
 const createUser = async (req, res, next) => {
     try {
-        const { name, email, phone, password, role = 'patient', status = 'active' } = req.body;
+        const { name, email, phone, password, role = 'patient', status = 'active', assignedServices = [], subscriptionInfo = null } = req.body;
         const crypto = require('crypto');
         const { sendEmail } = require('../services/email.service');
 
@@ -154,17 +155,101 @@ const createUser = async (req, res, next) => {
         // Generate random password if not provided
         tempPassword = Math.random().toString(36).slice(-8) + 'Temp1!';
 
-        // Create new user - password will be hashed by pre-save hook
-        const user = new User({
+        // Prepare subscription info if provided
+        let processedSubscriptionInfo = null;
+        let createdSubscription = null;
+        
+        if (subscriptionInfo && subscriptionInfo.planId) {
+            const SubscriptionPlan = mongoose.model('SubscriptionPlan');
+            const plan = await SubscriptionPlan.findOne({ planId: subscriptionInfo.planId });
+            
+            if (plan) {
+                const startDate = new Date();
+                
+                // Calculate end date based on plan validityDays or duration
+                const endDate = new Date(startDate);
+                const validityDays = plan.validityDays || 
+                    (function() {
+                        switch(plan.duration) {
+                            case 'one-time': return 1;
+                            case 'daily': return 1;
+                            case 'weekly': return 7;
+                            case 'monthly': return 30;
+                            case 'quarterly': return 90;
+                            case 'half-yearly': return 180;
+                            case 'yearly': return 365;
+                            default: return 30;
+                        }
+                    })();
+                
+                endDate.setDate(endDate.getDate() + validityDays);
+                
+                processedSubscriptionInfo = {
+                    planId: plan.planId,
+                    planName: plan.name,
+                    status: 'active',
+                    startDate: startDate,
+                    endDate: endDate,
+                    isExpired: false
+                };
+
+                // Generate unique order ID for admin-created subscription
+                const orderId = `ADMIN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                
+                // Create Subscription record without payment
+                const Subscription = mongoose.model('Subscription');
+                createdSubscription = new Subscription({
+                    userId: null, // Will be set after user is created
+                    planId: plan.planId,
+                    planName: plan.name,
+                    amount: plan.price,
+                    currency: 'INR',
+                    orderId: orderId,
+                    paymentId: null, // No payment for admin-assigned subscriptions
+                    status: 'active',
+                    startDate: startDate,
+                    endDate: endDate,
+                    autoRenew: false,
+                    paymentGateway: 'admin_assignment',
+                    guestName: name,
+                    guestEmail: email,
+                    guestPhone: phone,
+                    finalAmount: plan.price,
+                    discountAmount: 0,
+                    scheduleType: 'now'
+                });
+            }
+        }
+
+        // Prepare user data object
+        const userData = {
             name,
             email,
             phone,
             password: tempPassword,
             role,
             status,
-        });
+            hasTempPassword: tempPassword ? true : false,
+            assignedServices: assignedServices || []
+        };
+        
+        // Only add subscriptionInfo if it's not null
+        if (processedSubscriptionInfo) {
+            userData.subscriptionInfo = processedSubscriptionInfo;
+        }
+
+        // Create new user - password will be hashed by pre-save hook
+        const user = new User(userData);
 
         await user.save();
+
+        // If subscription was created, update it with the userId
+        if (createdSubscription) {
+            createdSubscription.userId = user._id;
+            await createdSubscription.save();
+            
+            console.log(`✅ Subscription created for user ${user.email}: ${createdSubscription._id}`);
+        }
 
         // Remove password from response
         const userResponse = user.toObject();
@@ -181,6 +266,8 @@ const createUser = async (req, res, next) => {
                     <p><strong>Email:</strong> ${email}</p>
                     <p><strong>Password:</strong> ${tempPassword}</p>
                     <p style="color: #e53e3e; font-weight: bold;">⚠️ Important: Please change your password after first login for security.</p>
+                    ${processedSubscriptionInfo ? `<p><strong>Assigned Plan:</strong> ${processedSubscriptionInfo.planName}</p>` : ''}
+                    ${assignedServices.length > 0 ? `<p><strong>Assigned Services:</strong> ${assignedServices.length} service(s)</p>` : ''}
                     <p>Thank you for choosing Tanish Physio & Fitness!</p>
                 `;
             } else {
@@ -189,6 +276,8 @@ const createUser = async (req, res, next) => {
                     <p>Your account has been created successfully by an administrator.</p>
                     <p><strong>Login Email:</strong> ${email}</p>
                     <p>Please use the password you provided during account creation.</p>
+                    ${processedSubscriptionInfo ? `<p><strong>Assigned Plan:</strong> ${processedSubscriptionInfo.planName}</p>` : ''}
+                    ${assignedServices.length > 0 ? `<p><strong>Assigned Services:</strong> ${assignedServices.length} service(s)</p>` : ''}
                     <p>Thank you for choosing Tanish Physio & Fitness!</p>
                 `;
             }
