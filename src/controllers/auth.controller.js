@@ -208,7 +208,7 @@ const validateToken = async (req, res, next) => {
 
         // If appType is provided, validate role compatibility
         if (appType) {
-            const validAppTypes = ['client', 'admin'];
+            const validAppTypes = ['patient', 'admin'];
             if (!validAppTypes.includes(appType)) {
                 return res.status(400).json(ApiResponse.error("Invalid appType. Must be 'client' or 'admin'", 400));
             }

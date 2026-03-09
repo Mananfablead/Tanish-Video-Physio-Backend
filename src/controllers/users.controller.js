@@ -131,7 +131,8 @@ const createUser = async (req, res, next) => {
         const { name, email, phone, password, role = 'patient', status = 'active' } = req.body;
         const crypto = require('crypto');
         const { sendEmail } = require('../services/email.service');
-        const { hashPassword } = require('../utils/auth.utils');
+
+        let tempPassword = null; // Initialize to track if we created a new user with temp password
 
         // Validation - password is now optional
         if (!name || !email) {
@@ -151,24 +152,16 @@ const createUser = async (req, res, next) => {
         }
 
         // Generate random password if not provided
-        let finalPassword = password;
-        let generatedPassword = null;
-        
-        if (!password) {
-            // Generate a random 12-character password
-            generatedPassword = crypto.randomBytes(6).toString('hex');
-            finalPassword = generatedPassword;
-        }
+        tempPassword = Math.random().toString(36).slice(-8) + 'Temp1!';
 
         // Create new user - password will be hashed by pre-save hook
         const user = new User({
             name,
             email,
             phone,
-            password: finalPassword,
+            password: tempPassword,
             role,
             status,
-            hasTempPassword: generatedPassword ? true : false
         });
 
         await user.save();
@@ -180,14 +173,13 @@ const createUser = async (req, res, next) => {
         // Send welcome email with credentials
         try {
             let emailContent;
-            if (generatedPassword) {
+            if (tempPassword) {
                 emailContent = `
                     <h2>Welcome to Tanish Physio!</h2>
                     <p>Your account has been created successfully by an administrator.</p>
                     <p><strong>Login Credentials:</strong></p>
                     <p><strong>Email:</strong> ${email}</p>
-                    <p><strong>Password:</strong> ${generatedPassword}</p>
-                    <p><strong>Login URL:</strong> ${process.env.FRONTEND_URL || 'http://localhost:5173'}/login</p>
+                    <p><strong>Password:</strong> ${tempPassword}</p>
                     <p style="color: #e53e3e; font-weight: bold;">⚠️ Important: Please change your password after first login for security.</p>
                     <p>Thank you for choosing Tanish Physio & Fitness!</p>
                 `;
@@ -196,7 +188,6 @@ const createUser = async (req, res, next) => {
                     <h2>Welcome to Tanish Physio!</h2>
                     <p>Your account has been created successfully by an administrator.</p>
                     <p><strong>Login Email:</strong> ${email}</p>
-                    <p><strong>Login URL:</strong> ${process.env.FRONTEND_URL || 'http://localhost:5173'}/login</p>
                     <p>Please use the password you provided during account creation.</p>
                     <p>Thank you for choosing Tanish Physio & Fitness!</p>
                 `;
