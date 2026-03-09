@@ -23,6 +23,7 @@ const videoCallSignalingRoutes = require('./videoCallSignaling.routes');
 const offerRoutes = require('./offers');
 const credentialsRoutes = require('./credentials.routes');
 const phoneRoutes = require('./phoneRoutes');
+const csrfRoutes = require('./csrf.routes');
 
 // Mount route modules
 router.use('/auth', authRoutes);
@@ -46,5 +47,6 @@ router.use('/video-call', videoCallSignalingRoutes);
 router.use('/offers', offerRoutes);
 router.use('/credentials', credentialsRoutes);
 router.use('/phone', phoneRoutes);
+router.use('/', csrfRoutes);
 
 module.exports = router;
