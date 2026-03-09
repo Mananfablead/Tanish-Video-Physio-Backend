@@ -230,24 +230,41 @@ const startServer = async () => {
                     return next(new Error('Authentication error: Invalid token payload'));
                 }
 
-                // Attach user info to socket
-                // For now, we'll just use the info from the token since we don't have DB lookup here
-                const constructedName = `User ${decoded.userId.substring(0, 5)}`;
+                // Fetch complete user data from database
+                const User = require('./src/models/User.model');
+                const userData = await User.findById(decoded.userId).select('name firstName lastName displayName email').lean();
                 
+                // Construct name with proper fallbacks
+                let constructedName;
+                if (userData?.name && userData.name !== 'Clinician' && userData.name !== 'User Unknown') {
+                    constructedName = userData.name;
+                } else if (userData?.firstName && userData.lastName) {
+                    constructedName = `${userData.firstName} ${userData.lastName}`;
+                } else if (userData?.displayName) {
+                    constructedName = userData.displayName;
+                } else if (userData?.email) {
+                    constructedName = userData.email;
+                } else {
+                    constructedName = `User ${decoded.userId.substring(0, 5)}`;
+                }
+                
+                // Attach complete user info to socket
                 socket.user = {
                     userId: decoded.userId.toString(), // Ensure string format
                     role: decoded.role,
                     sessionId: decoded.sessionId,
                     name: constructedName,
-                    firstName: null,
-                    lastName: null,
-                    displayName: null,
-                    email: null
+                    firstName: userData?.firstName || null,
+                    lastName: userData?.lastName || null,
+                    displayName: userData?.displayName || null,
+                    email: userData?.email || null
                 };
 
                 console.log(`✅ Socket ${socket.id} authenticated:`, {
                     userId: socket.user.userId,
-                    role: socket.user.role
+                    role: socket.user.role,
+                    name: socket.user.name,
+                    email: socket.user.email
                 });
 
                 next();
