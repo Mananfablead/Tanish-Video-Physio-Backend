@@ -357,12 +357,19 @@ async function createSessionFromBooking(booking, service) {
 
         if (!existingSession) {
             try {
+                // Extract start time from scheduledTime (handle both HH:MM and HH:MM-HH:MM formats)
+                let startTimeValue = booking.scheduledTime;
+                if (booking.scheduledTime && booking.scheduledTime.includes('-')) {
+                    // If it's a time range like '19:20-20:05', extract just the start time
+                    startTimeValue = booking.scheduledTime.split('-')[0].trim();
+                }
+
                 const session = new Session({
                     therapistId: booking.therapistId,
                     userId: booking.userId,
                     date: booking.scheduledDate,
-                    time: booking.scheduledTime,
-                    startTime: new Date(`${booking.scheduledDate}T${booking.scheduledTime}`),
+                    time: startTimeValue, // Use extracted start time in HH:MM format
+                    startTime: new Date(`${booking.scheduledDate}T${startTimeValue}`),
                     type: '1-on-1',
                     status: 'pending',
                     notes: `Session created automatically from booking #${booking._id}`,
@@ -538,16 +545,16 @@ const verifyPayment = async (req, res, next) => {
                     const user = await User.findById(booking.userId).select('email phone name');
 
                     if (user) {
-                        // Send payment success notification to user (email and WhatsApp)
+                        // Send new booking notification to user (email and WhatsApp)
                         await NotificationService.sendNotification(
                             { email: user.email, phone: user.phone },
-                            'payment_successful',
+                            'new_booking',
                             {
                                 clientName: user.name,
-                                amount: payment.amount,
+                                phone: user.phone || 'N/A',  // Ensure phone is always defined
                                 serviceName: service?.name || 'Service',
-                                transactionId: paymentId,
-                                orderId: orderId
+                                date: booking?.date || booking?.scheduledDate || 'N/A',  // Fallback to scheduledDate
+                                time: booking?.time || booking?.scheduledTime || 'N/A'  // Fallback to scheduledTime
                             }
                         );
 
@@ -963,13 +970,20 @@ const verifyGuestPayment = async (req, res, next) => {
 
                     if (!existingSession) {
                         try {
+                            // Extract start time from scheduledTime (handle both HH:MM and HH:MM-HH:MM formats)
+                            let startTimeValue = booking.scheduledTime;
+                            if (booking.scheduledTime && booking.scheduledTime.includes('-')) {
+                                // If it's a time range like '19:20-20:05', extract just the start time
+                                startTimeValue = booking.scheduledTime.split('-')[0].trim();
+                            }
+
                             // Create a new session based on the booking
                             const session = new Session({
                                 therapistId: booking.therapistId,
                                 userId: booking.userId,
                                 date: booking.scheduledDate,
-                                time: booking.scheduledTime,
-                                startTime: new Date(`${booking.scheduledDate}T${booking.scheduledTime}`),
+                                time: startTimeValue, // Use extracted start time in HH:MM format
+                                startTime: new Date(`${booking.scheduledDate}T${startTimeValue}`),
                                 type: '1-on-1',
                                 status: 'pending',
                                 notes: `Session created automatically from booking #${booking._id}`,
@@ -1930,14 +1944,21 @@ const verifySubscriptionPayment = async (req, res, next) => {
 
                         if (!existingSession) {
                             try {
+                                // Extract start time from scheduledTime (handle both HH:MM and HH:MM-HH:MM formats)
+                                let startTimeValue = pendingBooking.scheduledTime;
+                                if (pendingBooking.scheduledTime && pendingBooking.scheduledTime.includes('-')) {
+                                    // If it's a time range like '19:20-20:05', extract just the start time
+                                    startTimeValue = pendingBooking.scheduledTime.split('-')[0].trim();
+                                }
+
                                 // Create a new session based on the booking
                                 // Use therapistId from booking first, fall back to subscription therapistId
                                 const session = new Session({
                                     therapistId: pendingBooking.therapistId || subscription.therapistId,
                                     userId: pendingBooking.userId,
                                     date: pendingBooking.scheduledDate,
-                                    time: pendingBooking.scheduledTime,
-                                    startTime: new Date(`${pendingBooking.scheduledDate}T${pendingBooking.scheduledTime}`),
+                                    time: startTimeValue, // Use extracted start time in HH:MM format
+                                    startTime: new Date(`${pendingBooking.scheduledDate}T${startTimeValue}`),
                                     type: '1-on-1',
                                     status: 'pending',
                                     notes: `Session created automatically from subscription booking #${pendingBooking._id}`,
@@ -2389,12 +2410,19 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
                                 });
 
                                 if (!existingSession) {
+                                    // Extract start time from scheduledTime (handle both HH:MM and HH:MM-HH:MM formats)
+                                    let startTimeValue = pendingBooking.scheduledTime;
+                                    if (pendingBooking.scheduledTime && pendingBooking.scheduledTime.includes('-')) {
+                                        // If it's a time range like '19:20-20:05', extract just the start time
+                                        startTimeValue = pendingBooking.scheduledTime.split('-')[0].trim();
+                                    }
+
                                     const session = new Session({
                                         therapistId: pendingBooking.therapistId || subscription.therapistId,
                                         userId: pendingBooking.userId || userIdToCheck,
                                         date: pendingBooking.scheduledDate,
-                                        time: pendingBooking.scheduledTime,
-                                        startTime: new Date(`${pendingBooking.scheduledDate}T${pendingBooking.scheduledTime}`),
+                                        time: startTimeValue, // Use extracted start time in HH:MM format
+                                        startTime: new Date(`${pendingBooking.scheduledDate}T${startTimeValue}`),
                                         type: '1-on-1',
                                         status: 'pending',
                                         notes: `Session created from subscription booking #${pendingBooking._id}`,

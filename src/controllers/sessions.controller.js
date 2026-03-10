@@ -1145,14 +1145,25 @@ const createAdminSession = async (req, res, next) => {
       }
 
       // 🔥 CHECK SERVICE EXPIRATION - NEW VALIDATION
+      // Allow session creation if booking is expired BUT only for missed sessions that can be rescheduled
       if (booking.isServiceExpired) {
-        return res
-          .status(400)
-          .json(
-            ApiResponse.error(
-              "Cannot create session: Service purchase has expired"
-            )
-          );
+        // Check if this is a missed session that can be rebooked
+        const missedSession = await Session.findOne({
+          bookingId: booking._id,
+          status: 'missed'
+        });
+
+        // If there's a missed session, allow rebooking (admin can create new session)
+        if (!missedSession) {
+          return res
+            .status(400)
+            .json(
+              ApiResponse.error(
+                "Cannot create session: Service purchase has expired"
+              )
+            );
+        }
+        // If missed session exists, continue to allow admin to create a new session
       }
 
       // 🔥 ONE SESSION PER DAY LIMIT (for admin too)

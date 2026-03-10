@@ -11,6 +11,7 @@ const { getWhatsAppCredentials, getEmailCredentials } = require('../utils/creden
 const Credentials = require('../models/Credentials.model');
 const { validateWhatsAppToken, addCountryCode } = require('../utils/whatsapp.utils');
 const User = require('../models/User.model'); // Import User model for admin profile
+const logger = require('../utils/logger');
 
 class NotificationService {
     // Static templates mapping for direct access
@@ -193,7 +194,7 @@ class NotificationService {
             ]
         },
 
-        new_booking: {
+        new_booking_request: {
             name: 'new_booking_request',
             language: 'en',
             components: [
@@ -385,7 +386,7 @@ class NotificationService {
                 ];
                 break;
 
-            case 'new_booking':
+            case 'new_booking_request':
                 preparedTemplate.components = [
                     {
                         type: 'body',
@@ -409,7 +410,7 @@ class NotificationService {
         try {
             const emailCreds = await getEmailCredentials();
             const adminEmail = emailCreds?.adminEmail || null;
-            logger.info('📧 Admin Email Retrieved:', adminEmail || 'NOT CONFIGURED');
+            logger.info('📧 Admin Email Retrieved:', adminEmail);
             return adminEmail;
         } catch (error) {
             console.error('Error getting admin email from credentials:', error);
@@ -526,7 +527,7 @@ class NotificationService {
                     this.emailEnabled = !!(emailCreds.user && emailCreds.password);
                 } catch (verifyError) {
                     console.warn('⚠️ Notification email transporter verification failed:', verifyError.message);
-                // Still enable email functionality but log the issue
+                    // Still enable email functionality but log the issue
                     this.emailEnabled = !!(emailCreds.user && emailCreds.password);
                 }
             }
@@ -695,15 +696,23 @@ class NotificationService {
                 const adminEmail = await NotificationService.getAdminEmail();
                 if (adminEmail) {
                     recipient.email = adminEmail;
-                     console.log('📧 Admin notification being sent to:', adminEmail);
+                    console.log('📧 Admin notification being sent to:', adminEmail);
                 } else {
-                  }
+                    console.warn('💡 To configure: Please add admin email in Admin Panel > Settings > Email Credentials');
+                    recipient.email = null; // This will cause email sending to be skipped gracefully
+                }
             }
 
             // Send email if configured
             if (this.emailEnabled && template.email) {
                 console.log('📧 Sending email notification to:', recipient.email);
-                results.email = await this.sendEmail(recipient.email, template.email, data);
+                // Only send email if recipient.email is defined
+                if (recipient.email) {
+                    results.email = await this.sendEmail(recipient.email, template.email, data);
+                } else {
+                    console.warn('⚠️ Skipping email notification: recipient email not defined');
+                    results.email = { success: false, error: 'Admin email not configured' };
+                }
             }
 
             // Check if WhatsApp is enabled and active before sending
@@ -753,7 +762,8 @@ class NotificationService {
                 } else {
                     console.warn(`No phone number available for WhatsApp template: ${template.whatsapp}`);
                 }
-            } else if (template.whatsapp && !whatsappCredential) {
+            }
+            else if (template.whatsapp && !whatsappCredential) {
                 console.log('⚠️ WhatsApp credential is not active, skipping WhatsApp notification');
                 results.whatsapp = { success: false, error: 'WhatsApp credential is not active' };
             }
@@ -867,7 +877,7 @@ class NotificationService {
                 // Check if template has the required structure
                 if (template && typeof template.template === 'function') {
                     subject = typeof template.subject === 'function'
-                        ? template.subject(data) 
+                        ? template.subject(data)
                         : template.subject || 'Notification from Tanish Physio';
                     htmlContent = template.template(data);
                 } else {
@@ -988,7 +998,7 @@ class NotificationService {
             if (!adminUser || !adminUser.phone) {
                 throw new Error('Admin phone number not configured in admin profile');
             }
-            
+
             // Format admin phone number with country code if needed
             formattedPhone = addCountryCode(adminUser.phone);
 
@@ -1030,7 +1040,7 @@ class NotificationService {
                 }
 
             });
-            console.log('WhatsApp API Request:', response.data);  
+            console.log('WhatsApp API Request:', response.data);
 
             // Analyze the response
             const analysis = this.analyzeWhatsAppResponse(response, requestData);

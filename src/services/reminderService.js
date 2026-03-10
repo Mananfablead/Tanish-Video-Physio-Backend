@@ -87,14 +87,11 @@ class ReminderService {
                 .populate('therapistId', 'name email phone')
                 .populate('bookingId');
 
-            // Find sessions that are starting within the next 5-6 minutes (for 1-hour reminder - now 5 min)
-            // Find sessions that are starting within the next 5-6 minutes (for 1-hour reminder - now 5 min)
-            // Find sessions that are starting within the next 5-6 minutes (for 1-hour reminder - now 5 min)
-            const in5Minutes = new Date(now.getTime() + 5 * 60 * 1000);
+            // Find sessions that are starting within the next 1-2 hours (for 1-hour reminder)
             const sessionsFor1HourReminder = await Session.find({
                 startTime: {
-                    $gte: in5Minutes,
-                    $lt: new Date(in5Minutes.getTime() + 60 * 1000) // 1 minute window
+                    $gte: in1Hour,
+                    $lt: new Date(in1Hour.getTime() + 60 * 60 * 1000) // 1 hour window
                 },
                 status: { $in: ['scheduled', 'pending'] },
                 last1HourReminderSent: { $exists: false }
@@ -103,7 +100,7 @@ class ReminderService {
                 .populate('bookingId');
 
             console.log(`Found ${sessionsFor24HourReminder.length} sessions for 24-hour reminders`);
-            console.log(`Found ${sessionsFor1HourReminder.length} sessions for 5-minute reminders`);
+            console.log(`Found ${sessionsFor1HourReminder.length} sessions for 1-hour reminders`);
 
             // Send 24-hour reminders
             for (const session of sessionsFor24HourReminder) {
@@ -121,9 +118,9 @@ class ReminderService {
                 try {
                     await this.sendSessionReminder(session, '1hour');
                     await this.updateSessionReminderSent(session, '1hour');
-                    console.log(`✅ 5-minute reminder sent for session ${session._id}`);
+                    console.log(`✅ 1-hour reminder sent for session ${session._id}`);
                 } catch (error) {
-                    console.error(`❌ Error sending 5-minute reminder for session ${session._id}:`, error);
+                    console.error(`❌ Error sending 1-hour reminder for session ${session._id}:`, error);
                 }
             }
 

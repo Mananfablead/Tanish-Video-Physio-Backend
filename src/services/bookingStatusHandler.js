@@ -203,8 +203,8 @@ class BookingStatusHandler {
             triggers.push({
                 type: 'user',
                 template: 'booking_confirmation',
-                data: { 
-                    bookingId: booking._id, 
+                data: {
+                    bookingId: booking._id,
                     serviceName: booking.serviceName,
                     date: booking.date,
                     time: booking.time,
@@ -237,16 +237,10 @@ class BookingStatusHandler {
         }
 
         // Admin notifications
-        if (booking.status === this.BOOKING_STATUS.PENDING) {
-            triggers.push({
-                type: 'admin',
-                template: 'new_booking',
-                data: { bookingId: booking._id, clientName: booking.clientName }
-            });
-        }
-
-        if (payment?.status === this.PAYMENT_MODEL_STATUS.PAID) {
-            // Send new booking notification when payment is made to ensure admin gets notified
+        // Send new_booking notification only when BOTH conditions are met:
+        // 1. booking.status = PENDING AND 2. payment.status = PAID
+        if (booking.status === this.BOOKING_STATUS.PENDING &&
+            payment?.status === this.PAYMENT_MODEL_STATUS.PAID) {
             triggers.push({
                 type: 'admin',
                 template: 'new_booking',
@@ -256,9 +250,9 @@ class BookingStatusHandler {
                     patientName: booking.clientName,
                     serviceName: booking.serviceName,
                     amount: payment.amount,
-                    phone: booking.phone || (booking.userId?.phone),  // Use booking phone or user phone
-                    date: booking.date || booking.scheduledDate,     // Use booking date
-                    time: booking.time || booking.scheduledTime      // Use booking time
+                    phone: booking.clientPhone || booking.guestPhone || 'N/A',  // Use clientPhone or guestPhone
+                    date: booking.date || booking.scheduledDate,
+                    time: booking.time || booking.scheduledTime
                 }
             });
         }
