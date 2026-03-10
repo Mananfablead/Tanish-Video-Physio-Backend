@@ -7332,3 +7332,37 @@
 {"level":"info","message":"✓ Email service transporter initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-10T07:36:01.583Z"}
 {"level":"info","message":"✓ Reminder service initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-10T07:36:01.639Z"}
 {"level":"info","message":"Email transporter is ready to send messages","service":"tanish-physio-backend","timestamp":"2026-03-10T07:36:01.653Z"}
+{"level":"info","message":"Initializing external services...","service":"tanish-physio-backend","timestamp":"2026-03-10T07:36:20.521Z"}
+{"level":"info","message":"Google Calendar API initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-10T07:36:20.531Z"}
+{"level":"info","message":"✓ Google Calendar API initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-10T07:36:20.533Z"}
+{"level":"info","message":"Email transporter is ready to send messages","service":"tanish-physio-backend","timestamp":"2026-03-10T07:36:26.664Z"}
+{"level":"info","message":"Email transporter is ready to send messages","service":"tanish-physio-backend","timestamp":"2026-03-10T07:36:26.721Z"}
+{"level":"info","message":"✓ Email service transporter initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-10T07:36:26.723Z"}
+{"level":"info","message":"✓ Reminder service initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-10T07:36:26.781Z"}
+{"level":"info","message":"Admin 6983285edd35041942ccbffd joined admin notification room","service":"tanish-physio-backend","timestamp":"2026-03-10T07:36:30.663Z"}
+{"level":"info","message":"Initializing external services...","service":"tanish-physio-backend","timestamp":"2026-03-10T07:50:47.824Z"}
+{"level":"info","message":"Google Calendar API initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-10T07:50:47.843Z"}
+{"level":"info","message":"✓ Google Calendar API initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-10T07:50:47.845Z"}
+{"level":"info","message":"Email transporter is ready to send messages","service":"tanish-physio-backend","timestamp":"2026-03-10T07:50:49.485Z"}
+{"level":"info","message":"✓ Email service transporter initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-10T07:50:49.487Z"}
+{"level":"info","message":"✓ Reminder service initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-10T07:50:49.744Z"}
+{"level":"info","message":"Email transporter is ready to send messages","service":"tanish-physio-backend","timestamp":"2026-03-10T07:50:50.087Z"}
+{"level":"info","message":"Admin 6983285edd35041942ccbffd joined admin notification room","service":"tanish-physio-backend","timestamp":"2026-03-10T07:50:54.140Z"}
+{"level":"info","message":"Initializing external services...","service":"tanish-physio-backend","timestamp":"2026-03-10T07:53:51.029Z"}
+{"level":"info","message":"Google Calendar API initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-10T07:53:51.043Z"}
+{"level":"info","message":"✓ Google Calendar API initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-10T07:53:51.044Z"}
+{"level":"info","message":"Email transporter is ready to send messages","service":"tanish-physio-backend","timestamp":"2026-03-10T07:53:51.939Z"}
+{"level":"info","message":"✓ Email service transporter initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-10T07:53:51.941Z"}
+{"level":"info","message":"✓ Reminder service initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-10T07:53:52.002Z"}
+{"level":"info","message":"Email transporter is ready to send messages","service":"tanish-physio-backend","timestamp":"2026-03-10T07:53:52.018Z"}
+{"level":"info","message":"Admin 6983285edd35041942ccbffd joined admin notification room","service":"tanish-physio-backend","timestamp":"2026-03-10T07:53:55.831Z"}
+{"level":"info","message":"User 6983285edd35041942ccbffd disconnected from chat","service":"tanish-physio-backend","timestamp":"2026-03-10T08:03:35.684Z"}
+{"level":"info","message":"Socket hCfIHjg4iqu5CTj3AAAB disconnected","service":"tanish-physio-backend","timestamp":"2026-03-10T08:03:35.687Z"}
+{"level":"info","message":"Admin socket hCfIHjg4iqu5CTj3AAAB disconnected","service":"tanish-physio-backend","timestamp":"2026-03-10T08:03:35.689Z"}
+{"level":"info","message":"Initializing external services...","service":"tanish-physio-backend","timestamp":"2026-03-10T08:09:23.613Z"}
+{"level":"info","message":"Google Calendar API initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-10T08:09:23.624Z"}
+{"level":"info","message":"✓ Google Calendar API initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-10T08:09:23.625Z"}
+{"level":"info","message":"Email transporter is ready to send messages","service":"tanish-physio-backend","timestamp":"2026-03-10T08:09:24.909Z"}
+{"level":"info","message":"Email transporter is ready to send messages","service":"tanish-physio-backend","timestamp":"2026-03-10T08:09:24.919Z"}
+{"level":"info","message":"✓ Email service transporter initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-10T08:09:24.919Z"}
+{"level":"info","message":"✓ Reminder service initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-10T08:09:24.986Z"}

@@ -680,7 +680,7 @@ class EmailTemplates {
             <td align="center">
                 <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 25px rgba(2, 132, 199, 0.15); overflow: hidden; border: 1px solid #bae6fd;">
                     ${EmailTemplates.generateHeader(
-                        '🔔 New Booking Request',
+                        'New Booking Request',
                         'Action required: Review and confirm',
                         { start: '#0284c7', end: '#0369a1', text: '#bae6fd' }
                     )}
@@ -750,7 +750,7 @@ class EmailTemplates {
                                             ₹
                                         </div>
                                         <div style="flex: 1;">
-                                            <div style="font-weight: 600; color: #083344; font-size: 18px;">₹${data.amount || '0'}</div>
+                                            <div style="font-weight: 600; color: #083344; font-size: 18px;">₹${data.amount && data.amount !== '0' ? data.amount : (data.bookingAmount || '0')}</div>
                                             <div style="font-size: 13px; color: #0369a1;">Booking Amount</div>
                                         </div>
                                     </div>
@@ -769,14 +769,13 @@ class EmailTemplates {
                             
                             <div style="text-align: center; margin: 35px 0;">
                                 <a href="#" style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color: white; text-decoration: none; padding: 16px 40px; border-radius: 12px; font-weight: 600; font-size: 16px; display: inline-block; box-shadow: 0 4px 15px rgba(2, 132, 199, 0.3); transition: all 0.3s ease;">
-                                    📋 View Full Booking Details
+                                    View Full Booking Details
                                 </a>
                             </div>
                             
                             <div style="background-color: #f0fdf4; border-radius: 12px; padding: 20px; margin: 25px 0; text-align: center; border: 1px solid #bbf7d0;">
                                 <p style="color: #15803d; margin: 0; font-size: 15px; line-height: 1.6;">
-                                    <strong>📊 Booking ID:</strong> ${data.bookingId || 'N/A'}<br>
-                                    <strong>🕐 Request Time:</strong> ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
+                                    <strong>Request Time:</strong> ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
                                 </p>
                             </div>
                             
