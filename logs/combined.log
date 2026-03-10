@@ -7612,3 +7612,4 @@
 {"level":"info","message":"User 69aecb3ab9e067fbf55efb46 disconnected from chat","service":"tanish-physio-backend","timestamp":"2026-03-10T10:11:58.106Z"}
 {"level":"info","message":"Socket 8kgZiirx-xQG4yTAAAAz disconnected","service":"tanish-physio-backend","timestamp":"2026-03-10T10:11:58.130Z"}
 {"level":"info","message":"Admin socket 8kgZiirx-xQG4yTAAAAz disconnected","service":"tanish-physio-backend","timestamp":"2026-03-10T10:11:58.131Z"}
+{"0":"E","1":"m","10":"i","11":"g","12":"u","13":"r","14":"a","15":"t","16":"i","17":"o","18":"n","19":" ","2":"a","20":"n","21":"o","22":"t","23":" ","24":"f","25":"o","26":"u","27":"n","28":"d","29":" ","3":"i","30":"i","31":"n","32":" ","33":"d","34":"a","35":"t","36":"a","37":"b","38":"a","39":"s","4":"l","40":"e","5":" ","6":"c","7":"o","8":"n","9":"f","level":"error","message":"Email transporter configuration error:","service":"tanish-physio-backend","timestamp":"2026-03-10T10:46:03.967Z"}
