@@ -7613,3 +7613,32 @@
 {"level":"info","message":"Socket 8kgZiirx-xQG4yTAAAAz disconnected","service":"tanish-physio-backend","timestamp":"2026-03-10T10:11:58.130Z"}
 {"level":"info","message":"Admin socket 8kgZiirx-xQG4yTAAAAz disconnected","service":"tanish-physio-backend","timestamp":"2026-03-10T10:11:58.131Z"}
 {"0":"E","1":"m","10":"i","11":"g","12":"u","13":"r","14":"a","15":"t","16":"i","17":"o","18":"n","19":" ","2":"a","20":"n","21":"o","22":"t","23":" ","24":"f","25":"o","26":"u","27":"n","28":"d","29":" ","3":"i","30":"i","31":"n","32":" ","33":"d","34":"a","35":"t","36":"a","37":"b","38":"a","39":"s","4":"l","40":"e","5":" ","6":"c","7":"o","8":"n","9":"f","level":"error","message":"Email transporter configuration error:","service":"tanish-physio-backend","timestamp":"2026-03-10T10:46:03.967Z"}
+{"level":"info","message":"Initializing external services...","service":"tanish-physio-backend","timestamp":"2026-03-10T10:55:43.871Z"}
+{"level":"info","message":"Google Calendar API initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-10T10:55:43.883Z"}
+{"level":"info","message":"✓ Google Calendar API initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-10T10:55:43.885Z"}
+{"level":"info","message":"Email transporter is ready to send messages","service":"tanish-physio-backend","timestamp":"2026-03-10T10:55:44.724Z"}
+{"level":"info","message":"✓ Email service transporter initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-10T10:55:44.724Z"}
+{"level":"info","message":"✓ Reminder service initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-10T10:55:44.785Z"}
+{"level":"info","message":"Email transporter is ready to send messages","service":"tanish-physio-backend","timestamp":"2026-03-10T10:55:44.804Z"}
+{"level":"info","message":"Admin 6983285edd35041942ccbffd joined admin notification room","service":"tanish-physio-backend","timestamp":"2026-03-10T12:13:46.203Z"}
+{"level":"info","message":"User 6983285edd35041942ccbffd disconnected from chat","service":"tanish-physio-backend","timestamp":"2026-03-10T12:31:29.529Z"}
+{"level":"info","message":"Socket SQjHE08BDslyXzxCAAAB disconnected","service":"tanish-physio-backend","timestamp":"2026-03-10T12:31:29.532Z"}
+{"level":"info","message":"Admin socket SQjHE08BDslyXzxCAAAB disconnected","service":"tanish-physio-backend","timestamp":"2026-03-10T12:31:29.539Z"}
+{"level":"info","message":"Admin 6983285edd35041942ccbffd joined admin notification room","service":"tanish-physio-backend","timestamp":"2026-03-10T12:42:25.400Z"}
+{"level":"info","message":"User 6983285edd35041942ccbffd disconnected from chat","service":"tanish-physio-backend","timestamp":"2026-03-10T12:42:30.781Z"}
+{"level":"info","message":"Socket CZbvxgFOj_fg28mzAAAD disconnected","service":"tanish-physio-backend","timestamp":"2026-03-10T12:42:30.792Z"}
+{"level":"info","message":"Admin socket CZbvxgFOj_fg28mzAAAD disconnected","service":"tanish-physio-backend","timestamp":"2026-03-10T12:42:30.805Z"}
+{"level":"info","message":"Admin 6983285edd35041942ccbffd joined admin notification room","service":"tanish-physio-backend","timestamp":"2026-03-10T12:42:32.078Z"}
+{"level":"info","message":"User 6983285edd35041942ccbffd disconnected from chat","service":"tanish-physio-backend","timestamp":"2026-03-10T12:49:54.441Z"}
+{"level":"info","message":"Socket H-Ft9xT_lx2pCbfUAAAF disconnected","service":"tanish-physio-backend","timestamp":"2026-03-10T12:49:54.452Z"}
+{"level":"info","message":"Admin socket H-Ft9xT_lx2pCbfUAAAF disconnected","service":"tanish-physio-backend","timestamp":"2026-03-10T12:49:54.461Z"}
+{"level":"info","message":"Admin 6983285edd35041942ccbffd joined admin notification room","service":"tanish-physio-backend","timestamp":"2026-03-10T12:49:55.395Z"}
+{"level":"info","message":"User 6983285edd35041942ccbffd disconnected from chat","service":"tanish-physio-backend","timestamp":"2026-03-10T12:49:56.694Z"}
+{"level":"info","message":"Socket ctAJQWJF1qio1GCLAAAH disconnected","service":"tanish-physio-backend","timestamp":"2026-03-10T12:49:56.713Z"}
+{"level":"info","message":"Admin socket ctAJQWJF1qio1GCLAAAH disconnected","service":"tanish-physio-backend","timestamp":"2026-03-10T12:49:56.715Z"}
+{"level":"info","message":"Admin 6983285edd35041942ccbffd joined admin notification room","service":"tanish-physio-backend","timestamp":"2026-03-10T12:49:57.759Z"}
+{"level":"info","message":"Admin 6983285edd35041942ccbffd joined admin notification room","service":"tanish-physio-backend","timestamp":"2026-03-10T12:50:17.335Z"}
+{"level":"info","message":"User 6983285edd35041942ccbffd disconnected from chat","service":"tanish-physio-backend","timestamp":"2026-03-10T12:50:17.350Z"}
+{"level":"info","message":"Socket TuhfT5NvWabW7sfwAAAL disconnected","service":"tanish-physio-backend","timestamp":"2026-03-10T12:50:17.352Z"}
+{"level":"info","message":"Admin socket TuhfT5NvWabW7sfwAAAL disconnected","service":"tanish-physio-backend","timestamp":"2026-03-10T12:50:17.353Z"}
+{"level":"info","message":"Admin 6983285edd35041942ccbffd joined admin notification room","service":"tanish-physio-backend","timestamp":"2026-03-10T12:50:17.561Z"}
