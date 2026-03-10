@@ -554,7 +554,8 @@ const verifyPayment = async (req, res, next) => {
                                 phone: user.phone || 'N/A',  // Ensure phone is always defined
                                 serviceName: service?.name || 'Service',
                                 date: booking?.date || booking?.scheduledDate || 'N/A',  // Fallback to scheduledDate
-                                time: booking?.time || booking?.scheduledTime || 'N/A'  // Fallback to scheduledTime
+                                time: booking?.time || booking?.scheduledTime || 'N/A',  // Fallback to scheduledTime
+                                amount: booking?.amount || service?.price || '0'  // Add amount from booking or service
                             }
                         );
 
@@ -1038,6 +1039,28 @@ const verifyGuestPayment = async (req, res, next) => {
                 name: payment.guestName
             });
             await sendWelcomeEmailWithCredentials(payment.guestEmail, payment.guestName, payment.guestEmail, tempPassword);
+
+            // Send new booking notification to ADMIN (not to guest user)
+            try {
+                const NotificationService = require('../services/notificationService');
+                const service = await Service.findById(booking.serviceId);
+
+                await NotificationService.sendNotification(
+                    { email: 'placeholder', phone: 'placeholder' }, // Admin will receive via notification service
+                    'new_booking',
+                    {
+                        clientName: payment.guestName,
+                        phone: payment.guestPhone || 'N/A',
+                        serviceName: service?.name || 'Service',
+                        date: booking?.scheduledDate || 'N/A',
+                        time: booking?.scheduledTime || 'N/A',
+                        amount: payment?.amount || booking?.amount || service?.price || '0'
+                    }
+                );
+            } catch (notificationError) {
+                console.error('Error sending admin booking notification:', notificationError);
+                // Don't fail the process if notifications fail
+            }
 
             res.status(200).json(
                 ApiResponse.success({

@@ -692,7 +692,7 @@ class EmailTemplates {
                             </p>
                             
                             <div style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-radius: 12px; padding: 25px; margin: 25px 0; border: 2px solid #7dd3fc;">
-                                <h2 style="color: #083344; margin: 0 0 25px 0; font-size: 24px; font-weight: 700;">📋 Booking Details</h2>
+                                <h2 style="color: #083344; margin: 0 0 25px 0; font-size: 24px; font-weight: 700;">Booking Details</h2>
                                 
                                 <div style="display: grid; gap: 12px;">
                                     <div style="display: flex; align-items: center; gap: 15px; padding: 18px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #0284c7;">
@@ -758,7 +758,7 @@ class EmailTemplates {
                             </div>
                             
                             <div style="background-color: #fef3c7; border-radius: 12px; padding: 20px; margin: 25px 0; border-left: 4px solid #f59e0b;">
-                                <h3 style="color: #92400e; margin: 0 0 12px 0; font-size: 18px; font-weight: 700;">⚡ Immediate Actions Required</h3>
+                                <h3 style="color: #92400e; margin: 0 0 12px 0; font-size: 18px; font-weight: 700;">Immediate Actions Required</h3>
                                 <ul style="color: #b45309; margin: 0; padding-left: 20px; line-height: 1.8;">
                                     <li style="margin-bottom: 6px;">Review the booking details above</li>
                                     <li style="margin-bottom: 6px;">Confirm or reschedule the appointment</li>
