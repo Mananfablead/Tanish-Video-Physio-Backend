@@ -656,6 +656,36 @@ const createSession = async (req, res, next) => {
     );
     await session.populate("therapistId", "name email role");
 
+    /* ================= SEND ADMIN NOTIFICATION ================= */
+    // Send new session request notification to admin
+    try {
+      const User = require('../models/User.model');
+      const user = await User.findById(userId).select('email phone name');
+
+      if (user) {
+        const notificationData = {
+          clientName: user.name,
+          phone: user.phone || 'N/A',
+          serviceName: session.bookingId?.serviceName || 'Subscription Session',
+          date: session.date,
+          time: session.time,
+          sessionId: session._id
+        };
+
+        // Send notification to admin
+        await NotificationService.sendNotification(
+          { email: 'placeholder', phone: 'placeholder' }, // Admin contact will be retrieved by notification service
+          'new_session_request',
+          notificationData
+        );
+
+        console.log(`✅ New session request notification sent to admin for session ${session._id}`);
+      }
+    } catch (notificationError) {
+      console.error(`❌ Error sending admin session notification for session ${session._id}:`, notificationError);
+      // Continue with response even if notification fails
+    }
+
     return res
       .status(201)
       .json(ApiResponse.success({ session }, "Session created successfully"));
@@ -1367,6 +1397,36 @@ const createAdminSession = async (req, res, next) => {
 
     await session.populate("therapistId", "name email role");
     await session.populate("userId", "name email");
+
+    /* ================= SEND ADMIN NOTIFICATION ================= */
+    // Send new session request notification to admin (even when created by admin, send confirmation)
+    try {
+      const User = require('../models/User.model');
+      const user = await User.findById(userId).select('email phone name');
+
+      if (user) {
+        const notificationData = {
+          clientName: user.name,
+          phone: user.phone || 'N/A',
+          serviceName: session.bookingId?.serviceName || 'Subscription Session',
+          date: session.date,
+          time: session.time,
+          sessionId: session._id
+        };
+
+        // Send notification to admin
+        await NotificationService.sendNotification(
+          { email: 'placeholder', phone: 'placeholder' }, // Admin contact will be retrieved by notification service
+          'new_session_request',
+          notificationData
+        );
+
+        console.log(`✅ New session request notification sent to admin for session ${session._id}`);
+      }
+    } catch (notificationError) {
+      console.error(`❌ Error sending admin session notification for session ${session._id}:`, notificationError);
+      // Continue with response even if notification fails
+    }
 
     res
       .status(201)

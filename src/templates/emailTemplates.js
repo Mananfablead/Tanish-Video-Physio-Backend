@@ -51,10 +51,10 @@ class EmailTemplates {
             <td align="center">
                 <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden;">
                     ${EmailTemplates.generateHeader(
-                        data.title || 'Important Notification',
-                        '',
-                        { start: '#1e3a8a', end: '#3b82f6', text: '#e0f2fe' }
-                    )}
+            data.title || 'Important Notification',
+            '',
+            { start: '#1e3a8a', end: '#3b82f6', text: '#e0f2fe' }
+        )}
                     
                     <tr>
                         <td style="padding: 40px;">
@@ -75,10 +75,10 @@ class EmailTemplates {
                     </tr>
                     
                     ${EmailTemplates.generateFooter(
-                        '#1e293b',
-                        { light: '#cbd5e1', accent: '#94a3b8', border: '#334155' },
-                        'Best regards, Tanish Physio Team'
-                    )}
+            '#1e293b',
+            { light: '#cbd5e1', accent: '#94a3b8', border: '#334155' },
+            'Best regards, Tanish Physio Team'
+        )}
                 </table>
             </td>
         </tr>
@@ -105,10 +105,10 @@ class EmailTemplates {
             <td align="center">
                 <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 20px rgba(0,0,0,0.08); overflow: hidden; border: 1px solid #e0e7ff;">
                     ${EmailTemplates.generateHeader(
-                        'Welcome to Tanish Physio',
-                        'Your recovery journey starts here',
-                        { start: '#4f46e5', end: '#6366f1', text: '#e0e7ff' }
-                    )}
+            'Welcome to Tanish Physio',
+            'Your recovery journey starts here',
+            { start: '#4f46e5', end: '#6366f1', text: '#e0e7ff' }
+        )}
                     
                     <tr>
                         <td style="padding: 40px;">
@@ -136,10 +136,10 @@ class EmailTemplates {
                     </tr>
 
                     ${EmailTemplates.generateFooter(
-                        '#312e81',
-                        { light: '#c7d2fe', accent: '#a5b4fc', border: '#4338ca' },
-                        'Warm regards, Team Tanish Physio'
-                    )}
+            '#312e81',
+            { light: '#c7d2fe', accent: '#a5b4fc', border: '#4338ca' },
+            'Warm regards, Team Tanish Physio'
+        )}
                 </table>
             </td>
         </tr>
@@ -165,10 +165,10 @@ class EmailTemplates {
             <td align="center">
                 <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #e0f2fe;">
                     ${EmailTemplates.generateHeader(
-                        'Booking Request Submitted!',
-                        "We've received your request",
-                        { start: '#0ea5e9', end: '#0284c7', text: '#e0f2fe' }
-                    )}
+            'Booking Request Submitted!',
+            "We've received your request",
+            { start: '#0ea5e9', end: '#0284c7', text: '#e0f2fe' }
+        )}
                     
                     <tr>
                         <td style="padding: 40px;">
@@ -200,10 +200,10 @@ class EmailTemplates {
                     </tr>
                     
                     ${EmailTemplates.generateFooter(
-                        '#0c4a6e',
-                        { light: '#bae6fd', accent: '#7dd3fc', border: '#1e5a8a' },
-                        'Questions? Contact our support team'
-                    )}
+            '#0c4a6e',
+            { light: '#bae6fd', accent: '#7dd3fc', border: '#1e5a8a' },
+            'Questions? Contact our support team'
+        )}
                 </table>
             </td>
         </tr>
@@ -216,16 +216,16 @@ class EmailTemplates {
     // Template 3: Booking Confirmed
     static bookingConfirmed(data) {
         const isPaymentPending = data.paymentStatus === 'pending';
-        
+
         // Format date properly
-        const formattedDate = data.date ? 
+        const formattedDate = data.date ?
             new Date(data.date).toLocaleDateString('en-IN', {
                 weekday: 'long',
                 year: 'numeric',
                 month: 'long',
                 day: 'numeric'
             }) : 'Not specified';
-        
+
         const formattedTime = data.time || 'Not specified';
 
         return `
@@ -242,10 +242,10 @@ class EmailTemplates {
             <td align="center">
                 <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #bbf7d0;">
                     ${EmailTemplates.generateHeader(
-                        'Booking Confirmed!',
-                        'Your appointment is secured',
-                        { start: '#16a34a', end: '#15803d', text: '#dcfce7' }
-                    )}
+            'Booking Confirmed!',
+            'Your appointment is secured',
+            { start: '#16a34a', end: '#15803d', text: '#dcfce7' }
+        )}
                     
                     <tr>
                         <td style="padding: 40px;">
@@ -259,7 +259,7 @@ class EmailTemplates {
                                 <div style="display: grid; grid-template-columns: auto 1fr; gap: 15px; align-items: center;">
                                     <div style="background-color: #16a34a; color: white; padding: 12px; border-radius: 8px; text-align: center; min-width: 100px;">
                                         <div style="font-size: 24px; font-weight: bold;">${new Date(data.date).getDate()}</div>
-                                        <div style="font-size: 14px;">${new Date(data.date).toLocaleDateString('en-US', {month: 'short'})}</div>
+                                        <div style="font-size: 14px;">${new Date(data.date).toLocaleDateString('en-US', { month: 'short' })}</div>
                                     </div>
                                     <div>
                                         <p style="font-size: 18px; color: #15803d; margin: 0; line-height: 1.5;">
@@ -304,10 +304,10 @@ class EmailTemplates {
                     </tr>
                     
                     ${EmailTemplates.generateFooter(
-                        '#14532d',
-                        { light: '#bbf7d0', accent: '#86efac', border: '#166534' },
-                        'Need to make changes to your appointment?'
-                    )}
+            '#14532d',
+            { light: '#bbf7d0', accent: '#86efac', border: '#166534' },
+            'Need to make changes to your appointment?'
+        )}
                 </table>
             </td>
         </tr>
@@ -333,10 +333,10 @@ class EmailTemplates {
             <td align="center">
                 <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #fecaca;">
                     ${EmailTemplates.generateHeader(
-                        'Booking Cancelled',
-                        'We sincerely apologize',
-                        { start: '#dc2626', end: '#b91c1c', text: '#fecaca' }
-                    )}
+            'Booking Cancelled',
+            'We sincerely apologize',
+            { start: '#dc2626', end: '#b91c1c', text: '#fecaca' }
+        )}
                     
                     <tr>
                         <td style="padding: 40px;">
@@ -381,10 +381,10 @@ class EmailTemplates {
                     </tr>
                     
                     ${EmailTemplates.generateFooter(
-                        '#7f1d1d',
-                        { light: '#fecaca', accent: '#fca5a5', border: '#991b1b' },
-                        'Need immediate assistance?'
-                    )}
+            '#7f1d1d',
+            { light: '#fecaca', accent: '#fca5a5', border: '#991b1b' },
+            'Need immediate assistance?'
+        )}
                 </table>
             </td>
         </tr>
@@ -489,10 +489,10 @@ class EmailTemplates {
             <td align="center">
                 <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #bbf7d0;">
                     ${EmailTemplates.generateHeader(
-                        'Payment Successful!',
-                        'Transaction confirmed',
-                        { start: '#16a34a', end: '#15803d', text: '#dcfce7' }
-                    )}
+            'Payment Successful!',
+            'Transaction confirmed',
+            { start: '#16a34a', end: '#15803d', text: '#dcfce7' }
+        )}
                     
                     <tr>
                         <td style="padding: 40px;">
@@ -535,10 +535,10 @@ class EmailTemplates {
                     </tr>
                     
                     ${EmailTemplates.generateFooter(
-                        '#14532d',
-                        { light: '#bbf7d0', accent: '#86efac', border: '#166534' },
-                        'Have questions about your payment or appointment?'
-                    )}
+            '#14532d',
+            { light: '#bbf7d0', accent: '#86efac', border: '#166534' },
+            'Have questions about your payment or appointment?'
+        )}
                 </table>
             </td>
         </tr>
@@ -564,10 +564,10 @@ class EmailTemplates {
             <td align="center">
                 <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #bae6fd;">
                     ${EmailTemplates.generateHeader(
-                        'Session Reminder',
-                        'Your appointment is coming up',
-                        { start: '#0284c7', end: '#0369a1', text: '#bae6fd' }
-                    )}
+            'Session Reminder',
+            'Your appointment is coming up',
+            { start: '#0284c7', end: '#0369a1', text: '#bae6fd' }
+        )}
                     
                     <tr>
                         <td style="padding: 40px;">
@@ -651,10 +651,10 @@ class EmailTemplates {
                     </tr>
                     
                     ${EmailTemplates.generateFooter(
-                        '#083344',
-                        { light: '#bae6fd', accent: '#7dd3fc', border: '#0c4a6e' },
-                        'Need to reschedule or have questions?'
-                    )}
+            '#083344',
+            { light: '#bae6fd', accent: '#7dd3fc', border: '#0c4a6e' },
+            'Need to reschedule or have questions?'
+        )}
                 </table>
             </td>
         </tr>
@@ -680,10 +680,10 @@ class EmailTemplates {
             <td align="center">
                 <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 25px rgba(2, 132, 199, 0.15); overflow: hidden; border: 1px solid #bae6fd;">
                     ${EmailTemplates.generateHeader(
-                        'New Booking Request',
-                        'Action required: Review and confirm',
-                        { start: '#0284c7', end: '#0369a1', text: '#bae6fd' }
-                    )}
+            'New Booking Request',
+            'Action required: Review and confirm',
+            { start: '#0284c7', end: '#0369a1', text: '#bae6fd' }
+        )}
                     
                     <tr>
                         <td style="padding: 40px;">
@@ -773,10 +773,10 @@ class EmailTemplates {
                     </tr>
 
                     ${EmailTemplates.generateFooter(
-                        '#083344',
-                        { light: '#bae6fd', accent: '#7dd3fc', border: '#0c4a6e' },
-                        'Tanish Physio Operations Management'
-                    )}
+            '#083344',
+            { light: '#bae6fd', accent: '#7dd3fc', border: '#0c4a6e' },
+            'Tanish Physio Operations Management'
+        )}
                 </table>
             </td>
         </tr>
@@ -786,7 +786,129 @@ class EmailTemplates {
         `;
     }
 
-    // Template 9: Admin - Payment Received
+    // Template 9: Admin - New Session Request
+    static adminNewSessionRequest(data) {
+        return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Session Request - Admin</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0fdf4;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f0fdf4; padding: 20px 0;">
+        <tr>
+            <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 25px rgba(34, 197, 94, 0.15); overflow: hidden; border: 1px solid #bbf7d0;">
+                    ${EmailTemplates.generateHeader(
+            'New Session Request',
+            'Action required: Review and schedule',
+            { start: '#16a34a', end: '#15803d', text: '#bbf7d0' }
+        )}
+                    
+                    <tr>
+                        <td style="padding: 40px;">
+                            <p style="font-size: 20px; color: #14532d; margin: 0 0 25px 0; font-weight: 600;">
+                                Hello Admin Team,
+                            </p>
+                            
+                            <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-radius: 12px; padding: 25px; margin: 25px 0; border: 2px solid #86efac;">
+                                <h2 style="color: #14532d; margin: 0 0 25px 0; font-size: 24px; font-weight: 700;">Session Details</h2>
+                                
+                                <div style="display: grid; gap: 12px;">
+                                    <div style="display: flex; align-items: center; gap: 15px; padding: 18px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #16a34a;">
+                                        <div style="flex: 1;">
+                                            <div style="font-weight: 600; color: #14532d; font-size: 16px;">${data.clientName || data.patientName || 'N/A'}</div>
+                                            <div style="font-size: 13px; color: #166534;">Client / Patient Name</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div style="display: flex; align-items: center; gap: 15px; padding: 18px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #15803d;">
+                                        <div style="flex: 1;">
+                                            <div style="font-weight: 600; color: #14532d; font-size: 16px;">${data.phone || 'N/A'}</div>
+                                            <div style="font-size: 13px; color: #166534;">Contact Number</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div style="display: flex; align-items: center; gap: 15px; padding: 18px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #22c55e;">
+                                        <div style="flex: 1;">
+                                            <div style="font-weight: 600; color: #14532d; font-size: 16px;">${data.serviceName || 'Service'}</div>
+                                            <div style="font-size: 13px; color: #166534;">Session Service</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div style="display: flex; align-items: center; gap: 15px; padding: 18px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #16a34a;">
+                                        <div style="flex: 1;">
+                                            <div style="font-weight: 600; color: #14532d; font-size: 16px;">${data.date || 'N/A'}</div>
+                                            <div style="font-size: 13px; color: #166534;">Scheduled Date</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div style="display: flex; align-items: center; gap: 15px; padding: 18px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #15803d;">
+                                        <div style="flex: 1;">
+                                            <div style="font-weight: 600; color: #14532d; font-size: 16px;">${data.time || 'N/A'}</div>
+                                            <div style="font-size: 13px; color: #166534;">Scheduled Time</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div style="display: flex; align-items: center; gap: 15px; padding: 18px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #10b981;">
+                                        <div style="flex: 1;">
+                                            <div style="font-weight: 600; color: #14532d; font-size: 16px;">Session ID: ${data.sessionId ? String(data.sessionId).substring(0, 8) + '...' : 'N/A'}</div>
+                                            <div style="font-size: 13px; color: #166534;">Reference ID</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div style="background-color: #fef3c7; border-radius: 12px; padding: 20px; margin: 25px 0; border-left: 4px solid #f59e0b;">
+                                <h3 style="color: #92400e; margin: 0 0 12px 0; font-size: 18px; font-weight: 700;">Immediate Actions Required</h3>
+                                <ul style="color: #b45309; margin: 0; padding-left: 20px; line-height: 1.8;">
+                                    <li style="margin-bottom: 6px;">Review the session request details above</li>
+                                    <li style="margin-bottom: 6px;">Verify therapist availability</li>
+                                    <li style="margin-bottom: 6px;">Confirm or assign appropriate therapist</li>
+                                    <li>Send session confirmation to the patient</li>
+                                </ul>
+                            </div>
+                            
+                            <div style="text-align: center; margin: 35px 0;">
+                                <a href="#" style="background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); color: white; text-decoration: none; padding: 16px 40px; border-radius: 12px; font-weight: 600; font-size: 16px; display: inline-block; box-shadow: 0 4px 15px rgba(22, 163, 74, 0.3); transition: all 0.3s ease;">
+                                    View Full Session Details
+                                </a>
+                            </div>
+                            
+                            <div style="background-color: #f0fdf4; border-radius: 12px; padding: 20px; margin: 25px 0; text-align: center; border: 1px solid #bbf7d0;">
+                                <p style="color: #15803d; margin: 0; font-size: 15px; line-height: 1.6;">
+                                    <strong>Request Time:</strong> ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
+                                </p>
+                            </div>
+                            
+                            <p style="font-size: 16px; color: #475569; margin: 30px 0 0 0; line-height: 1.6; text-align: center;">
+                                Please process this session request promptly to ensure excellent patient care.
+                            </p>
+                            
+                            <p style="font-size: 14px; color: #64748b; margin: 25px 0 0 0; text-align: center;">
+                                Best regards,<br>
+                                <strong style="color: #16a34a; font-size: 16px;">Tanish Physio Administration</strong>
+                            </p>
+                        </td>
+                    </tr>
+
+                    ${EmailTemplates.generateFooter(
+            '#14532d',
+            { light: '#bbf7d0', accent: '#86efac', border: '#166534' },
+            'Tanish Physio Operations Management'
+        )}
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+        `;
+    }
+
+    // Template 10: Admin - Payment Received
     static adminPaymentReceived(data) {
         return `
 <!DOCTYPE html>
@@ -802,10 +924,10 @@ class EmailTemplates {
             <td align="center">
                 <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #bbf7d0;">
                     ${EmailTemplates.generateHeader(
-                        'Payment Received',
-                        'Transaction confirmed',
-                        { start: '#16a34a', end: '#15803d', text: '#dcfce7' }
-                    )}
+            'Payment Received',
+            'Transaction confirmed',
+            { start: '#16a34a', end: '#15803d', text: '#dcfce7' }
+        )}
                     
                     <tr>
                         <td style="padding: 40px;">
@@ -865,10 +987,10 @@ class EmailTemplates {
                     </tr>
                     
                     ${EmailTemplates.generateFooter(
-                        '#14532d',
-                        { light: '#bbf7d0', accent: '#86efac', border: '#166534' },
-                        'Tanish Physio Financial Management'
-                    )}
+            '#14532d',
+            { light: '#bbf7d0', accent: '#86efac', border: '#166534' },
+            'Tanish Physio Financial Management'
+        )}
                 </table>
             </td>
         </tr>
@@ -1005,10 +1127,10 @@ class EmailTemplates {
             <td align="center">
                 <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 25px rgba(22, 163, 74, 0.15); overflow: hidden; border: 1px solid #bbf7d0;">
                     ${EmailTemplates.generateHeader(
-                        '🔔 Upcoming Session Alert',
-                        'Prepare for tomorrow\'s scheduled session',
-                        { start: '#16a34a', end: '#15803d', text: '#dcfce7' }
-                    )}
+            '🔔 Upcoming Session Alert',
+            'Prepare for tomorrow\'s scheduled session',
+            { start: '#16a34a', end: '#15803d', text: '#dcfce7' }
+        )}
                     
                     <tr>
                         <td style="padding: 40px;">
@@ -1113,10 +1235,10 @@ class EmailTemplates {
                     </tr>
                     
                     ${EmailTemplates.generateFooter(
-                        '#14532d',
-                        { light: '#bbf7d0', accent: '#86efac', border: '#14532d' },
-                        'Tanish Physio Operations Management'
-                    )}
+            '#14532d',
+            { light: '#bbf7d0', accent: '#86efac', border: '#14532d' },
+            'Tanish Physio Operations Management'
+        )}
                 </table>
             </td>
         </tr>

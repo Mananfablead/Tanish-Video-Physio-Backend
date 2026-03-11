@@ -2090,6 +2090,35 @@ const createBookingWithSubscription = async (req, res, next) => {
         console.log(`Session ${session._id} linked to subscription ${subscription._id}`);
         console.log(`User now has ${remainingSessions - 1} sessions remaining.`);
         
+        // Send new session request notification to admin
+        try {
+            const User = require('../models/User.model');
+            const user = await User.findById(req.user.userId).select('email phone name');
+
+            if (user) {
+                const notificationData = {
+                    clientName: user.name,
+                    phone: user.phone || 'N/A',
+                    serviceName: service?.name || 'Subscription Session',
+                    date: date,
+                    time: time,
+                    sessionId: session._id
+                };
+
+                // Send notification to admin
+                await NotificationService.sendNotification(
+                    { email: 'placeholder', phone: 'placeholder' }, // Admin contact will be retrieved by notification service
+                    'new_session_request',
+                    notificationData
+                );
+
+                console.log(`✅ New session request notification sent to admin for subscription session ${session._id}`);
+            }
+        } catch (notificationError) {
+            console.error(`❌ Error sending admin session notification for subscription session ${session._id}:`, notificationError);
+            // Continue with response even if notification fails
+        }
+
         // Also update the booking to link it properly with subscription
         // This ensures both session and service counts are tracked correctly
         booking.subscriptionId = subscription._id;

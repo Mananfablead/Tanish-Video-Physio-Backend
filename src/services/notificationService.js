@@ -61,6 +61,14 @@ class NotificationService {
             whatsapp: 'new_booking_request'
         },
 
+        new_session_request: {
+            email: {
+                subject: 'New Session Request - Admin',
+                template: EmailTemplates.adminNewSessionRequest
+            },
+            whatsapp: 'new_session_request'
+        },
+
         appointment_rescheduled: {
             email: {
                 subject: 'Appointment Rescheduled - Tanish Physio',
@@ -196,6 +204,23 @@ class NotificationService {
 
         new_booking_request: {
             name: 'new_booking_request',
+            language: 'en',
+            components: [
+                {
+                    type: 'body',
+                    parameters: [
+                        { type: 'text', text: '{{1}}' },  // Patient Name
+                        { type: 'text', text: '{{2}}' },  // Phone
+                        { type: 'text', text: '{{3}}' },  // Service Name
+                        { type: 'text', text: '{{4}}' },  // Date
+                        { type: 'text', text: '{{5}}' }   // Time
+                    ]
+                }
+            ]
+        },
+
+        new_session_request: {
+            name: 'new_session_request',
             language: 'en',
             components: [
                 {
@@ -381,6 +406,21 @@ class NotificationService {
                             { type: 'text', text: data.serviceName || 'Service' },      // Service Name
                             { type: 'text', text: data.date || 'N/A' },                // Date
                             { type: 'text', text: data.time || 'N/A' }                 // Time
+                        ]
+                    }
+                ];
+                break;
+
+            case 'new_session_request':
+                preparedTemplate.components = [
+                    {
+                        type: 'body',
+                        parameters: [
+                            { type: 'text', text: data.clientName || data.patientName || 'Patient' },  // Patient Name
+                            { type: 'text', text: data.phone || 'N/A' },  // Phone
+                            { type: 'text', text: data.serviceName || 'Service' },  // Service Name
+                            { type: 'text', text: data.date || 'N/A' },  // Date
+                            { type: 'text', text: data.time || 'N/A' }   // Time
                         ]
                     }
                 ];
@@ -853,6 +893,7 @@ class NotificationService {
                     'booking_confirmation': EmailTemplates.bookingConfirmed,
                     'booking_cancelled': EmailTemplates.bookingCancelled,
                     'new_booking': EmailTemplates.adminNewBooking,  // Added for admin notifications
+                    'new_session_request': EmailTemplates.adminNewSessionRequest,  // New template for session requests
                     /* 'payment_reminder': EmailTemplates.paymentReminder, */
                     /* 'payment_successful': EmailTemplates.paymentSuccess, */
                     'session_reminder_24h': SessionReminderTemplates.sessionReminder24hEmail,
