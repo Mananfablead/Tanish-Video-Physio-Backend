@@ -1256,6 +1256,62 @@ const generateGoogleMeetLink = async (req, res) => {
             });
         }
 
+        // If admin or therapist provided a manual link, use that instead of generating
+        if (req.body.googleMeetLink) {
+            const manualLink = req.body.googleMeetLink;
+            const manualCode = req.body.googleMeetCode || null;
+
+            // update session with manual link and optional code
+            await Session.findByIdAndUpdate(
+                sessionId,
+                {
+                    googleMeetLink: manualLink,
+                    googleMeetCode: manualCode,
+                    // dont touch expiresAt/eventId when manually entered
+                },
+                { new: true, runValidators: true }
+            );
+
+            // notify user same as generation
+            if (session.userId) {
+                try {
+                    const io = require('../../server').io;
+                    if (io) {
+                        const userNotificationRoom = `user_notifications_${session.userId._id}`;
+                        io.to(userNotificationRoom).emit('client-notification', {
+                            type: 'google_meet_ready',
+                            title: 'Alternative Meeting Ready',
+                            message: 'Your therapist has provided a meeting link for your session. Please check your session details.',
+                            sessionId: sessionId,
+                            googleMeetLink: manualLink,
+                            googleMeetCode: manualCode,
+                            timestamp: new Date().toISOString(),
+                            priority: 'medium'
+                        });
+                    }
+                } catch (socketError) {
+                    const Notification = require('../models/Notification.model');
+                    const notification = new Notification({
+                        title: 'Alternative Meeting Available',
+                        message: `Your therapist has arranged a meeting link as an alternative to the video call. You can join using the link provided.`,
+                        type: 'connection_failure',
+                        userId: session.userId._id,
+                        sessionId: sessionId
+                    });
+                    await notification.save();
+                }
+            }
+
+            return res.json({
+                success: true,
+                message: 'Google Meet link saved manually',
+                data: {
+                    meetLink: manualLink,
+                    meetCode: manualCode
+                }
+            });
+        }
+
         // Check if Google Meet link already exists
         if (session.googleMeetLink) {
             return res.json({
