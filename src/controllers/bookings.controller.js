@@ -2086,10 +2086,7 @@ const createBookingWithSubscription = async (req, res, next) => {
         
         await session.save();
         
-        console.log(`Subscription booking and session created successfully.`);
-        console.log(`Session ${session._id} linked to subscription ${subscription._id}`);
-        console.log(`User now has ${remainingSessions - 1} sessions remaining.`);
-        
+ 
         // Send new session request notification to admin
         try {
             const User = require('../models/User.model');

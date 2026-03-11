@@ -695,7 +695,7 @@ class NotificationService {
             };
 
             // For admin notifications, get admin email from credentials instead of recipient
-            const isAdminNotification = ['new_booking', 'admin_session_reminder'].includes(type);
+            const isAdminNotification = ['new_booking', 'new_session_request', 'admin_session_reminder'].includes(type);
 
             // Check user status if this is a user notification (not admin notification)
             if (!isAdminNotification && recipient.email) {
