@@ -696,9 +696,6 @@ class EmailTemplates {
                                 
                                 <div style="display: grid; gap: 12px;">
                                     <div style="display: flex; align-items: center; gap: 15px; padding: 18px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #0284c7;">
-                                        <div style="background-color: #0284c7; color: white; width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 22px;">
-                                            👤
-                                        </div>
                                         <div style="flex: 1;">
                                             <div style="font-weight: 600; color: #083344; font-size: 16px;">${data.clientName || data.patientName || 'N/A'}</div>
                                             <div style="font-size: 13px; color: #0369a1;">Client / Patient Name</div>
@@ -706,9 +703,6 @@ class EmailTemplates {
                                     </div>
                                     
                                     <div style="display: flex; align-items: center; gap: 15px; padding: 18px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #0ea5e9;">
-                                        <div style="background-color: #0ea5e9; color: white; width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 22px;">
-                                            📞
-                                        </div>
                                         <div style="flex: 1;">
                                             <div style="font-weight: 600; color: #083344; font-size: 16px;">${data.phone || 'N/A'}</div>
                                             <div style="font-size: 13px; color: #0369a1;">Contact Number</div>
@@ -716,9 +710,6 @@ class EmailTemplates {
                                     </div>
                                     
                                     <div style="display: flex; align-items: center; gap: 15px; padding: 18px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #38bdf8;">
-                                        <div style="background-color: #38bdf8; color: white; width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 22px;">
-                                            💆
-                                        </div>
                                         <div style="flex: 1;">
                                             <div style="font-weight: 600; color: #083344; font-size: 16px;">${data.serviceName || 'Service'}</div>
                                             <div style="font-size: 13px; color: #0369a1;">Booked Service</div>
@@ -726,9 +717,6 @@ class EmailTemplates {
                                     </div>
                                     
                                     <div style="display: flex; align-items: center; gap: 15px; padding: 18px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #0284c7;">
-                                        <div style="background-color: #0284c7; color: white; width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 22px;">
-                                            🗓️
-                                        </div>
                                         <div style="flex: 1;">
                                             <div style="font-weight: 600; color: #083344; font-size: 16px;">${data.date || 'N/A'}</div>
                                             <div style="font-size: 13px; color: #0369a1;">Scheduled Date</div>
@@ -736,9 +724,6 @@ class EmailTemplates {
                                     </div>
                                     
                                     <div style="display: flex; align-items: center; gap: 15px; padding: 18px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #0ea5e9;">
-                                        <div style="background-color: #0ea5e9; color: white; width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 22px;">
-                                            ⏰
-                                        </div>
                                         <div style="flex: 1;">
                                             <div style="font-weight: 600; color: #083344; font-size: 16px;">${data.time || 'N/A'}</div>
                                             <div style="font-size: 13px; color: #0369a1;">Scheduled Time</div>
@@ -746,9 +731,6 @@ class EmailTemplates {
                                     </div>
                                     
                                     <div style="display: flex; align-items: center; gap: 15px; padding: 18px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #14b8a6;">
-                                        <div style="background-color: #14b8a6; color: white; width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 22px;">
-                                            ₹
-                                        </div>
                                         <div style="flex: 1;">
                                             <div style="font-weight: 600; color: #083344; font-size: 18px;">₹${data.amount && data.amount !== '0' ? data.amount : (data.bookingAmount || '0')}</div>
                                             <div style="font-size: 13px; color: #0369a1;">Booking Amount</div>
@@ -1035,13 +1017,10 @@ class EmailTemplates {
                             </p>
                             
                             <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-radius: 12px; padding: 25px; margin: 25px 0; border: 2px solid #86efac;">
-                                <h2 style="color: #14532d; margin: 0 0 25px 0; font-size: 24px; font-weight: 700;">📋 Session Information</h2>
+                                <h2 style="color: #14532d; margin: 0 0 25px 0; font-size: 24px; font-weight: 700;">Session Information</h2>
 
                                 <div style="display: grid; gap: 12px;">
                                     <div style="display: flex; align-items: center; gap: 15px; padding: 18px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #16a34a;">
-                                        <div style="background-color: #16a34a; color: white; width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 22px;">
-                                            👤
-                                        </div>
                                         <div style="flex: 1;">
                                             <div style="font-weight: 600; color: #14532d; font-size: 16px;">${data.patientName || data.clientName || 'Client Name'}</div>
                                             <div style="font-size: 13px; color: #15803d;">Patient / Client</div>
@@ -1049,9 +1028,6 @@ class EmailTemplates {
                                     </div>
                                     
                                     <div style="display: flex; align-items: center; gap: 15px; padding: 18px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #22c55e;">
-                                        <div style="background-color: #22c55e; color: white; width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 22px;">
-                                            📞
-                                        </div>
                                         <div style="flex: 1;">
                                             <div style="font-weight: 600; color: #14532d; font-size: 16px;">${data.phone || 'N/A'}</div>
                                             <div style="font-size: 13px; color: #15803d;">Contact Number</div>
@@ -1059,9 +1035,6 @@ class EmailTemplates {
                                     </div>
                                     
                                     <div style="display: flex; align-items: center; gap: 15px; padding: 18px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #4ade80;">
-                                        <div style="background-color: #4ade80; color: white; width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 22px;">
-                                            💆
-                                        </div>
                                         <div style="flex: 1;">
                                             <div style="font-weight: 600; color: #14532d; font-size: 16px;">${data.serviceName || 'Service Name'}</div>
                                             <div style="font-size: 13px; color: #15803d;">Scheduled Service</div>
@@ -1069,9 +1042,6 @@ class EmailTemplates {
                                     </div>
                                     
                                     <div style="display: flex; align-items: center; gap: 15px; padding: 18px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #16a34a;">
-                                        <div style="background-color: #16a34a; color: white; width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 22px;">
-                                            👨‍⚕️
-                                        </div>
                                         <div style="flex: 1;">
                                             <div style="font-weight: 600; color: #14532d; font-size: 16px;">${data.therapistName || 'Therapist Name'}</div>
                                             <div style="font-size: 13px; color: #15803d;">Assigned Therapist</div>
@@ -1079,9 +1049,6 @@ class EmailTemplates {
                                     </div>
                                     
                                     <div style="display: flex; align-items: center; gap: 15px; padding: 18px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #22c55e;">
-                                        <div style="background-color: #22c55e; color: white; width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 22px;">
-                                            🗓️
-                                        </div>
                                         <div style="flex: 1;">
                                             <div style="font-weight: 600; color: #14532d; font-size: 16px;">${data.date || 'TBD'}</div>
                                             <div style="font-size: 13px; color: #15803d;">Session Date</div>
@@ -1089,9 +1056,6 @@ class EmailTemplates {
                                     </div>
                                     
                                     <div style="display: flex; align-items: center; gap: 15px; padding: 18px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #4ade80;">
-                                        <div style="background-color: #4ade80; color: white; width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 22px;">
-                                            ⏰
-                                        </div>
                                         <div style="flex: 1;">
                                             <div style="font-weight: 600; color: #14532d; font-size: 16px;">${data.time || 'TBD'}</div>
                                             <div style="font-size: 13px; color: #15803d;">Session Time</div>
@@ -1115,7 +1079,7 @@ class EmailTemplates {
                             ${data.sessionLink ? `
                             <div style="text-align: center; margin: 35px 0;">
                                 <a href="${data.sessionLink}" style="background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); color: white; text-decoration: none; padding: 16px 40px; border-radius: 12px; font-weight: 600; font-size: 16px; display: inline-block; box-shadow: 0 4px 15px rgba(22, 163, 74, 0.3); transition: all 0.3s ease;">
-                                    🔗 Access Session Link
+                                    Access Session Link
                                 </a>
                             </div>
                             <p style="text-align: center; font-size: 13px; color: #15803d; margin: 15px 0 0 0; word-break: break-all;">
@@ -1124,7 +1088,7 @@ class EmailTemplates {
                             ` : ''}
                             
                             <div style="background-color: #dbeafe; border-radius: 12px; padding: 20px; margin: 25px 0; border-left: 4px solid #3b82f6;">
-                                <h3 style="color: #1e40af; margin: 0 0 12px 0; font-size: 18px; font-weight: 700;">💡 Important Notes</h3>
+                                <h3 style="color: #1e40af; margin: 0 0 12px 0; font-size: 18px; font-weight: 700;">Important Notes</h3>
                                 <p style="color: #1e3a8a; margin: 0; font-size: 15px; line-height: 1.6;">
                                     This is an automated reminder to ensure smooth session delivery and optimal client experience. Please complete all preparations at least 30 minutes before the scheduled time.
                                 </p>
@@ -1132,8 +1096,8 @@ class EmailTemplates {
                             
                             <div style="background-color: #f0fdf4; border-radius: 12px; padding: 20px; margin: 25px 0; text-align: center; border: 1px solid #bbf7d0;">
                                 <p style="color: #15803d; margin: 0; font-size: 15px; line-height: 1.6;">
-                                    <strong>📊 Session ID:</strong> ${data.sessionId || 'N/A'}<br>
-                                    <strong>🔔 Reminder Type:</strong> ${data.reminderType === '24hour' ? '24-Hour Advance Notice' : '1-Hour Final Alert'}
+                                    <strong>Session ID:</strong> ${data.sessionId || 'N/A'}<br>
+                                    <strong>Reminder Type:</strong> ${data.reminderType === '24hour' ? '24-Hour Advance Notice' : '1-Hour Final Alert'}
                                 </p>
                             </div>
                             
