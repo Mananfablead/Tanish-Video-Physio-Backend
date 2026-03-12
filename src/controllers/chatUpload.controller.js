@@ -17,6 +17,18 @@ const uploadFile = async (req, res) => {
             fileType = 'image';
         } else if (req.file.mimetype.startsWith('video/')) {
             fileType = 'video';
+        } else if (
+            req.file.mimetype === 'application/pdf' ||
+            req.file.mimetype === 'application/msword' ||
+            req.file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+            req.file.mimetype === 'application/vnd.ms-excel' ||
+            req.file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+            req.file.mimetype === 'application/vnd.ms-powerpoint' ||
+            req.file.mimetype === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
+            req.file.mimetype === 'text/plain' ||
+            req.file.mimetype === 'text/csv'
+        ) {
+            fileType = 'document';
         }
 
         const baseUrl = config.BASE_URL || `http://${req.headers.host}`;

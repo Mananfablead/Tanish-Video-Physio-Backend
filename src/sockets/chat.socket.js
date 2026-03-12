@@ -115,6 +115,11 @@ const setupChatHandlers = (io, socket) => {
                 attachments: message.attachments || []
             };
 
+            // If message is empty but has attachments, add a placeholder text
+            if (!chatMessageData.message.trim() && chatMessageData.attachments.length > 0) {
+                chatMessageData.message = '📎 File attachment';
+            }
+
             // If this is a support/private chat room, store the chatRoom name for querying
             if (isSupportRoom) {
                 chatMessageData.chatRoom = sessionId;
