@@ -12670,3 +12670,16 @@
 {"level":"info","message":"User 69b15686b356db41132ef51b joined session room 69b288fdb086d5ea6169f381","service":"tanish-physio-backend","timestamp":"2026-03-12T12:32:52.428Z"}
 {"level":"info","message":"User 69b15686b356db41132ef51b joined video session room: 69b288fdb086d5ea6169f381","service":"tanish-physio-backend","timestamp":"2026-03-12T12:32:52.432Z"}
 {"level":"info","message":"User 69b15686b356db41132ef51b joined video call room: video-call-69b288fdb086d5ea6169f381","service":"tanish-physio-backend","timestamp":"2026-03-12T12:32:52.433Z"}
+{"level":"info","message":"User 69b15686b356db41132ef51b disconnected from chat","service":"tanish-physio-backend","timestamp":"2026-03-12T12:37:24.861Z"}
+{"level":"info","message":"Socket asHw-8Dm__UAMR4ZAAAB disconnected","service":"tanish-physio-backend","timestamp":"2026-03-12T12:37:24.864Z"}
+{"level":"info","message":"Admin socket asHw-8Dm__UAMR4ZAAAB disconnected","service":"tanish-physio-backend","timestamp":"2026-03-12T12:37:24.865Z"}
+{"level":"info","message":"User 69b15686b356db41132ef51b disconnected from chat","service":"tanish-physio-backend","timestamp":"2026-03-12T12:37:24.869Z"}
+{"level":"info","message":"Socket KlyeNXi8EH9NvXoHAAAD disconnected","service":"tanish-physio-backend","timestamp":"2026-03-12T12:37:24.870Z"}
+{"level":"info","message":"Admin socket KlyeNXi8EH9NvXoHAAAD disconnected","service":"tanish-physio-backend","timestamp":"2026-03-12T12:37:24.871Z"}
+{"level":"info","message":"Initializing external services...","service":"tanish-physio-backend","timestamp":"2026-03-12T13:12:57.087Z"}
+{"level":"info","message":"Google Calendar API initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-12T13:12:57.100Z"}
+{"level":"info","message":"✓ Google Calendar API initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-12T13:12:57.102Z"}
+{"level":"info","message":"Email transporter is ready to send messages","service":"tanish-physio-backend","timestamp":"2026-03-12T13:12:58.529Z"}
+{"level":"info","message":"Email transporter is ready to send messages","service":"tanish-physio-backend","timestamp":"2026-03-12T13:12:58.544Z"}
+{"level":"info","message":"✓ Email service transporter initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-12T13:12:58.545Z"}
+{"level":"info","message":"✓ Reminder service initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-12T13:12:58.842Z"}

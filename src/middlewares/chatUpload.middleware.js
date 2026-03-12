@@ -67,15 +67,31 @@ const upload = multer({
         destination: function (req, file, cb) {
             const dir = path.join(__dirname, '..', 'public', 'uploads', 'chat');
             console.log('📁 Upload directory:', dir);
-            if (!fs.existsSync(dir)) {
-                console.log('📁 Creating directory:', dir);
-                fs.mkdirSync(dir, { recursive: true });
-            } else {
-                console.log('✅ Directory already exists');
+            console.log('📁 __dirname:', __dirname);
+
+            try {
+                if (!fs.existsSync(dir)) {
+                    console.log('📁 Creating directory:', dir);
+                    fs.mkdirSync(dir, { recursive: true });
+                    console.log('✅ Directory created successfully');
+                } else {
+                    console.log('✅ Directory already exists');
+                }
+
+                // Check if directory is writable
+                const testFile = path.join(dir, 'test-write.txt');
+                fs.writeFileSync(testFile, 'test');
+                fs.unlinkSync(testFile);
+                console.log('✅ Directory is writable');
+
+            } catch (err) {
+                console.error('❌ Error with directory:', err);
             }
+
             console.log('📦 File info:', {
                 originalname: file.originalname,
-                mimetype: file.mimetype
+                mimetype: file.mimetype,
+                fieldname: file.fieldname
             });
             cb(null, dir);
         },
@@ -83,6 +99,8 @@ const upload = multer({
             const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
             const filename = 'chat-' + uniqueSuffix + path.extname(file.originalname);
             console.log('📝 Generated filename:', filename);
+            console.log('📝 Original name:', file.originalname);
+            console.log('📝 Extension:', path.extname(file.originalname));
             cb(null, filename);
         }
     }),
@@ -92,6 +110,26 @@ const upload = multer({
     }
 });
 
+// Add error handling middleware
+const handleUploadError = (err, req, res, next) => {
+    console.error('❌ Multer error:', err);
+    if (err instanceof multer.MulterError) {
+        console.error('❌ Multer specific error:', err.code);
+        return res.status(400).json({
+            success: false,
+            message: `Multer error: ${err.message}`
+        });
+    } else if (err) {
+        console.error('❌ General upload error:', err);
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+    next();
+};
+
 module.exports = {
-    chatUpload: upload.single('file')
+    chatUpload: upload.single('file'),
+    handleUploadError
 };
