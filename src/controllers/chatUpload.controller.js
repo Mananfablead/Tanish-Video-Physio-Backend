@@ -41,7 +41,8 @@ const uploadFile = async (req, res) => {
             fileType = 'document';
         }
 
-        const baseUrl = config.BASE_URL || `https://${req.headers.host}`;
+
+        const baseUrl = config.BASE_URL || `http://${req.headers.host}`;
         const fileUrl = `${baseUrl}/uploads/chat/${req.file.filename}`;
 
         console.log('📎 Generated file URL:', fileUrl);
