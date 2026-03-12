@@ -37,6 +37,22 @@ const availabilitySchema = new mongoose.Schema({
             type: String,
             enum: ['regular', 'free-consultation'],
             default: 'regular'
+        },
+        // Group session fields
+        sessionType: {
+            type: String,
+            enum: ['one-to-one', 'group'],
+            default: 'one-to-one'
+        },
+        maxParticipants: {
+            type: Number,
+            default: 1,
+            min: 1
+        },
+        bookedParticipants: {
+            type: Number,
+            default: 0,
+            min: 0
         }
     }],
     adminTimezone: {

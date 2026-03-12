@@ -43,7 +43,8 @@ const paymentSchema = new mongoose.Schema({
     },
     paymentMethod: {
         type: String,
-        default: 'card' // card, netbanking, upi, wallet, etc.
+        enum: ['card', 'netbanking', 'upi', 'wallet'],
+        default: 'card' // card, netbanking, upi, wallet, cash
     },
     transactionId: {
         type: String // Transaction ID from payment gateway

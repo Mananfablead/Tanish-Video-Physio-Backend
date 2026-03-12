@@ -283,6 +283,17 @@ const setupVideoCallHandlers = (io, socket) => {
                 return;
             }
 
+            // For group sessions, ensure max participants is not exceeded and record acceptance
+            const isGroupSession = session.sessionType === 'group' || session.type === 'group';
+            if (isGroupSession) {
+                const acceptedCount = (session.participants || []).filter(p => p.status === 'accepted').length;
+                const maxPatients = session.maxParticipants || 0;
+                if (acceptedCount >= maxPatients) {
+                    socket.emit('error', { message: 'Group session is already full' });
+                    return;
+                }
+            }
+
             // Get the patient's socket to verify they're still connected
             const targetPatientSocket = io.sockets.sockets.get(patientSocketId);
             if (!targetPatientSocket) {
@@ -295,6 +306,26 @@ const setupVideoCallHandlers = (io, socket) => {
             if (!waitingPatient) {
                 socket.emit('error', { message: 'Patient not found in waiting room' });
                 return;
+            }
+
+            // Persist approval in session document for group sessions
+            if (isGroupSession) {
+                const participantIndex = (session.participants || []).findIndex(
+                    p => p.userId.toString() === targetPatientSocket.user.userId
+                );
+
+                if (participantIndex === -1) {
+                    session.participants = session.participants || [];
+                    session.participants.push({
+                        userId: targetPatientSocket.user.userId,
+                        bookingId: null,
+                        status: 'accepted'
+                    });
+                } else {
+                    session.participants[participantIndex].status = 'accepted';
+                }
+
+                await session.save();
             }
 
             // Add participant to video room registry FIRST
@@ -661,8 +692,14 @@ const setupVideoCallHandlers = (io, socket) => {
 
                 // Check if user has permission to join the call
                 isUser = session.userId && session.userId._id.toString() === userId;
+                const isParticipant = Array.isArray(session.participants)
+                    ? session.participants.some(p => p.userId.toString() === userId && p.status === 'accepted')
+                    : false;
                 isTherapist = session.therapistId && session.therapistId._id.toString() === userId;
                 const isAdmin = socket.user.role === 'admin';
+
+                // Attach group indicator for later logic
+                const isGroupSession = session.sessionType === 'group' || session.type === 'group';
 
                 // Check if patient was approved (should be in video room registry)
                 const videoRoomParticipants = getAllParticipantsInRoom(sessionId);
@@ -785,9 +822,10 @@ const setupVideoCallHandlers = (io, socket) => {
                     return;
                 }
 
-                // Check if max participants reached
+                // Check if max participants reached (maxParticipants counts patients; therapist is extra)
                 const activeParticipants = Array.from(io.sockets.adapter.rooms.get(groupSessionId) || []).length;
-                if (activeParticipants >= groupSession.maxParticipants && !isTherapist) {
+                const maxAllowed = (groupSession.maxParticipants || 0) + 1;
+                if (activeParticipants >= maxAllowed && !isTherapist) {
                     socket.emit('error', { message: 'Maximum participants reached for this group session' });
                     return;
                 }

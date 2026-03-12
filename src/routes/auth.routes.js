@@ -1,5 +1,5 @@
 const express = require('express');
-const { register, login, logout, validateToken, getProfile, getPublicProfile, getAllAdminProfiles, updateProfile, createAdminUser, forgotPassword, resetPassword, updatePassword, refreshToken } = require('../controllers/auth.controller');
+const { register, login, logout, validateToken, getProfile, getPublicProfile, getAllAdminProfiles, updateProfile, createAdminUser, forgotPassword, resetPassword, updatePassword, changePassword, refreshToken } = require('../controllers/auth.controller');
 const { authenticateToken } = require('../middlewares/auth.middleware');
 const { validateLogin } = require('../middlewares/validate.middleware');
 const { detectAppType } = require('../middlewares/appType.middleware');
@@ -20,6 +20,7 @@ router.post('/admin/create', createAdminUser);
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password/:token', resetPassword);
 router.put('/update-password', authenticateToken, updatePassword);
+router.put('/change-password', authenticateToken, changePassword);
 router.post('/refresh-token', refreshToken);
 
 module.exports = router;

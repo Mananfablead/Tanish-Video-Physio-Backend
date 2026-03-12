@@ -23,8 +23,18 @@ const getActiveQuestionnaire = async (req, res, next) => {
                 ApiResponse.error('No active questionnaire found', 404)
             );
         }
+        
+        // Filter only active questions
+        const activeQuestions = questionnaire.questions.filter(q => q.active !== false);
+        
+        // Return questionnaire with only active questions
+        const response = {
+            ...questionnaire.toObject(),
+            questions: activeQuestions
+        };
+        
         res.status(200).json(
-            ApiResponse.success(questionnaire, 'Active questionnaire retrieved successfully')
+            ApiResponse.success(response, 'Active questionnaire retrieved successfully')
         );
     } catch (error) {
         next(error);

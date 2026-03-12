@@ -47,11 +47,43 @@ const sessionSchema = new mongoose.Schema({
     endTime: {
         type: Date
     },
+    // Backwards-compatible field used by some parts of the system
     type: {
         type: String,
         enum: ['1-on-1', 'group'],
         default: '1-on-1'
     },
+    // New more explicit group/one-to-one designation (used for new group session flow)
+    sessionType: {
+        type: String,
+        enum: ['one-to-one', 'group'],
+        default: 'one-to-one'
+    },
+    maxParticipants: {
+        type: Number,
+        default: 1,
+        min: 1
+    },
+    participants: [{
+        userId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            required: true
+        },
+        bookingId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Booking'
+        },
+        status: {
+            type: String,
+            enum: ['pending', 'accepted', 'rejected'],
+            default: 'pending'
+        },
+        joinedAt: {
+            type: Date,
+            default: Date.now
+        }
+    }],
     status: {
         type: String,
         enum: ['pending', 'scheduled', 'live', 'completed', 'cancelled'],

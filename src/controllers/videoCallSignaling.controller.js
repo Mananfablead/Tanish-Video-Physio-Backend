@@ -8,49 +8,67 @@ const config = require('../config/env');
 const { createGoogleMeetEvent } = require('../utils/googleMeet.utils');
 const { getIO } = require('../utils/socketManager'); // Import socket manager
 
-// Generate secure JWT for joining call
+// Generate secure JWT for joining call (supports both 1-on-1 and group sessions)
 const generateCallToken = async (req, res) => {
     try {
-        const { sessionId, userId, role } = req.body;
+        const { sessionId, groupSessionId, userId, role } = req.body;
         const requesterId = req.user.userId;
         const requesterRole = req.user.role;
 
-        logger.info(`Generate call token request - sessionId: ${sessionId}, userId: ${userId}, role: ${role}, requesterId: ${requesterId}, requesterRole: ${requesterRole}`);
+        const roomId = sessionId || groupSessionId;
+        const roomType = sessionId ? 'session' : 'group';
+
+        logger.info(`Generate call token request - roomType: ${roomType}, roomId: ${roomId}, userId: ${userId}, role: ${role}, requesterId: ${requesterId}, requesterRole: ${requesterRole}`);
 
         // Validate input
-        if (!sessionId || !userId || !role) {
+        if (!roomId || !userId || !role) {
             logger.warn('Missing required fields in generate call token request');
             return res.status(400).json({
                 success: false,
-                message: 'sessionId, userId, and role are required'
+                message: 'sessionId/groupSessionId, userId, and role are required'
             });
         }
 
-        // Verify session exists and user has access
-        const session = await Session.findById(sessionId)
-            .populate('userId')
-            .populate('therapistId');
+        // Fetch the appropriate session type
+        let session = null;
+        if (roomType === 'session') {
+            session = await Session.findById(roomId)
+                .populate('userId')
+                .populate('therapistId');
+        } else {
+            session = await GroupSession.findById(roomId)
+                .populate('therapistId')
+                .populate('participants.userId');
+        }
 
         if (!session) {
-            logger.warn(`Session not found - sessionId: ${sessionId}`);
+            logger.warn(`Session not found - roomType: ${roomType}, roomId: ${roomId}`);
             return res.status(404).json({
                 success: false,
-                message: 'Session not found'
+                message: `${roomType === 'session' ? 'Session' : 'Group session'} not found`
             });
         }
 
-        logger.info(`Session found - ID: ${session._id}, Status: ${session.status}, Date: ${session.date}, Time: ${session.time}`);
+        logger.info(`Session found - ID: ${session._id}, Status: ${session.status || session.status}, RoomType: ${roomType}`);
 
         // Check if requester is authorized to generate token
         const isTherapist = session.therapistId && session.therapistId._id.toString() === requesterId;
         const isAdmin = requesterRole === 'admin';
-        const isUser = session.userId && session.userId._id.toString() === requesterId;
+        let isUser = false;
+        let isParticipant = false;
 
-        logger.info(`Authorization check - isTherapist: ${isTherapist}, isAdmin: ${isAdmin}, isUser: ${isUser}, requesterId: ${requesterId}`);
+        if (roomType === 'session') {
+            isUser = session.userId && session.userId._id.toString() === requesterId;
+        } else {
+            isParticipant = Array.isArray(session.participants)
+                ? session.participants.some(p => p.userId._id.toString() === requesterId && p.status === 'accepted')
+                : false;
+        }
 
-        // Allow admins to join any session for monitoring purposes
-        if (!isTherapist && !isAdmin && !isUser) {
-            logger.warn(`Unauthorized access attempt - requesterId: ${requesterId}, sessionId: ${sessionId}`);
+        logger.info(`Authorization check - isTherapist: ${isTherapist}, isAdmin: ${isAdmin}, isUser: ${isUser}, isParticipant: ${isParticipant}, requesterId: ${requesterId}`);
+
+        if (!isTherapist && !isAdmin && !isUser && !isParticipant) {
+            logger.warn(`Unauthorized access attempt - requesterId: ${requesterId}, roomId: ${roomId}`);
             return res.status(403).json({
                 success: false,
                 message: 'Unauthorized to generate call token'
@@ -69,13 +87,24 @@ const generateCallToken = async (req, res) => {
 
         logger.info(`Target user found - userId: ${userId}, userName: ${targetUser.name}`);
 
-        const isTargetUser = session.userId && session.userId._id.toString() === userId;
-        const isTargetTherapist = session.therapistId && session.therapistId._id.toString() === userId;
+        let isTargetUser = false;
+        let isTargetTherapist = false;
+        let isTargetParticipant = false;
 
-        logger.info(`Target user authorization - isTargetUser: ${isTargetUser}, isTargetTherapist: ${isTargetTherapist}, userId: ${userId}`);
+        if (roomType === 'session') {
+            isTargetUser = session.userId && session.userId._id.toString() === userId;
+            isTargetTherapist = session.therapistId && session.therapistId._id.toString() === userId;
+        } else {
+            isTargetTherapist = session.therapistId && session.therapistId._id.toString() === userId;
+            isTargetParticipant = Array.isArray(session.participants)
+                ? session.participants.some(p => p.userId._id.toString() === userId && p.status === 'accepted')
+                : false;
+        }
 
-        if (!isTargetUser && !isTargetTherapist) {
-            logger.warn(`Target user not part of session - userId: ${userId}, sessionId: ${sessionId}`);
+        logger.info(`Target user authorization - isTargetUser: ${isTargetUser}, isTargetTherapist: ${isTargetTherapist}, isTargetParticipant: ${isTargetParticipant}, userId: ${userId}`);
+
+        if (!isTargetUser && !isTargetTherapist && !isTargetParticipant) {
+            logger.warn(`Target user not part of session - userId: ${userId}, roomId: ${roomId}`);
             return res.status(403).json({
                 success: false,
                 message: 'User is not part of this session'
@@ -83,9 +112,10 @@ const generateCallToken = async (req, res) => {
         }
 
         // Check session status
-        logger.info(`Session status check - Current status: ${session.status}, Session ID: ${sessionId}`);
-        if (session.status !== 'scheduled' && session.status !== 'live' && session.status !== 'pending') {
-            logger.warn(`Session status forbidden - Status: ${session.status}, Session ID: ${sessionId}`);
+        const status = session.status;
+        logger.info(`Session status check - Current status: ${status}, RoomType: ${roomType}, RoomId: ${roomId}`);
+        if (status !== 'scheduled' && status !== 'live' && status !== 'pending') {
+            logger.warn(`Session status forbidden - Status: ${status}, RoomType: ${roomType}, RoomId: ${roomId}`);
             return res.status(403).json({
                 success: false,
                 message: 'Session is not active at this time'
@@ -94,17 +124,14 @@ const generateCallToken = async (req, res) => {
 
         // Check if call has started within the valid time frame
         const now = new Date();
-        // Use the startTime field which is already in the correct timezone
         const sessionTime = new Date(session.startTime);
 
-        logger.info(`Time validation check - Now: ${now.toISOString()}, Session Time: ${sessionTime.toISOString()}, Session ID: ${sessionId}`);
+        logger.info(`Time validation check - Now: ${now.toISOString()}, Session Time: ${sessionTime.toISOString()}, RoomId: ${roomId}`);
         logger.info(`Time window - Min: ${new Date(sessionTime.getTime() - 30 * 60000).toISOString()}, Max: ${new Date(sessionTime.getTime() + 60 * 60000).toISOString()}`);
 
-        // Allow generating tokens 24 hours before and 60 minutes after session start time (development mode)
-        // Temporarily relaxed for debugging - remove this in production
-        logger.info(`DEBUG: Time validation check - Now: ${now.toISOString()}, Session Time: ${sessionTime.toISOString()}, Diff: ${now - sessionTime}ms`);
+        // Allow generating tokens 24 hours before and 60 minutes after session start time (debugging tolerance)
         if (now < new Date(sessionTime.getTime() - 48 * 60 * 60000) || now > new Date(sessionTime.getTime() + 120 * 60000)) {
-            logger.warn(`Time validation failed - Now: ${now.toISOString()}, Session Time: ${sessionTime.toISOString()}, Session ID: ${sessionId}`);
+            logger.warn(`Time validation failed - Now: ${now.toISOString()}, Session Time: ${sessionTime.toISOString()}, RoomId: ${roomId}`);
             return res.status(403).json({
                 success: false,
                 message: 'Session is not active at this time'
@@ -113,7 +140,8 @@ const generateCallToken = async (req, res) => {
 
         // Generate JWT token (expires in 5 minutes)
         const tokenPayload = {
-            sessionId,
+            roomId,
+            roomType,
             userId,
             role,
             exp: Math.floor(Date.now() / 1000) + (5 * 60) // 5 minutes
@@ -121,7 +149,7 @@ const generateCallToken = async (req, res) => {
 
         const token = jwt.sign(tokenPayload, process.env.JWT_SECRET || 'fallback_secret');
 
-        logger.info(`Call token generated for user ${userId} in session ${sessionId}`);
+        logger.info(`Call token generated for user ${userId} in room ${roomId} (type: ${roomType})`);
 
         res.status(200).json({
             success: true,
@@ -152,12 +180,21 @@ const verifyCallToken = async (req, res) => {
         // Verify JWT token
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
 
-        // Verify session still exists
-        const session = await Session.findById(decoded.sessionId);
-        if (!session) {
+        // Verify room still exists (supports both 1-on-1 and group sessions)
+        const roomId = decoded.roomId || decoded.sessionId;
+        const roomType = decoded.roomType || (decoded.sessionId ? 'session' : 'group');
+        let room = null;
+
+        if (roomType === 'group') {
+            room = await GroupSession.findById(roomId);
+        } else {
+            room = await Session.findById(roomId);
+        }
+
+        if (!room) {
             return res.status(404).json({
                 success: false,
-                message: 'Session not found or expired'
+                message: `${roomType === 'group' ? 'Group session' : 'Session'} not found or expired`
             });
         }
 
@@ -173,7 +210,8 @@ const verifyCallToken = async (req, res) => {
         res.status(200).json({
             success: true,
             valid: true,
-            sessionId: decoded.sessionId,
+            roomId,
+            roomType,
             userId: decoded.userId,
             role: decoded.role
         });

@@ -603,6 +603,7 @@ async function checkTimeSlotAvailability(therapistId, date, time, timeSlot, book
         timeSlotsCount: availability.timeSlots.length,
         timeSlots: availability.timeSlots
     } : 'No availability found');
+    let requestedSlot = null;
 
     if (availability) {
         console.log('[checkTimeSlotAvailability] Found availability with', availability.timeSlots.length, 'slots');
@@ -618,10 +619,9 @@ async function checkTimeSlotAvailability(therapistId, date, time, timeSlot, book
             console.log('[checkTimeSlotAvailability] Available slots:', availability.timeSlots.map(s => `${s.start}-${s.end} (${s.status}, ${s.bookingType})`));
 
             // For booking type validation, we need to check if the slot duration matches the booking type
-            const requestedSlot = availability.timeSlots.find(slot =>
+            requestedSlot = availability.timeSlots.find(slot =>
                 slot.start === timeSlot.start &&
-                slot.end === timeSlot.end &&
-                slot.status !== 'booked'
+                slot.end === timeSlot.end
             );
 
             if (!requestedSlot) {
@@ -650,6 +650,21 @@ async function checkTimeSlotAvailability(therapistId, date, time, timeSlot, book
                 return { available: false, message: 'Requested time slot is not available' };
             }
 
+            // If slot is marked booked, it is not available
+            if (requestedSlot.status === 'booked') {
+                return { available: false, message: 'Requested time slot is not available' };
+            }
+
+            // Group slot availability is based on bookedParticipants
+            if (requestedSlot.sessionType === 'group') {
+                if (typeof requestedSlot.bookedParticipants !== 'number') {
+                    requestedSlot.bookedParticipants = 0;
+                }
+                if (requestedSlot.bookedParticipants >= (requestedSlot.maxParticipants || 1)) {
+                    return { available: false, message: 'Requested time slot is full' };
+                }
+            }
+
             // Validate that the slot duration matches the expected duration for the booking type
             if (bookingType === 'free-consultation' && requestedSlot.duration !== 15) {
                 return { available: false, message: 'Free consultation requires 15-minute time slots' };
@@ -658,7 +673,7 @@ async function checkTimeSlotAvailability(therapistId, date, time, timeSlot, book
             }
         } else {
             // If no specific timeSlot provided, just check if the time exists and is available
-            const requestedSlot = availability.timeSlots.find(slot =>
+            requestedSlot = availability.timeSlots.find(slot =>
                 slot.start === time && slot.status !== 'booked'
             );
 
@@ -683,19 +698,21 @@ async function checkTimeSlotAvailability(therapistId, date, time, timeSlot, book
         return { available: false, message: `No availability found for the selected date (${date}). Please choose a different date.` };
     }
 
-    // Check if there's already a PAID booking for this therapist at the same time
-    const existingPaidBooking = await Booking.findOne({
-        therapistId,
-        scheduledDate: date,
-        paymentStatus: 'paid', // Only consider paid bookings as blocking
-        $or: [
-            { 'timeSlot.start': timeSlot ? timeSlot.start : time },
-            { scheduledTime: time }
-        ]
-    });
+    // For one-to-one slots, prevent double booking even if a paid booking exists
+    if (!requestedSlot || requestedSlot.sessionType !== 'group') {
+        const existingPaidBooking = await Booking.findOne({
+            therapistId,
+            scheduledDate: date,
+            paymentStatus: 'paid', // Only consider paid bookings as blocking
+            $or: [
+                { 'timeSlot.start': timeSlot ? timeSlot.start : time },
+                { scheduledTime: time }
+            ]
+        });
 
-    if (existingPaidBooking) {
-        return { available: false, message: 'A booking already exists for this time slot' };
+        if (existingPaidBooking) {
+            return { available: false, message: 'A booking already exists for this time slot' };
+        }
     }
 
     return { available: true, message: 'Time slot is available' };
@@ -723,10 +740,37 @@ async function updateAvailabilitySlot(therapistId, date, startTime, endTime, sta
         );
 
         if (slotIndex !== -1) {
-            // Preserve the duration and bookingType while updating the status
-            availability.timeSlots[slotIndex].status = status;
+            const slot = availability.timeSlots[slotIndex];
+
+            // Handle group slots: increment bookedParticipants and only mark booked when full.
+            if (slot.sessionType === 'group') {
+                if (status === 'booked') {
+                    slot.bookedParticipants = (slot.bookedParticipants || 0) + 1;
+
+                    // Ensure bookedParticipants does not exceed maxParticipants
+                    if (slot.maxParticipants && slot.bookedParticipants >= slot.maxParticipants) {
+                        slot.status = 'booked';
+                    } else {
+                        // keep it available until full
+                        slot.status = 'available';
+                    }
+                } else if (status === 'available') {
+                    // If we are freeing a slot, decrement bookedParticipants
+                    slot.bookedParticipants = Math.max((slot.bookedParticipants || 1) - 1, 0);
+                    if (slot.bookedParticipants < (slot.maxParticipants || 1)) {
+                        slot.status = 'available';
+                    }
+                } else {
+                    // Other statuses should still be applied
+                    slot.status = status;
+                }
+            } else {
+                // Standard 1-on-1 flow
+                slot.status = status;
+            }
+
             await availability.save();
-            console.log(`Successfully updated slot ${startTime}-${endTime} to ${status} for therapist ${therapistId} on ${date}`);
+            console.log(`Successfully updated slot ${startTime}-${endTime} to ${slot.status} for therapist ${therapistId} on ${date}`);
         } else {
             console.log(`Time slot ${startTime}-${endTime} not found for therapist ${therapistId} on ${date}`);
         }
@@ -1174,6 +1218,79 @@ const updateBooking = async (req, res, next) => {
                         trigger.data
                     );
                 }
+            }
+        }
+
+        // If this booking uses a group slot, ensure a shared group session exists and the user is added
+        if (booking.status === 'confirmed') {
+            try {
+                const Availability = require('../models/Availability.model');
+                const Session = require('../models/Session.model');
+
+                const bookingDate = booking.scheduledDate || booking.date;
+                const bookingTime = booking.timeSlot?.start || (booking.scheduledTime || booking.time);
+
+                const availability = await Availability.findOne({
+                    therapistId: booking.therapistId,
+                    date: bookingDate
+                });
+
+                const slot = availability?.timeSlots?.find(s =>
+                    s.start === (booking.timeSlot?.start || bookingTime) &&
+                    s.end === (booking.timeSlot?.end || (booking.timeSlot?.end || ''))
+                );
+
+                if (slot && slot.sessionType === 'group') {
+                    const sessionTime = booking.timeSlot?.start || bookingTime;
+                    const startTime = new Date(`${bookingDate}T${sessionTime}:00`);
+                    const duration = slot.duration || 45;
+                    const endTime = new Date(startTime.getTime() + duration * 60000);
+
+                    // Find existing group session for this slot
+                    let session = await Session.findOne({
+                        therapistId: booking.therapistId,
+                        date: bookingDate,
+                        time: sessionTime,
+                        sessionType: 'group'
+                    });
+
+                    if (!session) {
+                        session = await Session.create({
+                            bookingId: booking._id,
+                            therapistId: booking.therapistId,
+                            date: bookingDate,
+                            time: sessionTime,
+                            startTime,
+                            endTime,
+                            type: 'group',
+                            sessionType: 'group',
+                            maxParticipants: slot.maxParticipants || 1,
+                            duration,
+                            status: 'pending',
+                            participants: [
+                                {
+                                    userId: booking.userId,
+                                    bookingId: booking._id,
+                                    status: 'pending'
+                                }
+                            ]
+                        });
+                    } else {
+                        const already = session.participants.some(
+                            p => p.userId.toString() === booking.userId.toString()
+                        );
+                        if (!already) {
+                            session.participants.push({
+                                userId: booking.userId,
+                                bookingId: booking._id,
+                                status: 'pending'
+                            });
+                            await session.save();
+                        }
+                    }
+                }
+            } catch (sessionErr) {
+                console.error('Error ensuring group session exists for booking', booking._id, sessionErr);
             }
         }
 
