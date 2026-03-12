@@ -1,4 +1,5 @@
 const logger = require('../utils/logger');
+const Notification = require('../models/Notification.model');
 
 // Function to setup notification socket handlers
 const setupNotificationHandlers = (io, socket) => {
@@ -67,16 +68,32 @@ const setupNotificationHandlers = (io, socket) => {
 
             logger.info(`Connection failure reported by user ${userId} for session ${sessionId}`);
 
+            // Save to database first
+            const notification = new Notification({
+                title: 'Connection Issue Reported',
+                message: `User ${userId} is experiencing connection issues in session ${sessionId}`,
+                type: 'connection_failure',
+                recipientType: 'admin',
+                userId: userId,
+                sessionId: sessionId,
+                priority: 'high',
+                metadata: { errorDetails },
+                channels: { inApp: true }
+            });
+
+            await notification.save();
+
             // Broadcast to admin notification room
             const adminNotificationRoom = 'admin_notifications';
             io.to(adminNotificationRoom).emit('admin-notification', {
+                id: notification._id,
                 type: 'connection_failure',
                 title: 'Connection Issue Reported',
                 message: `User ${userId} is experiencing connection issues in session ${sessionId}`,
                 sessionId: sessionId,
                 userId: userId,
                 errorDetails: errorDetails,
-                timestamp: new Date().toISOString(),
+                timestamp: notification.createdAt,
                 priority: 'high'
             });
 
@@ -102,20 +119,37 @@ const setupNotificationHandlers = (io, socket) => {
                 return;
             }
 
+            // Save to database first
+            const notification = new Notification({
+                title: 'Alternative Meeting Ready',
+                message: 'Your therapist has prepared a Google Meet link as an alternative. Please check your session details.',
+                type: 'google_meet_ready',
+                recipientType: 'client',
+                userId: userId,
+                sessionId: sessionId,
+                googleMeetLink: googleMeetLink,
+                googleMeetCode: googleMeetCode,
+                priority: 'medium',
+                channels: { inApp: true }
+            });
+
+            await notification.save();
+
             // Send notification to specific user
             const userNotificationRoom = `user_notifications_${userId}`;
             io.to(userNotificationRoom).emit('client-notification', {
+                id: notification._id,
                 type: 'google_meet_ready',
                 title: 'Alternative Meeting Ready',
                 message: 'Your therapist has prepared a Google Meet link as an alternative. Please check your session details.',
                 sessionId: sessionId,
                 googleMeetLink: googleMeetLink,
                 googleMeetCode: googleMeetCode,
-                timestamp: new Date().toISOString(),
+                timestamp: notification.createdAt,
                 priority: 'medium'
             });
 
-            logger.info(`Google Meet notification sent to user ${userId} for session ${sessionId}`);
+            logger.info(`Google Meet notification saved and sent to user ${userId} for session ${sessionId}`);
 
         } catch (error) {
             logger.error('Error notifying client about Google Meet:', error);
@@ -142,15 +176,46 @@ const setupNotificationHandlers = (io, socket) => {
 
             // Send to specific user or all admins
             if (targetUserId) {
+                // Save to database
+                const notification = new Notification({
+                    title,
+                    message,
+                    type,
+                    recipientType: 'client',
+                    userId: targetUserId,
+                    priority,
+                    metadata: { senderId },
+                    channels: { inApp: true }
+                });
+
+                await notification.save();
+
                 const userNotificationRoom = `user_notifications_${targetUserId}`;
                 io.to(userNotificationRoom).emit('client-notification', {
+                    id: notification._id,
                     type,
                     title,
                     message,
-                    timestamp: new Date().toISOString(),
+                    timestamp: notification.createdAt,
                     priority
                 });
             } else {
+                // Save to database for all admins
+                const admins = await require('../models/User.model').find({ role: 'admin' }).select('_id');
+
+                const adminNotifications = admins.map(admin => ({
+                    title,
+                    message,
+                    type,
+                    recipientType: 'admin',
+                    adminId: admin._id,
+                    priority,
+                    metadata: { senderId },
+                    channels: { inApp: true }
+                }));
+
+                await Notification.insertMany(adminNotifications);
+
                 // Broadcast to all admins
                 const adminNotificationRoom = 'admin_notifications';
                 io.to(adminNotificationRoom).emit('admin-notification', {

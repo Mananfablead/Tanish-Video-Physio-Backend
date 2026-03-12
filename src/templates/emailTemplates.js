@@ -851,13 +851,6 @@ class EmailTemplates {
                                             <div style="font-size: 13px; color: #166534;">Scheduled Time</div>
                                         </div>
                                     </div>
-                                    
-                                    <div style="display: flex; align-items: center; gap: 15px; padding: 18px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #10b981;">
-                                        <div style="flex: 1;">
-                                            <div style="font-weight: 600; color: #14532d; font-size: 16px;">Session ID: ${data.sessionId ? String(data.sessionId).substring(0, 8) + '...' : 'N/A'}</div>
-                                            <div style="font-size: 13px; color: #166534;">Reference ID</div>
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
                             

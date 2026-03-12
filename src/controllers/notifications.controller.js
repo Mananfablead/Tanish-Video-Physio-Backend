@@ -4,17 +4,104 @@ const NotificationService = require('../services/notificationService');
 const User = require('../models/User.model');
 const CmsContact = require('../models/CmsContact.model');
 
-// Get all notifications for authenticated user
+// Get all notifications for authenticated user (client/therapist)
 const getAllNotifications = async (req, res, next) => {
     try {
-        const notifications = await Notification.find({
-            $or: [
-                { userId: req.user.userId }, // User-specific notifications
-                { userId: null } // Global notifications
-            ]
-        }).sort({ createdAt: -1 });
+        const { page = 1, limit = 20, unreadOnly = false } = req.query;
+        const skip = (page - 1) * limit;
 
-        res.status(200).json(ApiResponse.success({ notifications }, 'Notifications retrieved successfully'));
+        console.log('📡 GET /notifications - Request info:', {
+            userId: req.user.userId,
+            role: req.user.role,
+            page,
+            limit,
+            unreadOnly
+        });
+
+        let query = {};
+
+        if (req.user.role === 'admin') {
+            // Admin sees all notifications
+            query = {};
+            console.log('👑 Admin user - returning ALL notifications');
+        } else {
+            // Users see their own notifications and global ones
+            query = {
+                $or: [
+                    { userId: req.user.userId },
+                    { recipientType: { $in: ['all', 'client', 'therapist'] } }
+                ]
+            };
+            console.log('👤 Regular user - using filtered query:', JSON.stringify(query));
+        }
+
+        if (unreadOnly === 'true') {
+            query.read = false;
+            console.log('📖 Filtering for unread only');
+        }
+
+        console.log('🔍 Final query:', JSON.stringify(query));
+
+        const notifications = await Notification.find(query)
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(parseInt(limit));
+
+        const total = await Notification.countDocuments(query);
+        const unreadCount = await Notification.countDocuments({ ...query, read: false });
+
+        console.log(`✅ Found ${notifications.length} notifications (total: ${total})`);
+
+        res.status(200).json(ApiResponse.success({
+            notifications,
+            pagination: {
+                page: parseInt(page),
+                limit: parseInt(limit),
+                total,
+                pages: Math.ceil(total / limit)
+            },
+            unreadCount
+        }, 'Notifications retrieved successfully'));
+    } catch (error) {
+        console.error('❌ Error in getAllNotifications:', error);
+        next(error);
+    }
+};
+
+// Get admin-specific notifications
+const getAdminNotifications = async (req, res, next) => {
+    try {
+        if (req.user.role !== 'admin') {
+            return res.status(403).json(ApiResponse.error('Access denied. Admin only.'));
+        }
+
+        const { page = 1, limit = 20, unreadOnly = false } = req.query;
+        const skip = (page - 1) * limit;
+
+        let query = { recipientType: 'admin' };
+
+        if (unreadOnly === 'true') {
+            query.read = false;
+        }
+
+        const notifications = await Notification.find(query)
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(parseInt(limit));
+
+        const total = await Notification.countDocuments(query);
+        const unreadCount = await Notification.countDocuments({ ...query, read: false });
+
+        res.status(200).json(ApiResponse.success({
+            notifications,
+            pagination: {
+                page: parseInt(page),
+                limit: parseInt(limit),
+                total,
+                pages: Math.ceil(total / limit)
+            },
+            unreadCount
+        }, 'Admin notifications retrieved successfully'));
     } catch (error) {
         next(error);
     }
@@ -23,76 +110,156 @@ const getAllNotifications = async (req, res, next) => {
 // Send a notification (admin only)
 const sendNotification = async (req, res, next) => {
     try {
-        const { title, message, type, recipientType, userId = null, channels = {} } = req.body;
+        const { title, message, type, recipientType, userId = null, channels = {}, priority = 'medium', metadata = {} } = req.body;
 
-        // Save to database first (for in-app notifications)
-        if (channels.inApp !== false) {
-            const notification = new Notification({
-                title,
-                message,
-                type,
-                userId, // If null, it's a global notification
-                channels: channels
-            });
-
-            await notification.save();
+        // Validate recipient type
+        if (!['all', 'users', 'therapists', 'admin', 'specific'].includes(recipientType)) {
+            return res.status(400).json(ApiResponse.error('Invalid recipient type'));
         }
 
-        // Send via NotificationService (email/WhatsApp)
         let recipients = [];
+        let savedNotifications = [];
         
+        // Get recipients based on type
         if (recipientType === 'all') {
-            // Get all users and therapists
             const users = await User.find({ role: { $in: ['user', 'therapist'] } }).select('email phone name');
             recipients = users.map(user => ({
                 email: user.email,
                 phone: user.phone,
-                name: user.name
+                name: user.name,
+                userId: user._id
             }));
+
+            // Save in-app notifications for all users
+            if (channels.inApp !== false) {
+                const userNotifications = recipients.map(recipient => ({
+                    title,
+                    message,
+                    type,
+                    recipientType: 'client',
+                    userId: recipient.userId,
+                    channels,
+                    priority,
+                    metadata
+                }));
+                savedNotifications = await Notification.insertMany(userNotifications);
+            }
         } else if (recipientType === 'users') {
             const users = await User.find({ role: 'user' }).select('email phone name');
             recipients = users.map(user => ({
                 email: user.email,
                 phone: user.phone,
-                name: user.name
+                name: user.name,
+                userId: user._id
             }));
+
+            if (channels.inApp !== false) {
+                const userNotifications = recipients.map(recipient => ({
+                    title,
+                    message,
+                    type,
+                    recipientType: 'client',
+                    userId: recipient.userId,
+                    channels,
+                    priority,
+                    metadata
+                }));
+                savedNotifications = await Notification.insertMany(userNotifications);
+            }
         } else if (recipientType === 'therapists') {
             const therapists = await User.find({ role: 'therapist' }).select('email phone name');
             recipients = therapists.map(user => ({
                 email: user.email,
                 phone: user.phone,
-                name: user.name
+                name: user.name,
+                userId: user._id
             }));
+
+            if (channels.inApp !== false) {
+                const therapistNotifications = recipients.map(recipient => ({
+                    title,
+                    message,
+                    type,
+                    recipientType: 'therapist',
+                    userId: recipient.userId,
+                    channels,
+                    priority,
+                    metadata
+                }));
+                savedNotifications = await Notification.insertMany(therapistNotifications);
+            }
+        } else if (recipientType === 'admin') {
+            const admins = await User.find({ role: 'admin' }).select('email phone name');
+            recipients = admins.map(admin => ({
+                email: admin.email,
+                phone: admin.phone,
+                name: admin.name,
+                adminId: admin._id
+            }));
+
+            if (channels.inApp !== false) {
+                const adminNotifications = recipients.map(admin => ({
+                    title,
+                    message,
+                    type,
+                    recipientType: 'admin',
+                    adminId: admin.adminId,
+                    channels,
+                    priority,
+                    metadata
+                }));
+                savedNotifications = await Notification.insertMany(adminNotifications);
+            }
         } else if (recipientType === 'specific' && userId) {
-            const user = await User.findById(userId).select('email phone name');
+            const user = await User.findById(userId).select('email phone name role');
             if (user) {
                 recipients = [{
                     email: user.email,
                     phone: user.phone,
-                    name: user.name
+                    name: user.name,
+                    userId: user._id,
+                    role: user.role
                 }];
+
+                if (channels.inApp !== false) {
+                    const notificationData = {
+                        title,
+                        message,
+                        type,
+                        recipientType: user.role === 'admin' ? 'admin' : 'client',
+                    };
+
+                    if (user.role === 'admin') {
+                        notificationData.adminId = user._id;
+                    } else {
+                        notificationData.userId = user._id;
+                    }
+
+                    notificationData.channels = channels;
+                    notificationData.priority = priority;
+                    notificationData.metadata = metadata;
+
+                    savedNotifications = [await Notification.create(notificationData)];
+                }
             }
         }
 
-        // Send notifications via NotificationService
-        if (recipients.length > 0) {
+        // Send via NotificationService (email/WhatsApp)
+        if (recipients.length > 0 && (channels.email !== false || channels.whatsapp !== false)) {
             const notificationResults = [];
             
             for (const recipient of recipients) {
-                // Prepare recipient data
                 const recipientData = {
                     email: recipient.email,
                     phone: recipient.phone
                 };
 
-                // Prepare notification data
                 const notificationData = {
                     title: title,
                     message: message,
                     userName: recipient.name
                 };
 
-                // Send via selected channels
                 const result = {
                     recipient: recipient.email || recipient.phone,
                     channels: []
@@ -124,7 +291,6 @@ const sendNotification = async (req, res, next) => {
                 // Send WhatsApp if selected
                 if (channels.whatsapp !== false) {
                     try {
-                        // Get admin phone number from CmsContact instead of recipient phone
                         const contactInfo = await CmsContact.findOne().sort({ createdAt: -1 });
                         if (contactInfo && contactInfo.phone) {
                             const whatsappResult = await NotificationService.sendWhatsApp(
@@ -153,7 +319,7 @@ const sendNotification = async (req, res, next) => {
         }
 
         res.status(201).json(ApiResponse.success({ 
-            notification: channels.inApp !== false ? notification : null,
+            notifications: savedNotifications,
             notificationResults: notificationResults,
             message: 'Notification sent successfully' 
         }, 'Notification sent successfully'));
@@ -166,8 +332,16 @@ const sendNotification = async (req, res, next) => {
 // Mark notification as read
 const markAsRead = async (req, res, next) => {
     try {
+        let query = { _id: req.params.id };
+
+        if (req.user.role === 'admin') {
+            query.adminId = req.user.userId;
+        } else {
+            query.userId = req.user.userId;
+        }
+
         const notification = await Notification.findOneAndUpdate(
-            { _id: req.params.id, userId: req.user.userId },
+            query,
             { read: true },
             { new: true }
         );
@@ -177,6 +351,33 @@ const markAsRead = async (req, res, next) => {
         }
 
         res.status(200).json(ApiResponse.success({ notification }, 'Notification marked as read'));
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Mark all notifications as read
+const markAllAsRead = async (req, res, next) => {
+    try {
+        let query = { read: false };
+
+        if (req.user.role === 'admin') {
+            query.recipientType = 'admin';
+        } else {
+            query = {
+                $or: [
+                    { userId: req.user.userId },
+                    { recipientType: { $in: ['all', 'client', 'therapist'] } }
+                ],
+                read: false
+            };
+        }
+
+        const result = await Notification.updateMany(query, { read: true });
+
+        res.status(200).json(ApiResponse.success({
+            modifiedCount: result.modifiedCount
+        }, 'All notifications marked as read'));
     } catch (error) {
         next(error);
     }
@@ -210,8 +411,10 @@ const deleteAllNotifications = async (req, res, next) => {
 
 module.exports = {
     getAllNotifications,
+    getAdminNotifications,
     sendNotification,
     markAsRead,
+    markAllAsRead,
     deleteNotification,
     deleteAllNotifications
 };

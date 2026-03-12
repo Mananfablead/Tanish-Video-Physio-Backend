@@ -8,6 +8,8 @@ const ApiResponse = require("../utils/apiResponse");
 const { parseDurationString } = require("../utils/session.utils");
 const { generateJoinLink } = require("../utils/videoCall.utils");
 const NotificationService = require("../services/notificationService");
+const logger = require('../utils/logger');
+const { getIO } = require('../utils/socketManager'); // Import socket manager
 
 // Helper function to check subscription session limits
 const checkSubscriptionLimits = async (subscriptionId, userId = null) => {
@@ -686,6 +688,49 @@ const createSession = async (req, res, next) => {
       // Continue with response even if notification fails
     }
 
+    /* ================= SEND REAL-TIME NOTIFICATIONS ================= */
+    // Send real-time notification to admin
+    try {
+      const io = getIO();
+      const Notification = require('../models/Notification.model');
+
+      // Save to database first
+      const adminNotification = new Notification({
+        title: 'New Session Request',
+        message: `${session.bookingId?.clientName || 'Client'} scheduled a session for ${session.date} at ${session.time}`,
+        type: 'session',
+        recipientType: 'admin',
+        adminId: req.user.userId, // ✅ Set admin ID
+        sessionId: session._id,
+        bookingId: session.bookingId?._id,
+        priority: 'medium',
+        channels: { inApp: true },
+        metadata: {
+          date: session.date,
+          time: session.time
+        }
+      });
+
+      await adminNotification.save();
+
+      // Emit with database ID
+      io.to('admin_notifications').emit('admin-notification', {
+        id: adminNotification._id,
+        type: 'session',
+        title: 'New Session Request',
+        message: `${session.bookingId?.clientName || 'Client'} scheduled a session for ${session.date} at ${session.time}`,
+        sessionId: session._id,
+        bookingId: session.bookingId?._id,
+        date: session.date,
+        time: session.time,
+        timestamp: adminNotification.createdAt
+      });
+
+      logger.info(`Real-time notification saved and sent to admin for new session ${session._id}`);
+    } catch (socketError) {
+      logger.error('Error sending real-time session notification to admin:', socketError);
+    }
+
     return res
       .status(201)
       .json(ApiResponse.success({ session }, "Session created successfully"));
@@ -787,6 +832,32 @@ const updateSession = async (req, res, next) => {
           availabilityError
         );
         // Continue with response even if availability update fails
+      }
+    }
+
+    /* ================= SEND REAL-TIME NOTIFICATION TO CLIENT ================= */
+    // Send notification to client when session is accepted/scheduled
+    if (status === 'scheduled' && updatedSession.userId) {
+      try {
+        const io = getIO();
+        // Extract userId - handle both ObjectId and populated user object
+        const userId = updatedSession.userId._id || updatedSession.userId;
+        const userNotificationRoom = `user_notifications_${userId.toString()}`;
+
+        io.to(userNotificationRoom).emit('client-notification', {
+          type: 'session',
+          title: 'Session Accepted!',
+          message: `Your session has been accepted and scheduled for ${updatedSession.date} at ${updatedSession.time}`,
+          sessionId: updatedSession._id,
+          bookingId: updatedSession.bookingId?._id,
+          date: updatedSession.date,
+          time: updatedSession.time,
+          timestamp: new Date().toISOString()
+        });
+
+        logger.info(`Real-time notification sent to client for session acceptance ${updatedSession._id}`);
+      } catch (socketError) {
+        logger.error('Error sending real-time session acceptance notification to client:', socketError);
       }
     }
 

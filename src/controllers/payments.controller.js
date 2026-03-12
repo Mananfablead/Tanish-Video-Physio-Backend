@@ -2604,6 +2604,36 @@ const getPaymentById = async (req, res, next) => {
             return res.status(404).json(ApiResponse.error('Payment not found'));
         }
 
+        // Fetch additional payment details from Razorpay if payment was captured
+        let razorpayDetails = null;
+        if (payment.paymentId && payment.captured) {
+            try {
+                const razorpayInstance = require('../config/razorpay');
+                razorpayDetails = await razorpayInstance.payments.fetch(payment.paymentId);
+
+                // Add additional Razorpay payment details to response
+                payment.rzp_details = {
+                    method: razorpayDetails.method,           // card, netbanking, wallet, upi
+                    card_network: razorpayDetails.card?.network || null,
+                    card_last_digits: razorpayDetails.card?.last4 || null,
+                    bank: razorpayDetails.bank || null,
+                    upi_id: razorpayDetails.upi?.vpa || null,
+                    wallet: razorpayDetails.wallet || null,
+                    vpa: razorpayDetails.vpa || null,
+                    email: razorpayDetails.email || null,
+                    contact: razorpayDetails.contact || null,
+                    notes: razorpayDetails.notes || {},
+                    refund_status: razorpayDetails.refund_status || null,
+                    captured_at: razorpayDetails.captured_at || null,
+                    fee: razorpayDetails.fee || null,
+                    tax_amount: razorpayDetails.tax_amount || null
+                };
+            } catch (rzpError) {
+                console.error('Error fetching Razorpay payment details:', rzpError.message);
+                // Continue without Razorpay details if fetch fails
+            }
+        }
+
         res.status(200).json(ApiResponse.success({ payment }, 'Payment details retrieved successfully'));
     } catch (error) {
         next(error);

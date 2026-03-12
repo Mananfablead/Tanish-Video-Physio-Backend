@@ -328,6 +328,7 @@ const errorHandler = require('./src/middlewares/error.middleware');
 const fs = require('fs');
 const logger = require('./src/utils/logger');
 const { initializeServices } = require('./src/utils/serviceInitializer.utils');
+const { setIO } = require('./src/utils/socketManager'); // Import socket manager
 
 // Server restart trigger
 const app = express();
@@ -516,6 +517,9 @@ const startServer = async () => {
             },
             transports: ['websocket', 'polling']
         });
+
+        // Store the io instance in our socket manager
+        setIO(io);
 
         // Middleware to authenticate socket connections
         io.use(async (socket, next) => {

@@ -28,7 +28,8 @@ const {
     getCallLogById,
     updateCallLog,
     deleteCallLog,
-    generateGoogleMeetLink
+    generateGoogleMeetLink,
+    updateGoogleMeetLink
 } = require('../controllers/videoCallSignaling.controller');
 
 const router = express.Router();
@@ -59,6 +60,9 @@ router.post('/report-issue', reportCallIssue);
 
 // Generate Google Meet link for session
 router.post('/generate-google-meet', generateGoogleMeetLink);
+
+// Update Google Meet link for session (Admin only)
+router.put('/update-google-meet/:sessionId', authorizeAdmin, updateGoogleMeetLink);
 
 // Get participants for a session
 router.get('/session/:sessionId/participants', getSessionParticipants);

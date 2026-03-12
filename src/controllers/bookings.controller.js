@@ -8,6 +8,8 @@ const ApiResponse = require('../utils/apiResponse');
 const BookingStatusHandler = require('../services/bookingStatusHandler');
 const NotificationService = require('../services/notificationService');
 const { generateToken } = require('../config/jwt');
+const { getIO } = require('../utils/socketManager'); // Import socket manager
+const logger = require('../utils/logger'); // Import logger
 
 // Get all bookings for authenticated user
 const getAllBookings = async (req, res, next) => {
@@ -461,14 +463,52 @@ Looking forward to helping you!
         await booking.populate('serviceId', 'name price duration validity images');
         await booking.populate('therapistId', 'name email role profilePicture');
 
-        // Send notifications
-        const notificationData = {
-            clientName: booking.clientName,
-            serviceName: serviceName,
-            bookingId: booking._id,
-            date: date,
-            time: time
-        };
+        // Send real-time notification to admin panel
+        try {
+            const io = getIO();
+            const Notification = require('../models/Notification.model');
+
+            // Save to database first
+            const adminNotification = new Notification({
+                title: 'New Booking Request',
+                message: `${booking.clientName} booked ${serviceName} for ${date} at ${time}`,
+                type: 'booking',
+                recipientType: 'admin',
+                adminId: req.user.userId, // ✅ Set admin ID
+                bookingId: booking._id,
+                priority: 'medium',
+                channels: { inApp: true },
+                metadata: {
+                    clientName: booking.clientName,
+                    serviceName: serviceName,
+                    date: date,
+                    time: time,
+                    status: booking.status
+                }
+            });
+
+            await adminNotification.save();
+
+            // Emit with database ID
+            io.to('admin_notifications').emit('admin-notification', {
+                id: adminNotification._id,
+                type: 'booking',
+                title: 'New Booking Request',
+                message: `${booking.clientName} booked ${serviceName} for ${date} at ${time}`,
+                bookingId: booking._id,
+                clientName: booking.clientName,
+                serviceName: serviceName,
+                date: date,
+                time: time,
+                status: booking.status,
+                timestamp: adminNotification.createdAt
+            });
+
+            logger.info(`Real-time notification saved and sent to admin for new booking ${booking._id}`);
+        } catch (socketError) {
+            logger.error('Error sending real-time booking notification to admin:', socketError);
+            // Don't fail the booking if socket notification fails
+        }
 
         res.status(201).json(ApiResponse.success({ booking }, 'Booking created successfully'));
     } catch (error) {
@@ -1118,6 +1158,59 @@ const updateBookingStatus = async (req, res, next) => {
                         trigger.data
                     );
                 }
+            }
+
+            // Send real-time socket notification to client
+            try {
+                const io = getIO();
+                const Notification = require('../models/Notification.model');
+                const userNotificationRoom = `user_notifications_${booking.userId.toString()}`;
+
+                // Determine notification based on new status
+                let notificationTitle = 'Booking Update';
+                let notificationType = 'booking';
+
+                if (status === 'confirmed') {
+                    notificationTitle = 'Booking Confirmed!';
+                } else if (status === 'cancelled') {
+                    notificationTitle = 'Booking Cancelled';
+                } else if (status === 'scheduled') {
+                    notificationTitle = 'Session Scheduled';
+                    notificationType = 'session';
+                }
+
+                // Save to database first
+                const clientNotification = new Notification({
+                    title: notificationTitle,
+                    message: `Your booking for ${booking.serviceName} has been ${status}`,
+                    type: notificationType,
+                    recipientType: 'client',
+                    userId: booking.userId,
+                    bookingId: booking._id,
+                    sessionId: booking.sessionId || null,
+                    priority: 'medium',
+                    channels: { inApp: true },
+                    metadata: { status }
+                });
+
+                await clientNotification.save();
+
+                // Emit with database ID
+                io.to(userNotificationRoom).emit('client-notification', {
+                    id: clientNotification._id,
+                    type: notificationType,
+                    title: notificationTitle,
+                    message: `Your booking for ${booking.serviceName} has been ${status}`,
+                    bookingId: booking._id,
+                    sessionId: booking.sessionId || null,
+                    status: status,
+                    timestamp: clientNotification.createdAt
+                });
+
+                logger.info(`Real-time notification saved and sent to client for booking status change to ${status}`);
+            } catch (socketError) {
+                logger.error('Error sending real-time notification to client:', socketError);
+                // Don't fail the operation if socket notification fails
             }
         }
 
@@ -2111,8 +2204,54 @@ const createBookingWithSubscription = async (req, res, next) => {
 
                 console.log(`✅ New session request notification sent to admin for subscription session ${session._id}`);
             }
+
+            /* ================= SEND REAL-TIME NOTIFICATION TO ADMIN ================= */
+            // Send real-time socket notification to admin about new subscription session
+            const io = getIO();
+            const Notification = require('../models/Notification.model');
+
+            // Save to database first
+            const adminNotification = new Notification({
+                title: 'New Subscription Session Request',
+                message: `${user?.name || 'Client'} booked a session with subscription for ${date} at ${time}`,
+                type: 'session',
+                recipientType: 'admin',
+                adminId: req.user.userId, // ✅ Set admin ID
+                sessionId: session._id,
+                bookingId: booking._id,
+                subscriptionId: subscription._id,
+                priority: 'medium',
+                channels: { inApp: true },
+                metadata: {
+                    clientName: user?.name || 'Client',
+                    serviceName: service?.name || 'Subscription Session',
+                    date: date,
+                    time: time
+                }
+            });
+
+            await adminNotification.save();
+
+            // Emit with database ID
+            io.to('admin_notifications').emit('admin-notification', {
+                id: adminNotification._id,
+                type: 'session',
+                title: 'New Subscription Session Request',
+                message: `${user?.name || 'Client'} booked a session with subscription for ${date} at ${time}`,
+                sessionId: session._id,
+                bookingId: booking._id,
+                subscriptionId: subscription._id,
+                clientName: user?.name || 'Client',
+                serviceName: service?.name || 'Subscription Session',
+                date: date,
+                time: time,
+                timestamp: adminNotification.createdAt
+            });
+
+            logger.info(`Real-time notification saved and sent to admin for subscription session ${session._id}`);
         } catch (notificationError) {
             console.error(`❌ Error sending admin session notification for subscription session ${session._id}:`, notificationError);
+            logger.error('Error sending real-time subscription session notification to admin:', notificationError);
             // Continue with response even if notification fails
         }
 
