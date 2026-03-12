@@ -12600,3 +12600,12 @@
 {"level":"info","message":"User 69b15686b356db41132ef51b joined video session room: 69b288fdb086d5ea6169f381","service":"tanish-physio-backend","timestamp":"2026-03-12T11:16:10.428Z"}
 {"level":"info","message":"User 69b15686b356db41132ef51b joined video call room: video-call-69b288fdb086d5ea6169f381","service":"tanish-physio-backend","timestamp":"2026-03-12T11:16:10.430Z"}
 {"level":"info","message":"User 69b15686b356db41132ef51b joined session room 69b288fdb086d5ea6169f381","service":"tanish-physio-backend","timestamp":"2026-03-12T11:16:10.462Z"}
+{"level":"info","message":"User 69a02c74648e5f698902ac63 disconnected from chat","service":"tanish-physio-backend","timestamp":"2026-03-12T11:20:03.277Z"}
+{"level":"info","message":"Socket Pn0grNb19DcOEfK9AAAF disconnected","service":"tanish-physio-backend","timestamp":"2026-03-12T11:20:03.296Z"}
+{"level":"info","message":"Admin socket Pn0grNb19DcOEfK9AAAF disconnected","service":"tanish-physio-backend","timestamp":"2026-03-12T11:20:03.305Z"}
+{"level":"info","message":"User 69a02c74648e5f698902ac63 disconnected from chat","service":"tanish-physio-backend","timestamp":"2026-03-12T11:20:03.325Z"}
+{"level":"info","message":"Socket B0nxuguZW_ne9SGuAAAJ disconnected","service":"tanish-physio-backend","timestamp":"2026-03-12T11:20:03.359Z"}
+{"level":"info","message":"Admin socket B0nxuguZW_ne9SGuAAAJ disconnected","service":"tanish-physio-backend","timestamp":"2026-03-12T11:20:03.385Z"}
+{"level":"info","message":"User 69a02c74648e5f698902ac63 disconnected from chat","service":"tanish-physio-backend","timestamp":"2026-03-12T11:20:03.403Z"}
+{"level":"info","message":"Socket 51oFS3ZslhnOPXC_AAAI disconnected","service":"tanish-physio-backend","timestamp":"2026-03-12T11:20:03.442Z"}
+{"level":"info","message":"Admin socket 51oFS3ZslhnOPXC_AAAI disconnected","service":"tanish-physio-backend","timestamp":"2026-03-12T11:20:03.450Z"}
