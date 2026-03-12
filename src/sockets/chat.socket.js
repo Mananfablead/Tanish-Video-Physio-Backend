@@ -168,7 +168,8 @@ const setupChatHandlers = (io, socket) => {
                     sessionId: sessionId,
                     chatRoom: chatMessage.chatRoom || null,
                     senderType: senderType,
-                    _id: chatMessage._id
+                    _id: chatMessage._id,
+                    attachments: chatMessage.attachments || []
                 });
             }
 
