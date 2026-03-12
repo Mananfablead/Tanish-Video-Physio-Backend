@@ -12619,3 +12619,13 @@
 {"level":"info","message":"User 69b15686b356db41132ef51b joined video session room: 69b288fdb086d5ea6169f381","service":"tanish-physio-backend","timestamp":"2026-03-12T12:17:33.413Z"}
 {"level":"info","message":"User 69b15686b356db41132ef51b joined video call room: video-call-69b288fdb086d5ea6169f381","service":"tanish-physio-backend","timestamp":"2026-03-12T12:17:33.414Z"}
 {"level":"info","message":"User 69b15686b356db41132ef51b joined session room 69b288fdb086d5ea6169f381","service":"tanish-physio-backend","timestamp":"2026-03-12T12:17:33.585Z"}
+{"level":"info","message":"Initializing external services...","service":"tanish-physio-backend","timestamp":"2026-03-12T12:18:37.549Z"}
+{"level":"info","message":"Google Calendar API initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-12T12:18:37.562Z"}
+{"level":"info","message":"✓ Google Calendar API initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-12T12:18:37.563Z"}
+{"level":"info","message":"Email transporter is ready to send messages","service":"tanish-physio-backend","timestamp":"2026-03-12T12:18:38.499Z"}
+{"level":"info","message":"✓ Email service transporter initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-12T12:18:38.501Z"}
+{"level":"info","message":"✓ Reminder service initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-12T12:18:38.598Z"}
+{"level":"info","message":"Email transporter is ready to send messages","service":"tanish-physio-backend","timestamp":"2026-03-12T12:18:38.627Z"}
+{"level":"info","message":"User 69b15686b356db41132ef51b joined video session room: 69b288fdb086d5ea6169f381","service":"tanish-physio-backend","timestamp":"2026-03-12T12:18:39.396Z"}
+{"level":"info","message":"User 69b15686b356db41132ef51b joined video call room: video-call-69b288fdb086d5ea6169f381","service":"tanish-physio-backend","timestamp":"2026-03-12T12:18:39.399Z"}
+{"level":"info","message":"User 69b15686b356db41132ef51b joined session room 69b288fdb086d5ea6169f381","service":"tanish-physio-backend","timestamp":"2026-03-12T12:18:39.469Z"}
