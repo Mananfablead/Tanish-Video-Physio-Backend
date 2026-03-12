@@ -66,14 +66,24 @@ const upload = multer({
     storage: multer.diskStorage({
         destination: function (req, file, cb) {
             const dir = path.join(__dirname, '..', 'public', 'uploads', 'chat');
+            console.log('📁 Upload directory:', dir);
             if (!fs.existsSync(dir)) {
+                console.log('📁 Creating directory:', dir);
                 fs.mkdirSync(dir, { recursive: true });
+            } else {
+                console.log('✅ Directory already exists');
             }
+            console.log('📦 File info:', {
+                originalname: file.originalname,
+                mimetype: file.mimetype
+            });
             cb(null, dir);
         },
         filename: function (req, file, cb) {
             const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-            cb(null, 'chat-' + uniqueSuffix + path.extname(file.originalname));
+            const filename = 'chat-' + uniqueSuffix + path.extname(file.originalname);
+            console.log('📝 Generated filename:', filename);
+            cb(null, filename);
         }
     }),
     fileFilter: fileFilter,
