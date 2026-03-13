@@ -30,12 +30,9 @@ const getUserNotifications = async (userId, options = {}) => {
         const { page = 1, limit = 20, unreadOnly = false } = options;
         const skip = (page - 1) * limit;
 
-        let query = {
-            $or: [
-                { userId: userId },
-                { recipientType: { $in: ['all', 'client', 'therapist'] } }
-            ]
-        };
+        // IMPORTANT: User should only receive their own notifications.
+        // Do not include global recipientType notifications, to avoid cross-user leakage.
+        let query = { userId: userId };
 
         if (unreadOnly) {
             query.read = false;
@@ -120,13 +117,8 @@ const markAllNotificationsAsRead = async (userId, isAdmin = false) => {
         if (isAdmin) {
             query.recipientType = 'admin';
         } else {
-            query = {
-                $or: [
-                    { userId: userId },
-                    { recipientType: { $in: ['all', 'client', 'therapist'] } }
-                ],
-                read: false
-            };
+            // Only mark the authenticated user's notifications as read
+            query = { userId: userId, read: false };
         }
 
         const result = await Notification.updateMany(query, { read: true });

@@ -25,14 +25,10 @@ const getAllNotifications = async (req, res, next) => {
             query = {};
             console.log('👑 Admin user - returning ALL notifications');
         } else {
-            // Users see their own notifications and global ones
-            query = {
-                $or: [
-                    { userId: req.user.userId },
-                    { recipientType: { $in: ['all', 'client', 'therapist'] } }
-                ]
-            };
-            console.log('👤 Regular user - using filtered query:', JSON.stringify(query));
+            // Non-admin users must ONLY see notifications created specifically for them.
+            // This prevents clients from seeing other users' notifications.
+            query = { userId: req.user.userId };
+            console.log('👤 Regular user - using user-scoped query:', JSON.stringify(query));
         }
 
         if (unreadOnly === 'true') {
@@ -364,13 +360,8 @@ const markAllAsRead = async (req, res, next) => {
         if (req.user.role === 'admin') {
             query.recipientType = 'admin';
         } else {
-            query = {
-                $or: [
-                    { userId: req.user.userId },
-                    { recipientType: { $in: ['all', 'client', 'therapist'] } }
-                ],
-                read: false
-            };
+            // Only mark the authenticated user's notifications as read
+            query = { userId: req.user.userId, read: false };
         }
 
         const result = await Notification.updateMany(query, { read: true });

@@ -34,13 +34,14 @@ const initializeServices = async () => {
         } catch (contactEmailError) {
         }
         
-        // Initialize reminder service
-        try {
-            ReminderService.initialize();
-            logger.info('✓ Reminder service initialized successfully');
-        } catch (reminderError) {
-             logger.error('Reminder service error details:', reminderError.message);
-        }
+        // Initialize reminder service - TEMPORARILY DISABLED
+        logger.warn('⚠ Reminder service initialization is temporarily disabled');
+        // try {
+        //     ReminderService.initialize();
+        //     logger.info('✓ Reminder service initialized successfully');
+        // } catch (reminderError) {
+        //      logger.error('Reminder service error details:', reminderError.message);
+        // }
     } catch (error) {
         logger.error('Error initializing services:', error);
     }
