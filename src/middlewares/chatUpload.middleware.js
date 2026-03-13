@@ -65,34 +65,10 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
     storage: multer.diskStorage({
         destination: function (req, file, cb) {
-            const dir = path.join(__dirname, '..', 'public', 'uploads', 'chat');
-            console.log('📁 Upload directory:', dir);
-            console.log('📁 __dirname:', __dirname);
-
-            try {
-                if (!fs.existsSync(dir)) {
-                    console.log('📁 Creating directory:', dir);
-                    fs.mkdirSync(dir, { recursive: true });
-                    console.log('✅ Directory created successfully');
-                } else {
-                    console.log('✅ Directory already exists');
-                }
-
-                // Check if directory is writable
-                const testFile = path.join(dir, 'test-write.txt');
-                fs.writeFileSync(testFile, 'test');
-                fs.unlinkSync(testFile);
-                console.log('✅ Directory is writable');
-
-            } catch (err) {
-                console.error('❌ Error with directory:', err);
+            const dir = path.join(__dirname, '..', '..', 'public', 'uploads', 'chat');
+            if (!fs.existsSync(dir)) {
+                fs.mkdirSync(dir, { recursive: true });
             }
-
-            console.log('📦 File info:', {
-                originalname: file.originalname,
-                mimetype: file.mimetype,
-                fieldname: file.fieldname
-            });
             cb(null, dir);
         },
         filename: function (req, file, cb) {

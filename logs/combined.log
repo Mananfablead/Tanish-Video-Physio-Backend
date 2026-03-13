@@ -12683,3 +12683,10 @@
 {"level":"info","message":"Email transporter is ready to send messages","service":"tanish-physio-backend","timestamp":"2026-03-12T13:12:58.544Z"}
 {"level":"info","message":"✓ Email service transporter initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-12T13:12:58.545Z"}
 {"level":"info","message":"✓ Reminder service initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-12T13:12:58.842Z"}
+{"level":"info","message":"Initializing external services...","service":"tanish-physio-backend","timestamp":"2026-03-12T13:13:32.242Z"}
+{"level":"info","message":"Google Calendar API initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-12T13:13:32.252Z"}
+{"level":"info","message":"✓ Google Calendar API initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-12T13:13:32.253Z"}
+{"level":"info","message":"Email transporter is ready to send messages","service":"tanish-physio-backend","timestamp":"2026-03-12T13:13:33.062Z"}
+{"level":"info","message":"✓ Email service transporter initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-12T13:13:33.063Z"}
+{"level":"info","message":"✓ Reminder service initialized successfully","service":"tanish-physio-backend","timestamp":"2026-03-12T13:13:33.112Z"}
+{"level":"info","message":"Email transporter is ready to send messages","service":"tanish-physio-backend","timestamp":"2026-03-12T13:13:33.128Z"}
