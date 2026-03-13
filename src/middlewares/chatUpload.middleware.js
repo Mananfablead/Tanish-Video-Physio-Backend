@@ -65,7 +65,7 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
     storage: multer.diskStorage({
         destination: function (req, file, cb) {
-            const dir = path.join(__dirname, '..', 'public', 'uploads', 'chat');
+            const dir = path.join(__dirname, '..', '..', 'public', 'uploads', 'chat');
             if (!fs.existsSync(dir)) {
                 fs.mkdirSync(dir, { recursive: true });
             }
