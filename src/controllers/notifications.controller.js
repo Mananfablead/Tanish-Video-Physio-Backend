@@ -331,9 +331,13 @@ const markAsRead = async (req, res, next) => {
         let query = { _id: req.params.id };
 
         if (req.user.role === 'admin') {
-            query.adminId = req.user.userId;
+            // Admin can mark any notification as read/unread
+            // No additional filter needed - admin has full access
+            console.log('👑 Admin toggling notification read status');
         } else {
+            // Regular users can only toggle their own notifications
             query.userId = req.user.userId;
+            console.log('👤 User toggling own notification read status');
         }
 
         // Get current read status to toggle
@@ -368,10 +372,12 @@ const markAllAsRead = async (req, res, next) => {
         let query = { read: false };
 
         if (req.user.role === 'admin') {
-            query.recipientType = 'admin';
+            // Admin can mark ALL notifications as read (not just admin notifications)
+            console.log('👑 Admin marking ALL notifications as read');
         } else {
             // Only mark the authenticated user's notifications as read
-            query = { userId: req.user.userId, read: false };
+            query.userId = req.user.userId;
+            console.log('👤 User marking own notifications as read');
         }
 
         const result = await Notification.updateMany(query, { read: true });
@@ -391,15 +397,18 @@ const deleteNotification = async (req, res, next) => {
 
         if (req.user.role === 'admin') {
             // Admin can delete any notification
+            console.log('👑 Admin deleting notification:', req.params.id);
             const notification = await Notification.findByIdAndDelete(req.params.id);
 
             if (!notification) {
                 return res.status(404).json(ApiResponse.error('Notification not found'));
             }
 
+            console.log('✅ Notification deleted successfully');
             return res.status(200).json(ApiResponse.success(null, 'Notification deleted successfully'));
         } else {
             // Regular users can only delete their own notifications
+            console.log('👤 User deleting own notification:', req.params.id);
             query.userId = req.user.userId;
             
             const notification = await Notification.findOneAndDelete(query);
@@ -408,6 +417,7 @@ const deleteNotification = async (req, res, next) => {
                 return res.status(404).json(ApiResponse.error('Notification not found or access denied'));
             }
 
+            console.log('✅ User notification deleted successfully');
             return res.status(200).json(ApiResponse.success(null, 'Notification deleted successfully'));
         }
     } catch (error) {
