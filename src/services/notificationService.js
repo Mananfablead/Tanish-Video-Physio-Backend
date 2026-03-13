@@ -12,6 +12,7 @@ const Credentials = require('../models/Credentials.model');
 const { validateWhatsAppToken, addCountryCode } = require('../utils/whatsapp.utils');
 const User = require('../models/User.model'); // Import User model for admin profile
 const logger = require('../utils/logger');
+const CmsContact = require('../models/CmsContact.model');
 
 class NotificationService {
     // Static templates mapping for direct access
@@ -880,6 +881,22 @@ class NotificationService {
                 }
 
                 console.log(`✅ User ${to} has active subscription, proceeding with plan booking email notification`);
+            }
+
+            // Ensure email footer contact info is loaded from CMS (CmsContact)
+            try {
+                const cmsContact = await CmsContact.findOne({ isPublic: true })
+                    .sort({ updatedAt: -1 })
+                    .lean();
+
+                if (cmsContact) {
+                    EmailTemplates.setContactInfo({
+                        phone: cmsContact.phone,
+                        email: cmsContact.email,
+                    });
+                }
+            } catch (contactErr) {
+                logger.warn(`Failed to load CMS contact info for email footer: ${contactErr.message}`);
             }
 
             // Handle template mapping - if template is a string, map to EmailTemplates function

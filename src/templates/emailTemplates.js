@@ -1,7 +1,20 @@
-// Beautiful Email Templates for Tanish Physio
+// Beautiful Email Templates for Tanish Online Physio & Fitness
 // Professional, Responsive, Healthcare-Focused Designs
 
 class EmailTemplates {
+    // Contact details will be injected from CmsContact.model (no hardcoded defaults)
+    static contactPhone = '';
+    static contactEmail = '';
+
+    static setContactInfo({ phone, email } = {}) {
+        if (typeof phone === 'string' && phone.trim()) {
+            this.contactPhone = phone.trim();
+        }
+        if (typeof email === 'string' && email.trim()) {
+            this.contactEmail = email.trim();
+        }
+    }
+
     // Utility method to generate consistent headers
     static generateHeader(title, subtitle, backgroundColor) {
         return `
@@ -22,12 +35,16 @@ class EmailTemplates {
                     <p style="color: ${textColor.light}; margin: 0 0 15px 0; font-size: 14px;">
                         ${copyrightText}
                     </p>
+                    ${EmailTemplates.contactPhone || EmailTemplates.contactEmail ? `
                     <p style="color: #ffffff; margin: 0; font-size: 16px; font-weight: 600;">
-                        📞 +91 XXXXXXXXXX | 📧 info@tanishphysio.com
+                        ${EmailTemplates.contactPhone ? `📞 ${EmailTemplates.contactPhone}` : ''}
+                        ${EmailTemplates.contactPhone && EmailTemplates.contactEmail ? ' | ' : ''}
+                        ${EmailTemplates.contactEmail ? `📧 ${EmailTemplates.contactEmail}` : ''}
                     </p>
+                    ` : ''}
                     <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid ${textColor.border};">
                         <p style="color: ${textColor.accent}; margin: 0; font-size: 12px;">
-                            © 2024 Tanish Physio. Professional Healthcare Services.
+                            © 2024 Tanish Online Physio & Fitness. Professional Healthcare Services.
                         </p>
                     </div>
                 </td>
@@ -77,7 +94,7 @@ class EmailTemplates {
                     ${EmailTemplates.generateFooter(
             '#1e293b',
             { light: '#cbd5e1', accent: '#94a3b8', border: '#334155' },
-            'Best regards, Tanish Physio Team'
+            'Best regards, Tanish Online Physio & Fitness Team'
         )}
                 </table>
             </td>
@@ -105,7 +122,7 @@ class EmailTemplates {
             <td align="center">
                 <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 20px rgba(0,0,0,0.08); overflow: hidden; border: 1px solid #e0e7ff;">
                     ${EmailTemplates.generateHeader(
-            'Welcome to Tanish Physio',
+            'Welcome to Tanish Online Physio & Fitness',
             'Your recovery journey starts here',
             { start: '#4f46e5', end: '#6366f1', text: '#e0e7ff' }
         )}
@@ -117,7 +134,7 @@ class EmailTemplates {
                             </p>
 
                             <p style="font-size: 16px; color: #4338ca; margin: 0 0 18px 0; line-height: 1.7;">
-                                Thanks for creating your account with <strong>Tanish Physio</strong>! We're excited to support your wellness goals.
+                                Thanks for creating your account with <strong>Tanish Online Physio & Fitness</strong>! We're excited to support your wellness goals.
                             </p>
 
                             <div style="background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%); border-radius: 12px; padding: 20px 24px; margin: 20px 0; border: 1px solid #c7d2fe;">
@@ -138,7 +155,7 @@ class EmailTemplates {
                     ${EmailTemplates.generateFooter(
             '#312e81',
             { light: '#c7d2fe', accent: '#a5b4fc', border: '#4338ca' },
-            'Warm regards, Team Tanish Physio'
+            'Warm regards, Tanish Online Physio & Fitness'
         )}
                 </table>
             </td>
@@ -194,7 +211,7 @@ class EmailTemplates {
                             </div>
                             
                             <p style="font-size: 16px; color: #475569; margin: 30px 0 0 0; line-height: 1.6;">
-                                Thank you for choosing <strong>Tanish Physio</strong>. We're excited to assist you with your healthcare journey!
+                                Thank you for choosing <strong>Tanish Online Physio & Fitness</strong>. We're excited to assist you with your healthcare journey!
                             </p>
                         </td>
                     </tr>
@@ -257,7 +274,7 @@ class EmailTemplates {
                                 <h2 style="color: #14532d; margin: 0 0 20px 0; font-size: 24px;">📅 Appointment Details</h2>
                                 
                                 <div style="display: grid; grid-template-columns: auto 1fr; gap: 15px; align-items: center;">
-                                    <div style="background-color: #16a34a; color: white; padding: 12px; border-radius: 8px; text-align: center; min-width: 100px;">
+                                    <div style="background-color:hsl(142, 76.20%, 36.30%); color: white; padding: 12px; border-radius: 8px; text-align: center; min-width: 100px;">
                                         <div style="font-size: 24px; font-weight: bold;">${new Date(data.date).getDate()}</div>
                                         <div style="font-size: 14px;">${new Date(data.date).toLocaleDateString('en-US', { month: 'short' })}</div>
                                     </div>
@@ -298,7 +315,7 @@ class EmailTemplates {
                             </div>
                             
                             <p style="font-size: 16px; color: #475569; margin: 30px 0 0 0; line-height: 1.6;">
-                                We're looking forward to helping you achieve your health goals. <strong>Tanish Physio</strong> is committed to providing you with exceptional care!
+                                We're looking forward to helping you achieve your health goals. <strong>Tanish Online Physio & Fitness</strong> is committed to providing you with exceptional care!
                             </p>
                         </td>
                     </tr>
@@ -375,7 +392,7 @@ class EmailTemplates {
                             </div>
                             
                             <p style="font-size: 16px; color: #64748b; margin: 30px 0 0 0; line-height: 1.6;">
-                                We truly value your trust in <strong>Tanish Physio</strong> and apologize for any inconvenience this cancellation may have caused. Our team is here to support you every step of the way.
+                                We truly value your trust in <strong>Tanish Online Physio & Fitness</strong> and apologize for any inconvenience this cancellation may have caused. Our team is here to support you every step of the way.
                             </p>
                         </td>
                     </tr>
@@ -454,7 +471,7 @@ class EmailTemplates {
                             </div>
                             
                             <p style="font-size: 16px; color: #64748b; margin: 30px 0 0 0; line-height: 1.6;">
-                                Thank you for choosing <strong>Tanish Physio</strong>. We're committed to providing you with exceptional healthcare services.
+                                Thank you for choosing <strong>Tanish Online Physio & Fitness</strong>. We're committed to providing you with exceptional healthcare services.
                             </p>
                         </td>
                     </tr>
@@ -529,7 +546,7 @@ class EmailTemplates {
                             </div>
                         
                             <p style="font-size: 16px; color: #475569; margin: 30px 0 0 0; line-height: 1.6;">
-                                We're grateful for your trust in <strong>Tanish Physio</strong>. Our team is dedicated to providing you with the highest quality healthcare services and personalized attention.
+                                We're grateful for your trust in <strong>Tanish Online Physio & Fitness</strong>. Our team is dedicated to providing you with the highest quality healthcare services and personalized attention.
                             </p>
                         </td>
                     </tr>
@@ -645,7 +662,7 @@ class EmailTemplates {
                             </div>
                             
                             <p style="font-size: 16px; color: #475569; margin: 30px 0 0 0; line-height: 1.6;">
-                                Looking forward to seeing you at your session. <strong>Tanish Physio</strong> is committed to supporting your health and wellness journey.
+                                Looking forward to seeing you at your session. <strong>Tanish Online Physio & Fitness</strong> is committed to supporting your health and wellness journey.
                             </p>
                         </td>
                     </tr>
@@ -767,7 +784,7 @@ class EmailTemplates {
                             
                             <p style="font-size: 14px; color: #64748b; margin: 25px 0 0 0; text-align: center;">
                                 Best regards,<br>
-                                <strong style="color: #0284c7; font-size: 16px;">Tanish Physio Administration</strong>
+                                <strong style="color: #0284c7; font-size: 16px;">Tanish Online Physio & Fitness Administration</strong>
                             </p>
                         </td>
                     </tr>
@@ -775,7 +792,7 @@ class EmailTemplates {
                     ${EmailTemplates.generateFooter(
             '#083344',
             { light: '#bae6fd', accent: '#7dd3fc', border: '#0c4a6e' },
-            'Tanish Physio Operations Management'
+            'Tanish Online Physio & Fitness Operations Management'
         )}
                 </table>
             </td>
@@ -882,7 +899,7 @@ class EmailTemplates {
                             
                             <p style="font-size: 14px; color: #64748b; margin: 25px 0 0 0; text-align: center;">
                                 Best regards,<br>
-                                <strong style="color: #16a34a; font-size: 16px;">Tanish Physio Administration</strong>
+                                <strong style="color: #16a34a; font-size: 16px;">Tanish Online Physio & Fitness Administration</strong>
                             </p>
                         </td>
                     </tr>
@@ -890,7 +907,7 @@ class EmailTemplates {
                     ${EmailTemplates.generateFooter(
             '#14532d',
             { light: '#bbf7d0', accent: '#86efac', border: '#166534' },
-            'Tanish Physio Operations Management'
+            'Tanish Online Physio & Fitness Operations Management'
         )}
                 </table>
             </td>
@@ -982,7 +999,7 @@ class EmailTemplates {
                     ${EmailTemplates.generateFooter(
             '#14532d',
             { light: '#bbf7d0', accent: '#86efac', border: '#166534' },
-            'Tanish Physio Financial Management'
+            'Tanish Online Physio & Fitness Financial Management'
         )}
                 </table>
             </td>
@@ -1085,7 +1102,7 @@ class EmailTemplates {
                             </div>
                             
                             <p style="font-size: 16px; color: #475569; margin: 30px 0 0 0; line-height: 1.6;">
-                                We apologize for any inconvenience this rescheduling may have caused. <strong>Tanish Physio</strong> is committed to providing you with the best possible care and appreciate your understanding.
+                                We apologize for any inconvenience this rescheduling may have caused. <strong>Tanish Online Physio & Fitness</strong> is committed to providing you with the best possible care and appreciate your understanding.
                             </p>
                         </td>
                     </tr>
@@ -1222,7 +1239,7 @@ class EmailTemplates {
                             
                             <p style="font-size: 14px; color: #64748b; margin: 25px 0 0 0; text-align: center;">
                                 Best regards,<br>
-                                <strong style="color: #16a34a; font-size: 16px;">Tanish Physio Operations Management</strong>
+                                <strong style="color: #16a34a; font-size: 16px;">Tanish Online Physio & Fitness Operations Management</strong>
                             </p>
                         </td>
                     </tr>
@@ -1230,7 +1247,7 @@ class EmailTemplates {
                     ${EmailTemplates.generateFooter(
             '#14532d',
             { light: '#bbf7d0', accent: '#86efac', border: '#14532d' },
-            'Tanish Physio Operations Management'
+            'Tanish Online Physio & Fitness Operations Management'
         )}
                 </table>
             </td>
@@ -1313,7 +1330,7 @@ class EmailTemplates {
                             </div>
                             
                             <p style="font-size: 16px; color: #475569; margin: 30px 0 0 0; line-height: 1.6;">
-                                Thank you for choosing <strong>Tanish Physio</strong>. Your subscription gives you access to premium healthcare services and personalized attention from our expert team.
+                                Thank you for choosing <strong>Tanish Online Physio & Fitness</strong>. Your subscription gives you access to premium healthcare services and personalized attention from our expert team.
                             </p>
                         </td>
                     </tr>
