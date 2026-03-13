@@ -325,7 +325,7 @@ const sendNotification = async (req, res, next) => {
     }
 };
 
-// Mark notification as read
+// Mark notification as read/unread (toggle)
 const markAsRead = async (req, res, next) => {
     try {
         let query = { _id: req.params.id };
@@ -336,18 +336,28 @@ const markAsRead = async (req, res, next) => {
             query.userId = req.user.userId;
         }
 
-        const notification = await Notification.findOneAndUpdate(
-            query,
-            { read: true },
-            { new: true }
-        );
-
-        if (!notification) {
+        // Get current read status to toggle
+        const currentNotification = await Notification.findOne(query);
+        
+        if (!currentNotification) {
             return res.status(404).json(ApiResponse.error('Notification not found'));
         }
 
-        res.status(200).json(ApiResponse.success({ notification }, 'Notification marked as read'));
+        // Toggle the read status
+        const newReadStatus = !currentNotification.read;
+        
+        const notification = await Notification.findOneAndUpdate(
+            query,
+            { read: newReadStatus },
+            { new: true }
+        );
+
+        res.status(200).json(ApiResponse.success({ 
+            notification,
+            read: newReadStatus
+        }, `Notification marked as ${newReadStatus ? 'read' : 'unread'}`));
     } catch (error) {
+        console.error('Error toggling notification read status:', error);
         next(error);
     }
 };
@@ -374,17 +384,34 @@ const markAllAsRead = async (req, res, next) => {
     }
 };
 
-// Delete a notification (admin only)
+// Delete a notification (user can delete their own, admin can delete any)
 const deleteNotification = async (req, res, next) => {
     try {
-        const notification = await Notification.findByIdAndDelete(req.params.id);
+        let query = { _id: req.params.id };
 
-        if (!notification) {
-            return res.status(404).json(ApiResponse.error('Notification not found'));
+        if (req.user.role === 'admin') {
+            // Admin can delete any notification
+            const notification = await Notification.findByIdAndDelete(req.params.id);
+
+            if (!notification) {
+                return res.status(404).json(ApiResponse.error('Notification not found'));
+            }
+
+            return res.status(200).json(ApiResponse.success(null, 'Notification deleted successfully'));
+        } else {
+            // Regular users can only delete their own notifications
+            query.userId = req.user.userId;
+            
+            const notification = await Notification.findOneAndDelete(query);
+
+            if (!notification) {
+                return res.status(404).json(ApiResponse.error('Notification not found or access denied'));
+            }
+
+            return res.status(200).json(ApiResponse.success(null, 'Notification deleted successfully'));
         }
-
-        res.status(200).json(ApiResponse.success(null, 'Notification deleted successfully'));
     } catch (error) {
+        console.error('Error deleting notification:', error);
         next(error);
     }
 };

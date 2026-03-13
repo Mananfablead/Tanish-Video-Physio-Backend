@@ -27,8 +27,8 @@ router.put('/:id/read', authenticateToken, markAsRead);
 // Mark all notifications as read
 router.put('/read-all', authenticateToken, markAllAsRead);
 
-// Delete single notification (admin only)
-router.delete('/:id', authenticateToken, authorizeRoles('admin'), deleteNotification);
+// Delete single notification (authenticated users can delete their own)
+router.delete('/:id', authenticateToken, deleteNotification);
 
 // Delete all notifications (admin only)
 router.delete('/', authenticateToken, authorizeRoles('admin'), deleteAllNotifications);
