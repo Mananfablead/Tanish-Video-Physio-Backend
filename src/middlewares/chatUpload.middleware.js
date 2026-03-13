@@ -73,7 +73,11 @@ const upload = multer({
         },
         filename: function (req, file, cb) {
             const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-            cb(null, 'chat-' + uniqueSuffix + path.extname(file.originalname));
+            const filename = 'chat-' + uniqueSuffix + path.extname(file.originalname);
+            console.log('📝 Generated filename:', filename);
+            console.log('📝 Original name:', file.originalname);
+            console.log('📝 Extension:', path.extname(file.originalname));
+            cb(null, filename);
         }
     }),
     fileFilter: fileFilter,
@@ -82,6 +86,26 @@ const upload = multer({
     }
 });
 
+// Add error handling middleware
+const handleUploadError = (err, req, res, next) => {
+    console.error('❌ Multer error:', err);
+    if (err instanceof multer.MulterError) {
+        console.error('❌ Multer specific error:', err.code);
+        return res.status(400).json({
+            success: false,
+            message: `Multer error: ${err.message}`
+        });
+    } else if (err) {
+        console.error('❌ General upload error:', err);
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+    next();
+};
+
 module.exports = {
-    chatUpload: upload.single('file')
+    chatUpload: upload.single('file'),
+    handleUploadError
 };
