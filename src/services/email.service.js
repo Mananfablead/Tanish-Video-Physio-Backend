@@ -105,7 +105,9 @@ const sendEmail = async (options) => {
         }
 
         const mailOptions = {
-            from: emailCreds.user,
+            // from: emailCreds.user,
+            from: `"Tanish Physio & Fitness" <${emailCreds.user}>`,
+
             to: options.to,
             subject: options.subject,
             text: options.text,

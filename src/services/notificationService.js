@@ -953,7 +953,9 @@ class NotificationService {
             }
 
             const mailOptions = {
-                from: process.env.EMAIL_FROM || this.emailConfig?.auth?.user || 'no-reply@tanishphysio.com',
+                // from: process.env.EMAIL_FROM || this.emailConfig?.auth?.user || 'no-reply@tanishphysio.com',
+                from: `"Tanish Physio & Fitness" <${this.emailConfig?.auth?.user}>`,
+
                 to: to,
                 subject: subject,
                 html: htmlContent

@@ -194,7 +194,8 @@ async function sendWelcomeEmailWithCredentials(email, name, username, password) 
 
         const mailOptions = {
             to: email,
-            from: emailCreds.user,
+            // from: emailCreds.user,
+            from: `"Tanish Physio & Fitness" <${emailCreds.user}>`,
             subject: 'Welcome to Tanish Physio - Account Created & Payment Verified',
             html: message
         };
