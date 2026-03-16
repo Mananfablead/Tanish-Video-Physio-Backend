@@ -122,6 +122,11 @@ const sessionSchema = new mongoose.Schema({
     therapistJoinLink: {
         type: String
     },
+    groupSessionId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'GroupSession',
+        description: 'Links multiple session instances to the same group call'
+    },
     last24HourReminderSent: {
         type: Date
     },

@@ -15,37 +15,109 @@ const generateCallToken = async (req, res) => {
         const requesterId = req.user.userId;
         const requesterRole = req.user.role;
 
-        const roomId = sessionId || groupSessionId;
-        const roomType = sessionId ? 'session' : 'group';
-
-        logger.info(`Generate call token request - roomType: ${roomType}, roomId: ${roomId}, userId: ${userId}, role: ${role}, requesterId: ${requesterId}, requesterRole: ${requesterRole}`);
+        logger.info(`Generate call token request - sessionId: ${sessionId}, groupSessionId: ${groupSessionId}, userId: ${userId}, role: ${role}, requesterId: ${requesterId}, requesterRole: ${requesterRole}`);
 
         // Validate input
-        if (!roomId || !userId || !role) {
+        if ((!sessionId && !groupSessionId) || !userId || !role) {
             logger.warn('Missing required fields in generate call token request');
             return res.status(400).json({
                 success: false,
-                message: 'sessionId/groupSessionId, userId, and role are required'
+                message: 'sessionId or groupSessionId, userId, and role are required'
             });
         }
+
+        // Determine room type and ID
+        const roomId = sessionId || groupSessionId;
+        const roomType = sessionId ? 'session' : 'group';
+
+        logger.info(`Resolved roomType: ${roomType}, roomId: ${roomId}`);
 
         // Fetch the appropriate session type
         let session = null;
         if (roomType === 'session') {
+            // First try to find by MongoDB _id
             session = await Session.findById(roomId)
                 .populate('userId')
                 .populate('therapistId');
+            
+            // If not found, try to find by custom sessionId field
+            if (!session) {
+                logger.warn(`Session not found by _id ${roomId}, trying sessionId field...`);
+                session = await Session.findOne({ sessionId: roomId })
+                    .populate('userId')
+                    .populate('therapistId');
+                
+                if (session) {
+                    logger.info(`Found session by sessionId field: ${roomId}`);
+                }
+            }
+            
+            // If still not found, check if it might be a group session
+            if (!session) {
+                logger.warn(`Session not found, checking if it's a group session...`);
+                
+                // First try GroupSession collection by _id
+                session = await GroupSession.findById(roomId)
+                    .populate('therapistId')
+                    .populate('participants.userId');
+                
+                if (session) {
+                    logger.info(`Found group session in GroupSession collection: ${roomId}`);
+                } else {
+                    // Last resort: check if this ID exists as a groupSessionId reference in Session collection
+                    logger.warn(`Group session not found by _id, checking if ${roomId} exists as groupSessionId reference...`);
+                    const sessionDocWithGroupRef = await Session.findOne({ groupSessionId: roomId })
+                        .populate('therapistId')
+                        .populate('userId');
+                    
+                    if (sessionDocWithGroupRef) {
+                        logger.info(`Found session document referencing groupSessionId: ${roomId}`);
+                        // Now get the actual group session
+                        session = await GroupSession.findById(sessionDocWithGroupRef.groupSessionId)
+                            .populate('therapistId')
+                            .populate('participants.userId');
+                        
+                        if (session) {
+                            logger.info(`Successfully found group session via reference: ${roomId}`);
+                        }
+                    } else {
+                        logger.error(`❌ No session or group session found with ID: ${roomId}`);
+                    }
+                }
+            }
         } else {
+            // roomType === 'group'
+            // First try to find in GroupSession collection
             session = await GroupSession.findById(roomId)
                 .populate('therapistId')
                 .populate('participants.userId');
+            
+            // If not found in GroupSession, check if it's a Session with groupSessionId reference
+            if (!session) {
+                logger.warn(`Group session not found by _id ${roomId}, checking Session collection for groupSessionId reference...`);
+                const sessionWithGroupRef = await Session.findOne({ groupSessionId: roomId })
+                    .populate('therapistId')
+                    .populate('userId');
+                
+                if (sessionWithGroupRef) {
+                    logger.info(`Found session referencing groupSessionId: ${roomId}`);
+                    // Use the groupSessionId from the session to get full details
+                    session = await GroupSession.findById(sessionWithGroupRef.groupSessionId)
+                        .populate('therapistId')
+                        .populate('participants.userId');
+                    
+                    if (session) {
+                        logger.info(`Successfully retrieved group session via Session reference: ${roomId}`);
+                    }
+                }
+            }
         }
 
         if (!session) {
             logger.warn(`Session not found - roomType: ${roomType}, roomId: ${roomId}`);
             return res.status(404).json({
                 success: false,
-                message: `${roomType === 'session' ? 'Session' : 'Group session'} not found`
+                message: 'Session not found. Please verify the session ID is correct.'
             });
         }
 
@@ -580,60 +652,150 @@ const getSessionParticipants = async (req, res) => {
 
         // Import the Session model
         const Session = require('../models/Session.model');
+        const GroupSession = require('../models/GroupSession.model');
 
-        // Verify session exists and user has access
-        const session = await Session.findById(sessionId)
-            .populate('userId', 'name email firstName lastName')
-            .populate('therapistId', 'name email firstName lastName');
-
-        if (!session) {
-            return res.status(404).json({ message: 'Session not found' });
-        }
-
-        // Check if user has access to this session
-        const isAdmin = req.user.role === 'admin';
-        const isTherapist = req.user.role === 'therapist' && session.therapistId && session.therapistId._id.toString() === userId;
-        const isUser = session.userId && session.userId._id.toString() === userId;
-
-        if (!isAdmin && !isTherapist && !isUser) {
-            return res.status(403).json({ message: 'Access denied' });
-        }
-
-        // Prepare participant details
-        const participants = [];
-
-        // Add user (patient) as participant
-        if (session.userId) {
-            participants.push({
-                userId: session.userId._id,
-                name: session.userId.name || `${session.userId.firstName} ${session.userId.lastName}`,
-                email: session.userId.email,
-                role: 'patient',
-                isSelf: session.userId._id.toString() === userId
-            });
-        }
-
-        // Add therapist as participant
-        if (session.therapistId) {
-            participants.push({
-                userId: session.therapistId._id,
-                name: session.therapistId.name || `${session.therapistId.firstName} ${session.therapistId.lastName}`,
-                email: session.therapistId.email,
-                role: 'therapist',
-                isTherapist: true,
-                isSelf: session.therapistId._id.toString() === userId
-            });
-        }
-
-        res.json({
-            success: true,
-            data: {
-                sessionId: session._id,
-                sessionDate: session.date,
-                sessionTime: session.time,
-                participants
+        let session;
+        let participants = [];
+        
+        // Check if this is a group session ID (starts with 'group_' or is ObjectId format)
+        const isGroupSessionId = sessionId.startsWith('group_') || sessionId.length === 24;
+        
+        if (isGroupSessionId) {
+            // Handle group session - extract actual groupSessionId if it has 'group_' prefix
+            const actualGroupSessionId = sessionId.startsWith('group_') ? sessionId.substring(6) : sessionId;
+            
+            // First try to find in GroupSession collection
+            let groupSession = await GroupSession.findById(actualGroupSessionId)
+                .populate('therapistId', 'name email firstName lastName role')
+                .populate('participants.userId', 'name email firstName lastName role phone profilePicture');
+            
+            // If not found in GroupSession, check if it exists in Session collection as a reference
+            if (!groupSession) {
+                logger.warn(`Group session not found by _id: ${actualGroupSessionId}, checking Session collection...`);
+                const sessionWithGroupRef = await Session.findOne({ groupSessionId: actualGroupSessionId })
+                    .populate('therapistId', 'name email firstName lastName role')
+                    .populate('userId', 'name email firstName lastName role phone profilePicture');
+                
+                if (sessionWithGroupRef) {
+                    logger.info(`Found session referencing groupSessionId: ${actualGroupSessionId}`);
+                    // Retrieve the actual group session using the reference
+                    groupSession = await GroupSession.findById(sessionWithGroupRef.groupSessionId)
+                        .populate('therapistId', 'name email firstName lastName role')
+                        .populate('participants.userId', 'name email firstName lastName role phone profilePicture');
+                    
+                    if (groupSession) {
+                        logger.info(`✅ Successfully retrieved group session via Session reference: ${actualGroupSessionId}`);
+                    }
+                }
             }
-        });
+
+            if (!groupSession) {
+                return res.status(404).json({ message: 'Group session not found' });
+            }
+            
+            // Check if user has access (admin, therapist, or participant)
+            const isAdmin = req.user.role === 'admin';
+            const isTherapist = groupSession.therapistId && groupSession.therapistId._id.toString() === userId;
+            const isParticipant = groupSession.participants.some(
+                p => p.userId && p.userId._id.toString() === userId && p.status === 'accepted'
+            );
+            
+            if (!isAdmin && !isTherapist && !isParticipant) {
+                return res.status(403).json({ message: 'Access denied' });
+            }
+            
+            // Add therapist as participant
+            if (groupSession.therapistId) {
+                participants.push({
+                    userId: groupSession.therapistId._id,
+                    name: groupSession.therapistId.name || `${groupSession.therapistId.firstName} ${groupSession.therapistId.lastName}`,
+                    email: groupSession.therapistId.email,
+                    role: 'therapist',
+                    isTherapist: true,
+                    isSelf: groupSession.therapistId._id.toString() === userId
+                });
+            }
+            
+            // Add all accepted participants from group session
+            groupSession.participants.forEach(p => {
+                if (p.userId && p.status === 'accepted') {
+                    participants.push({
+                        userId: p.userId._id,
+                        name: p.userId.name || `${p.userId.firstName} ${p.userId.lastName}`,
+                        email: p.userId.email,
+                        role: 'participant',
+                        isSelf: p.userId._id.toString() === userId
+                    });
+                }
+            });
+            
+            res.json({
+                success: true,
+                data: {
+                    sessionId: sessionId, // Use the prefixed version for consistency
+                    groupSessionId: actualGroupSessionId,
+                    type: 'group',
+                    sessionDate: groupSession.startTime,
+                    participants,
+                    maxParticipants: groupSession.maxParticipants
+                }
+            });
+        } else {
+            // Handle regular 1-on-1 session
+            session = await Session.findById(sessionId)
+                .populate('userId', 'name email firstName lastName')
+                .populate('therapistId', 'name email firstName lastName');
+            
+            if (!session) {
+                return res.status(404).json({ message: 'Session not found' });
+            }
+            
+            // Check if user has access to this session
+            const isAdmin = req.user.role === 'admin';
+            const isTherapist = req.user.role === 'therapist' && session.therapistId && session.therapistId._id.toString() === userId;
+            const isUser = session.userId && session.userId._id.toString() === userId;
+            
+            if (!isAdmin && !isTherapist && !isUser) {
+                return res.status(403).json({ message: 'Access denied' });
+            }
+            
+            // Prepare participant details
+            participants = [];
+            
+            // Add user (patient) as participant
+            if (session.userId) {
+                participants.push({
+                    userId: session.userId._id,
+                    name: session.userId.name || `${session.userId.firstName} ${session.userId.lastName}`,
+                    email: session.userId.email,
+                    role: 'patient',
+                    isSelf: session.userId._id.toString() === userId
+                });
+            }
+            
+            // Add therapist as participant
+            if (session.therapistId) {
+                participants.push({
+                    userId: session.therapistId._id,
+                    name: session.therapistId.name || `${session.therapistId.firstName} ${session.therapistId.lastName}`,
+                    email: session.therapistId.email,
+                    role: 'therapist',
+                    isTherapist: true,
+                    isSelf: session.therapistId._id.toString() === userId
+                });
+            }
+            
+            res.json({
+                success: true,
+                data: {
+                    sessionId: session._id,
+                    sessionDate: session.date,
+                    sessionTime: session.time,
+                    participants,
+                    type: session.sessionType || session.type || '1-on-1'
+                }
+            });
+        }
     } catch (error) {
         const logger = require('../utils/logger');
         logger.error('Error getting session participants:', error);

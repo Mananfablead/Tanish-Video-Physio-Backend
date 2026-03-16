@@ -156,12 +156,25 @@ const setupVideoCallHandlers = (io, socket) => {
             }
 
             // Verify session exists and user has access
-            const session = await Session.findById(sessionId)
+            // First try to find by MongoDB _id
+            let session = await Session.findById(sessionId)
                 .populate('userId')
                 .populate('therapistId');
 
+            // If not found, try to find by custom sessionId field
             if (!session) {
-                socket.emit('error', { message: 'Session not found' });
+                logger.warn(`Session not found by _id ${sessionId}, trying sessionId field...`);
+                session = await Session.findOne({ sessionId: sessionId })
+                    .populate('userId')
+                    .populate('therapistId');
+                
+                if (session) {
+                    logger.info(`Found session by sessionId field: ${sessionId}`);
+                }
+            }
+
+            if (!session) {
+                socket.emit('error', { message: 'Session not found. Please verify the session ID is correct.' });
                 return;
             }
 
@@ -661,6 +674,16 @@ const setupVideoCallHandlers = (io, socket) => {
     socket.on('join-room', async (data) => {
         try {
             const { sessionId, groupSessionId } = data;
+            
+            // LOG EVERYTHING for debugging
+            logger.info(`=== JOIN-ROOM REQUEST RECEIVED ===`);
+            logger.info(`Socket ID: ${socket.id}`);
+            logger.info(`User ID: ${socket.user.userId}`);
+            logger.info(`User Role: ${socket.user.role}`);
+            logger.info(`Request data:`, JSON.stringify(data, null, 2));
+            logger.info(`sessionId: ${sessionId}`);
+            logger.info(`groupSessionId: ${groupSessionId}`);
+            
             // If this is a special non-session room (support/admin/notifications), join and return early
             const specialRoom = (id) => typeof id === 'string' && (id.startsWith('support-') || id === 'admin-support-room' || id === 'admin_notifications' || id === 'default-chat-room');
             if (specialRoom(sessionId) || specialRoom(groupSessionId)) {
@@ -679,14 +702,38 @@ const setupVideoCallHandlers = (io, socket) => {
             if (sessionId) {
                 // 1-on-1 session
                 roomType = 'session';
+                logger.info(`Processing as 1-on-1 session with ID: ${sessionId}`);
                 
                 // Verify session exists and user has access
-                const session = await Session.findById(sessionId)
+                // First try to find by MongoDB _id
+                let session = await Session.findById(sessionId)
                     .populate('userId')
                     .populate('therapistId');
 
+                // If not found, try to find by custom sessionId field
                 if (!session) {
-                    socket.emit('error', { message: 'Session not found' });
+                    logger.warn(`Session not found by _id ${sessionId}, trying sessionId field...`);
+                    session = await Session.findOne({ sessionId: sessionId })
+                        .populate('userId')
+                        .populate('therapistId');
+                    
+                    if (session) {
+                        logger.info(`Found session by sessionId field: ${sessionId}`);
+                    } else {
+                        logger.error(`❌ Session still not found after checking both _id and sessionId fields`);
+                        logger.error(`Session collection stats:`);
+                        const sessionCount = await Session.countDocuments();
+                        logger.error(`Total sessions in DB: ${sessionCount}`);
+                        if (sessionCount > 0) {
+                            const sampleSessions = await Session.find().limit(5).select('_id sessionId');
+                            logger.error(`Sample sessions:`, JSON.stringify(sampleSessions, null, 2));
+                        }
+                    }
+                }
+
+                if (!session) {
+                    logger.error(`🛑 Emitting "Session not found" error to client`);
+                    socket.emit('error', { message: 'Session not found. Please verify the session ID is correct.' });
                     return;
                 }
 
@@ -798,16 +845,48 @@ const setupVideoCallHandlers = (io, socket) => {
             } else if (groupSessionId) {
                 // Group session
                 roomType = 'group';
+                logger.info(`Processing as GROUP session with ID: ${groupSessionId}`);
 
                 // Verify group session exists and user has access
-                const groupSession = await GroupSession.findById(groupSessionId)
+                logger.info(`Searching for group session by _id: ${groupSessionId}`);
+                let groupSession = await GroupSession.findById(groupSessionId)
                     .populate('therapistId')
                     .populate('participants.userId');
 
+                // If not found in GroupSession collection, check if it exists in Session collection as a reference
                 if (!groupSession) {
-                    socket.emit('error', { message: 'Group session not found' });
+                    logger.warn(`Group session not found by _id: ${groupSessionId}, checking Session collection...`);
+                    const sessionWithGroupRef = await Session.findOne({ groupSessionId: groupSessionId })
+                        .populate('therapistId')
+                        .populate('userId');
+                    
+                    if (sessionWithGroupRef) {
+                        logger.info(`Found session referencing groupSessionId: ${groupSessionId}`);
+                        // Retrieve the actual group session using the reference
+                        groupSession = await GroupSession.findById(sessionWithGroupRef.groupSessionId)
+                            .populate('therapistId')
+                            .populate('participants.userId');
+                        
+                        if (groupSession) {
+                            logger.info(`✅ Successfully retrieved group session via Session reference: ${groupSessionId}`);
+                        }
+                    }
+                }
+
+                if (!groupSession) {
+                    logger.error(`❌ Group session not found by _id: ${groupSessionId}`);
+                    logger.error(`GroupSession collection stats:`);
+                    const groupCount = await GroupSession.countDocuments();
+                    logger.error(`Total group sessions in DB: ${groupCount}`);
+                    if (groupCount > 0) {
+                        const sampleGroups = await GroupSession.find().limit(5).select('_id title');
+                        logger.error(`Sample group sessions:`, JSON.stringify(sampleGroups, null, 2));
+                    }
+                    socket.emit('error', { message: 'Group session not found. Please verify the group session ID is correct.' });
                     return;
                 }
+                
+                logger.info(`✅ Found group session: ${groupSession.title || 'Untitled'}`);
 
                 // Check if user has permission to join the group call
                 isTherapist = groupSession.therapistId._id.toString() === userId;

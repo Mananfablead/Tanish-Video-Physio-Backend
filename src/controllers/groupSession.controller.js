@@ -1,5 +1,6 @@
 const GroupSession = require('../models/GroupSession.model');
 const User = require('../models/User.model');
+const Booking = require('../models/Booking.model');
 const { validationResult } = require('express-validator');
 
 // Create a new group session
@@ -78,7 +79,11 @@ const getGroupSessions = async (req, res) => {
 
         const groupSessions = await GroupSession.find(query)
             .populate('therapistId', 'firstName lastName email')
-            .populate('participants.userId', 'firstName lastName email')
+            .populate('participants.userId', 'firstName lastName email phone')
+            .populate({
+                path: 'participants.bookingId',
+                select: 'serviceName status paymentStatus notes'
+            })
             .sort({ startTime: -1 });
 
         res.status(200).json({
@@ -87,6 +92,99 @@ const getGroupSessions = async (req, res) => {
         });
     } catch (error) {
         console.error('Error fetching group sessions:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+};
+
+// Admin endpoint: Get all group sessions with participants and booking details
+const getAllGroupSessionsWithParticipants = async (req, res) => {
+    try {
+        const { status, date, therapistId } = req.query;
+
+        // Build query
+        let query = {};
+
+        if (status) {
+            query.status = status;
+        }
+
+        if (therapistId) {
+            query.therapistId = therapistId;
+        }
+
+        if (date) {
+            const startDate = new Date(date);
+            const endDate = new Date(startDate);
+            endDate.setDate(endDate.getDate() + 1);
+
+            query.startTime = {
+                $gte: startDate,
+                $lt: endDate
+            };
+        }
+
+        const groupSessions = await GroupSession.find(query)
+            .populate('therapistId', 'firstName lastName email role profilePicture')
+            .populate({
+                path: 'participants.userId',
+                select: 'firstName lastName email phone profilePicture subscriptionInfo'
+            })
+            .populate({
+                path: 'participants.bookingId',
+                select: 'serviceName status paymentStatus notes createdAt serviceId',
+                populate: {
+                    path: 'serviceId',
+                    select: 'name price duration images'
+                }
+            })
+            .sort({ startTime: -1 });
+
+        // Format response with additional details
+        const formattedSessions = groupSessions.map(session => {
+            const participantCount = session.participants.filter(p => p.status === 'accepted').length;
+            const isFull = participantCount >= (session.maxParticipants || 0);
+
+            return {
+                _id: session._id,
+                title: session.title,
+                description: session.description,
+                therapist: session.therapistId,
+                startTime: session.startTime,
+                endTime: session.endTime,
+                maxParticipants: session.maxParticipants,
+                currentParticipants: participantCount,
+                isFull: isFull,
+                status: session.status,
+                isActiveCall: session.isActiveCall,
+                participants: session.participants.map(p => ({
+                    userId: p.userId?._id,
+                    name: `${p.userId?.firstName || ''} ${p.userId?.lastName || ''}`.trim(),
+                    email: p.userId?.email,
+                    phone: p.userId?.phone,
+                    profilePicture: p.userId?.profilePicture,
+                    bookingId: p.bookingId?._id,
+                    serviceName: p.bookingId?.serviceName,
+                    serviceDetails: p.bookingId?.serviceId,
+                    bookingStatus: p.bookingId?.status,
+                    paymentStatus: p.bookingId?.paymentStatus,
+                    bookedAt: p.bookingId?.createdAt,
+                    joinedGroupAt: p.joinedAt,
+                    status: p.status
+                }))
+            };
+        });
+
+        res.status(200).json({
+            success: true,
+            count: formattedSessions.length,
+            data: formattedSessions
+        });
+    } catch (error) {
+        console.error('Error fetching all group sessions:', error);
         res.status(500).json({
             success: false,
             message: 'Internal server error',
@@ -713,6 +811,124 @@ const getActiveGroupCalls = async (req, res) => {
     }
 };
 
+// Get group session join link by groupSessionId
+const getGroupSessionJoinLink = async (req, res) => {
+    try {
+        const { groupSessionId } = req.params;
+        const userId = req.user.userId;
+        const userRole = req.user.role;
+
+        // Find the group session
+        const groupSession = await GroupSession.findById(groupSessionId)
+            .populate('therapistId', '_id firstName lastName email role')
+            .populate('participants.userId', '_id firstName lastName email role');
+
+        if (!groupSession) {
+            return res.status(404).json({
+                success: false,
+                message: 'Group session not found'
+            });
+        }
+
+        // Check if user is authorized to join
+        const isTherapist = groupSession.therapistId._id.toString() === userId;
+        const isAdmin = userRole === 'admin';
+        
+        // For participants, check if they are in the participants list
+        const participant = groupSession.participants.find(
+            p => p.userId && p.userId._id.toString() === userId && p.status === 'accepted'
+        );
+        
+        const isParticipant = !!participant;
+
+        if (!isTherapist && !isParticipant && !isAdmin) {
+            return res.status(403).json({
+                success: false,
+                message: 'Access denied. You are not authorized to join this session'
+            });
+        }
+
+        // Check if session is within valid time window (30 min before to 1 hour after)
+        const now = new Date();
+        const sessionStart = new Date(groupSession.startTime);
+        const sessionEnd = new Date(groupSession.endTime);
+
+        if (now < new Date(sessionStart.getTime() - 30 * 60000) || now > new Date(sessionEnd.getTime() + 60 * 60000)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Cannot join call outside session time window'
+            });
+        }
+
+        // Generate sessionId for the video call room
+        const sessionId = `group_${groupSessionId}`;
+        
+        // Generate JWT token for video call authentication
+        const jwt = require('jsonwebtoken');
+        
+        let joinLink = '';
+        let therapistJoinLink = '';
+
+        if (isTherapist || (isAdmin && userRole === 'admin')) {
+            // Generate therapist/admin join link
+            const therapistToken = jwt.sign(
+                {
+                    sessionId: sessionId,
+                    userId: userId,
+                    role: isTherapist ? 'therapist' : 'admin',
+                    exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60), // 24 hours
+                    iat: Math.floor(Date.now() / 1000)
+                },
+                process.env.JWT_SECRET || 'fallback-secret'
+            );
+            
+            therapistJoinLink = `/video-call/${sessionId}/therapist?token=${therapistToken}`;
+            joinLink = therapistJoinLink;
+        } else if (isParticipant) {
+            // Generate participant join link
+            const participantToken = jwt.sign(
+                {
+                    sessionId: sessionId,
+                    userId: userId,
+                    role: 'participant',
+                    exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60), // 24 hours
+                    iat: Math.floor(Date.now() / 1000)
+                },
+                process.env.JWT_SECRET || 'fallback-secret'
+            );
+            
+            joinLink = `/video-call/${sessionId}/participant?token=${participantToken}`;
+        }
+
+        res.status(200).json({
+            success: true,
+            data: {
+                groupSessionId: groupSession._id,
+                sessionId: sessionId,
+                joinLink: joinLink,
+                therapistJoinLink: therapistJoinLink || null,
+                title: groupSession.title,
+                startTime: groupSession.startTime,
+                endTime: groupSession.endTime,
+                therapist: {
+                    _id: groupSession.therapistId._id,
+                    name: `${groupSession.therapistId.firstName} ${groupSession.therapistId.lastName}`
+                },
+                isActiveCall: groupSession.isActiveCall,
+                status: groupSession.status,
+                currentUserRole: isTherapist ? 'therapist' : (isAdmin ? 'admin' : 'participant')
+            }
+        });
+    } catch (error) {
+        console.error('Error getting group session join link:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
     createGroupSession,
     getGroupSessions,
@@ -727,5 +943,7 @@ module.exports = {
     endGroupCall,
     getGroupCallParticipants,
     muteGroupParticipant,
-    getActiveGroupCalls
+    getActiveGroupCalls,
+    getAllGroupSessionsWithParticipants,
+    getGroupSessionJoinLink
 };
