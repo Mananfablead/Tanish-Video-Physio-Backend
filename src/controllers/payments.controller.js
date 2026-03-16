@@ -1011,7 +1011,7 @@ const verifyGuestPayment = async (req, res, next) => {
                             slot.start === booking.timeSlot.start &&
                             slot.end === booking.timeSlot.end
                         );
-
+  
                         if (slotIndex !== -1) {
                             availability.timeSlots[slotIndex].status = 'booked';
                             await availability.save();
@@ -2924,12 +2924,12 @@ const getRazorpayConfig = async (req, res, next) => {
 // Utility function to expire stale payments (payments that were created but not completed)
 const expireStalePayments = async (req, res, next) => {
     try {
-        // Set expiry time to 5 minutes (300000 ms)
-        const expiryTime = new Date(Date.now() - 5 * 60 * 1000); // 5 minutes ago
+        // Set expiry time to 1 minute (60000 ms)
+        const expiryTime = new Date(Date.now() - 1 * 60 * 1000); // 1 minute ago
         
         console.log(`⏰ Checking for stale payments created before: ${expiryTime.toISOString()}`);
         
-        // Find all payments with status 'created' that are older than 5 minutes
+        // Find all payments with status 'created' that are older than 1 minute
         const stalePayments = await Payment.find({
             status: 'created',
             createdAt: { $lt: expiryTime }
@@ -2962,7 +2962,7 @@ const expireStalePayments = async (req, res, next) => {
                 
                 // Determine new status based on Razorpay data
                 let newStatus = 'failed';
-                let failureReason = 'Payment not completed within 5 minutes';
+                let failureReason = 'Payment not completed within 1 minute';
                 
                 if (razorpayStatus === 'paid') {
                     newStatus = 'paid';

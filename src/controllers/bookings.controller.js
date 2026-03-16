@@ -1727,20 +1727,21 @@ const getAllBookingsForAdmin = async (req, res, next) => {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
 
-        // Build query
-        let query = {};
+        // Build query - Show ONLY PAID bookings by default
+        let query = {
+            paymentStatus: 'paid' // Only show bookings with paid status
+        };
 
-        // Show all bookings to admin by default, but allow filtering by payment status
-        // Only apply default paymentStatus filter if no specific paymentStatus is requested
-        if (!paymentStatus) {
-            // Optionally filter to paid bookings only, but this can be overridden
-            // For now, removing the hardcoded filter to show all bookings to admin
-        } else {
-            query.paymentStatus = paymentStatus; // Filter by specific paymentStatus if provided
-        }
-
+        // Allow additional filtering
         if (status) query.status = status;
-        if (req.query.paymentStatus) query.paymentStatus = req.query.paymentStatus; // Override with specific paymentStatus if provided
+        
+        // Override paymentStatus if explicitly provided (to view cancelled/pending if needed)
+        if (req.query.paymentStatus && req.query.paymentStatus !== 'all') {
+            query.paymentStatus = req.query.paymentStatus;
+        } else if (req.query.paymentStatus === 'all') {
+            // If 'all' is specified, remove the paymentStatus filter
+            delete query.paymentStatus;
+        }
 
         if (dateFrom || dateTo) {
             query.date = {};
@@ -1765,7 +1766,7 @@ const getAllBookingsForAdmin = async (req, res, next) => {
             .skip(skip)
             .limit(limit);
 
-        const total = await Booking.countDocuments(query); // Count all bookings matching the query
+        const total = await Booking.countDocuments(query); // Count only paid bookings
 
         // Add status evaluation to each booking
         const bookingsWithStatus = bookings.map(booking => ({
@@ -1780,7 +1781,7 @@ const getAllBookingsForAdmin = async (req, res, next) => {
                 pages: Math.ceil(total / limit),
                 total
             }
-        }, 'All bookings retrieved successfully'));
+        }, 'Paid bookings retrieved successfully'));
     } catch (error) {
         next(error);
     }

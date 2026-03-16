@@ -1,6 +1,8 @@
 require('dotenv').config();
 const cron = require('node-cron');
-const fetch = require('node-fetch');
+
+// Use global fetch if available (Node 18+), otherwise use node-fetch
+const fetch = globalThis.fetch || require('node-fetch');
 
 // Configuration
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:5000';
@@ -28,7 +30,8 @@ cron.schedule('* * * * *', async () => {
       headers: {
         'Authorization': `Bearer ${ADMIN_TOKEN}`,
         'Content-Type': 'application/json'
-      }
+      },
+      body: JSON.stringify({}) // Send empty JSON object
     });
     
     if (!response.ok) {
