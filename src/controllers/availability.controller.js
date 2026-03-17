@@ -267,22 +267,18 @@ const createAvailability = async (req, res, next) => {
             return res.status(400).json(ApiResponse.error('Admin timezone is required'));
         }
         
-        // Validate time slots format and add default duration/bookingType if not provided
-        const validatedTimeSlots = timeSlots.map(slot => {
-            const sessionType = slot.sessionType || 'one-to-one';
-            const maxParticipants = sessionType === 'group' ? (slot.maxParticipants || 5) : 1;
 
-            return {
-                start: slot.start,
-                end: slot.end,
-                status: slot.status || 'available',
-                duration: slot.duration || 45, // Default to 45 min
-                bookingType: slot.bookingType || 'regular', // Default to regular
-                sessionType,
-                maxParticipants,
-                bookedParticipants: slot.bookedParticipants || 0
-            };
-        });
+        // Store time slots AS IS (admin's local time) - NO conversion needed
+        const validatedTimeSlots = timeSlots.map(slot => ({
+            start: slot.start,  // Store as-is
+            end: slot.end,      // Store as-is
+            status: slot.status || 'available',
+            duration: slot.duration || 45,
+            bookingType: slot.bookingType || 'regular',
+            sessionType: slot.sessionType || 'one-to-one',
+            maxParticipants: slot.maxParticipants || (slot.sessionType === 'group' ? 5 : 1),
+            bookedParticipants: typeof slot.bookedParticipants === 'number' ? slot.bookedParticipants : 0
+        }));
 
         // Check if availability already exists for the same therapist and date
         const existingAvailability = await Availability.findOne({ therapistId, date });
@@ -318,22 +314,17 @@ const updateAvailability = async (req, res, next) => {
             return res.status(404).json(ApiResponse.error('Availability not found'));
         }
 
-        // Validate time slots format and add default duration/bookingType if not provided
-        const validatedTimeSlots = timeSlots.map((slot) => {
-            const sessionType = slot.sessionType || 'one-to-one';
-            const maxParticipants = sessionType === 'group' ? (slot.maxParticipants || 5) : 1;
-
-            return {
-                start: slot.start,
-                end: slot.end,
-                status: slot.status || 'available',
-                duration: slot.duration || 45, // Default to 45 min
-                bookingType: slot.bookingType || 'regular', // Default to regular
-                sessionType,
-                maxParticipants,
-                bookedParticipants: slot.bookedParticipants || 0
-            };
-        });
+        // Store time slots AS IS (admin's local time) - NO conversion needed
+        const validatedTimeSlots = timeSlots.map(slot => ({
+            start: slot.start,  // Store as-is
+            end: slot.end,      // Store as-is
+            status: slot.status || 'available',
+            duration: slot.duration || 45,
+            bookingType: slot.bookingType || 'regular',
+            sessionType: slot.sessionType || 'one-to-one',
+            maxParticipants: slot.maxParticipants || (slot.sessionType === 'group' ? 5 : 1),
+            bookedParticipants: typeof slot.bookedParticipants === 'number' ? slot.bookedParticipants : 0
+        }));
 
         const availability = await Availability.findByIdAndUpdate(
             req.params.id,
@@ -429,22 +420,17 @@ const bulkUpdateAvailability = async (req, res, next) => {
             if (availability) {
                 // Update existing availability
                 if (timeSlots !== undefined) {
-                    // Validate time slots format and add default duration/bookingType if not provided
-                    const validatedTimeSlots = timeSlots.map((slot) => {
-                        const sessionType = slot.sessionType || 'one-to-one';
-                        const maxParticipants = sessionType === 'group' ? (slot.maxParticipants || 5) : 1;
-
-                        return {
-                            start: slot.start,
-                            end: slot.end,
-                            status: slot.status || 'available',
-                            duration: slot.duration || 45, // Default to 45 min
-                            bookingType: slot.bookingType || 'regular', // Default to regular
-                            sessionType,
-                            maxParticipants,
-                            bookedParticipants: slot.bookedParticipants || 0
-                        };
-                    });
+                    // Store time slots AS IS (admin's local time) - NO conversion
+                    const validatedTimeSlots = timeSlots.map(slot => ({
+                        start: slot.start,  // Store as-is
+                        end: slot.end,      // Store as-is
+                        status: slot.status || 'available',
+                        duration: slot.duration || 45,
+                        bookingType: slot.bookingType || 'regular',
+                        sessionType: slot.sessionType || 'one-to-one',
+                        maxParticipants: slot.maxParticipants || (slot.sessionType === 'group' ? 5 : 1),
+                        bookedParticipants: typeof slot.bookedParticipants === 'number' ? slot.bookedParticipants : 0
+                    }));
                     availability.timeSlots = validatedTimeSlots;
                 }
                 // Update minimumNoticePeriod if provided
@@ -457,22 +443,17 @@ const bulkUpdateAvailability = async (req, res, next) => {
                 // Create new availability
                 let validatedTimeSlots = [];
                 if (timeSlots && Array.isArray(timeSlots)) {
-                    // Validate time slots format and add default duration/bookingType if not provided
-                    validatedTimeSlots = timeSlots.map((slot) => {
-                        const sessionType = slot.sessionType || 'one-to-one';
-                        const maxParticipants = sessionType === 'group' ? (slot.maxParticipants || 5) : 1;
-
-                        return {
-                            start: slot.start,
-                            end: slot.end,
-                            status: slot.status || 'available',
-                            duration: slot.duration || 45, // Default to 45 min
-                            bookingType: slot.bookingType || 'regular', // Default to regular
-                            sessionType,
-                            maxParticipants,
-                            bookedParticipants: slot.bookedParticipants || 0
-                        };
-                    });
+                    // Store time slots AS IS (admin's local time)
+                    validatedTimeSlots = timeSlots.map(slot => ({
+                        start: slot.start,  // Store as-is
+                        end: slot.end,      // Store as-is
+                        status: slot.status || 'available',
+                        duration: slot.duration || 45,
+                        bookingType: slot.bookingType || 'regular',
+                        sessionType: slot.sessionType || 'one-to-one',
+                        maxParticipants: slot.maxParticipants || (slot.sessionType === 'group' ? 5 : 1),
+                        bookedParticipants: typeof slot.bookedParticipants === 'number' ? slot.bookedParticipants : 0
+                    }));
                 }
                 availability = new Availability({
                     therapistId,

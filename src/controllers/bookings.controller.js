@@ -23,7 +23,28 @@ const getAllBookings = async (req, res, next) => {
             .populate('serviceId', 'name price duration validity images')
             .populate('therapistId', 'name email role profilePicture');
 
-        res.status(200).json(ApiResponse.success({ bookings }, 'Bookings retrieved successfully'));
+        // Add duration information for subscription-covered bookings
+        const bookingsWithDuration = bookings.map(booking => {
+            const bookingObj = booking.toObject();
+
+            // For subscription-covered bookings without serviceId, add plan duration
+            if (booking.bookingType === 'subscription-covered' && !booking.serviceId) {
+                // Try to get duration from timeSlot
+                if (booking.timeSlot?.start && booking.timeSlot?.end) {
+                    const [startHours, startMinutes] = booking.timeSlot.start.split(':').map(Number);
+                    const [endHours, endMinutes] = booking.timeSlot.end.split(':').map(Number);
+                    const duration = (endHours * 60 + endMinutes) - (startHours * 60 + startMinutes);
+                    bookingObj.planDuration = `${duration} min`;
+                } else {
+                    // Default duration for subscription bookings
+                    bookingObj.planDuration = '45 min';
+                }
+            }
+
+            return bookingObj;
+        });
+
+        res.status(200).json(ApiResponse.success({ bookings: bookingsWithDuration }, 'Bookings retrieved successfully'));
     } catch (error) {
         next(error);
     }
@@ -83,6 +104,20 @@ const getBookingById = async (req, res, next) => {
             bookingObject.serviceExpiryDate = expiryDate;
             bookingObject.serviceValidityDays = validityDays;
             bookingObject.isServiceExpired = new Date() > expiryDate;
+        }
+
+        // Add duration information for subscription-covered bookings
+        if (booking.bookingType === 'subscription-covered' && !booking.serviceId) {
+            // Try to get duration from timeSlot
+            if (booking.timeSlot?.start && booking.timeSlot?.end) {
+                const [startHours, startMinutes] = booking.timeSlot.start.split(':').map(Number);
+                const [endHours, endMinutes] = booking.timeSlot.end.split(':').map(Number);
+                const duration = (endHours * 60 + endMinutes) - (startHours * 60 + startMinutes);
+                bookingObject.planDuration = `${duration} min`;
+            } else {
+                // Default duration for subscription bookings
+                bookingObject.planDuration = '45 min';
+            }
         }
 
         res.status(200).json(ApiResponse.success({
