@@ -1145,11 +1145,14 @@ const updateBookingStatus = async (req, res, next) => {
             // Send notifications
             for (const trigger of triggers) {
                 if (trigger.type === 'user') {
-                    await NotificationService.sendNotification(
-                        { email: bookingOwner.email, phone: bookingOwner.phone },
-                        trigger.template,
-                        { ...trigger.data, clientName: bookingOwner.name }
-                    );
+                    // Only send user notification if bookingOwner exists
+                    if (bookingOwner) {
+                        await NotificationService.sendNotification(
+                            { email: bookingOwner.email, phone: bookingOwner.phone },
+                            trigger.template,
+                            { ...trigger.data, clientName: bookingOwner.name }
+                        );
+                    }
                 } else if (trigger.type === 'admin') {
                     // Send admin notification - notification service will handle getting admin contact from credentials/profile
                     await NotificationService.sendNotification(
@@ -1230,7 +1233,7 @@ const updateBookingStatus = async (req, res, next) => {
             } else {
                 const sessionDate = booking.scheduledDate || booking.date;
                 // Use only the start time for session creation, not the time range
-                const sessionTime = booking.timeSlot?.start || booking.scheduledTime || booking.time || '09:00';
+                const sessionTime = booking.timeSlot?.start || booking.scheduledTime || booking.time;
 
                 const startTime = new Date(`${sessionDate}T${sessionTime}`);
 
@@ -1272,7 +1275,7 @@ const updateBookingStatus = async (req, res, next) => {
             } else {
                 const sessionDate = booking.scheduledDate || booking.date;
                 // Use only the start time for session creation, not the time range
-                const sessionTime = booking.timeSlot?.start || booking.scheduledTime || booking.time || '09:00';
+                const sessionTime = booking.timeSlot?.start || booking.scheduledTime || booking.time;
 
                 const startTime = new Date(`${sessionDate}T${sessionTime}`);
 
@@ -2006,10 +2009,13 @@ const createBookingWithSubscription = async (req, res, next) => {
         const { serviceId, date, time, notes, clientName, scheduleType, scheduledDate, scheduledTime, timeSlot } = req.body;
 
         // Check if user has an active subscription with remaining sessions
+        // Get the most recent active subscription
         const subscription = await Subscription.findOne({
             userId: req.user.userId,
             status: 'active'
-        }).populate('planId');
+        })
+        .sort({ createdAt: -1 }) // Get the most recent one
+        .populate('planId');
 
         if (!subscription) {
             return res.status(400).json(ApiResponse.error('No active subscription found'));
@@ -2053,6 +2059,21 @@ const createBookingWithSubscription = async (req, res, next) => {
             status: { $ne: "cancelled" }
         });
 
+        console.log(`🔍 DEBUG: Counting sessions for subscription ${subscription._id}:`, {
+            subscriptionId: subscription._id,
+            planName: plan.name,
+            planId: plan._id,
+            userSubscriptionCount: await Subscription.countDocuments({ userId: req.user.userId, status: 'active' })
+        });
+
+        // Log all sessions for this subscription
+        const allSessions = await Session.find({ subscriptionId: subscription._id }).select('status createdAt');
+        console.log(`📋 All sessions for this subscription:`, allSessions.map(s => ({
+            sessionId: s._id,
+            status: s.status,
+            createdAt: s.createdAt
+        })));
+
         // Get total sessions from subscription plan (consider both sessions and totalService fields)
         // Some plans might use 'totalService' instead of 'sessions' field
         let totalSessions = 0;
@@ -2086,6 +2107,12 @@ const createBookingWithSubscription = async (req, res, next) => {
         }
 
         if (remainingSessions <= 0) {
+            console.log(`SESSION_LIMIT_REACHED:`, {
+                totalSessions,
+                usedSessions,
+                remainingSessions,
+                planName: plan.name
+            });
             return res.status(400).json(ApiResponse.error(
                 `Session limit reached. You have used all ${totalSessions} sessions in your plan.`
             ));
@@ -2301,10 +2328,13 @@ const checkSubscriptionBookingEligibility = async (req, res, next) => {
         }
 
         // Check if user has an active subscription
+        // Get the most recent active subscription
         const subscription = await Subscription.findOne({
             userId: req.user.userId,
             status: 'active'
-        }).populate('planId');
+        })
+        .sort({ createdAt: -1 }) // Get the most recent one
+        .populate('planId');
 
         if (!subscription) {
             return res.status(200).json(ApiResponse.success({

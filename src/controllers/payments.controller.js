@@ -852,6 +852,17 @@ const verifyGuestPayment = async (req, res, next) => {
                     await Booking.findByIdAndUpdate(payment.bookingId, { userId: newUser._id });
 
                     await sendWelcomeEmailWithCredentials(payment.guestEmail, payment.guestName, payment.guestEmail, tempPassword);
+                } else {
+                    // User already exists - generate a temporary password for them
+                    tempPassword = Math.random().toString(36).slice(-8) + 'Temp1!';
+                    
+                    // Update existing user with new temporary password
+                    existingUser.password = tempPassword;
+                    existingUser.hasTempPassword = true;
+                    await existingUser.save();
+                    
+                    // Send welcome email with credentials
+                    await sendWelcomeEmailWithCredentials(payment.guestEmail, payment.guestName, payment.guestEmail, tempPassword);
                 }
                 // For existing users, no notification is sent as requested
             }
@@ -954,65 +965,13 @@ const verifyGuestPayment = async (req, res, next) => {
                 await booking.save();
 
 
-                // Create session if booking has scheduling information
-                if (booking.scheduledDate && booking.scheduledTime) {
-                    const Session = require('../models/Session.model');
-
-                    // Check if a session already exists for this booking to avoid duplicates
-                    const existingSession = await Session.findOne({
-                        bookingId: booking._id
-                    });
-
-                    if (!existingSession) {
-                        try {
-                            // Extract start time from scheduledTime (handle both HH:MM and HH:MM-HH:MM formats)
-                            let startTimeValue = booking.scheduledTime;
-                            if (booking.scheduledTime && booking.scheduledTime.includes('-')) {
-                                // If it's a time range like '19:20-20:05', extract just the start time
-                                startTimeValue = booking.scheduledTime.split('-')[0].trim();
-                            }
-
-                            // Create a new session based on the booking
-                            const session = new Session({
-                                therapistId: booking.therapistId,
-                                userId: booking.userId,
-                                date: booking.scheduledDate,
-                                time: startTimeValue, // Use extracted start time in HH:MM format
-                                startTime: new Date(`${booking.scheduledDate}T${startTimeValue}`),
-                                type: '1-on-1',
-                                status: 'pending',
-                                notes: `Session created automatically from booking #${booking._id}`,
-                                bookingId: booking._id
-                            });
-
-                            // Calculate end time if duration is available
-                            if (service && service.duration) {
-                                const durationMatch = service.duration.match(/(\d+)/);
-                                if (durationMatch) {
-                                    const duration = parseInt(durationMatch[0]);
-                                    const endTime = new Date(session.startTime);
-                                    endTime.setMinutes(endTime.getMinutes() + duration);
-                                    session.endTime = endTime;
-                                    session.duration = duration;
-                                }
-                            }
-
-                            await session.save();
-                            console.log(`✅ Automatic session created for booking ${booking._id}: Session ID ${session._id}`);
-
-                            // Update the booking status to indicate session has been created
-                            await Booking.findByIdAndUpdate(booking._id, {
-                                status: 'session_created'
-                            });
-                        } catch (sessionError) {
-                            console.error(`❌ Failed to create automatic session for booking ${booking._id}:`, sessionError);
-                            // Don't fail the payment verification if session creation fails
-                        }
-                    } else {
-                        console.log(`ℹ️ Session already exists for booking ${booking._id}: Session ID ${existingSession._id}`);
-                    }
+                // Create session from booking for guest users only if scheduleType is 'now'
+                // For 'later' bookings, session will be created when user schedules it later
+                if (booking.scheduleType === 'now') {
+                    await createSessionFromBooking(booking, service);
                 } else {
-                    console.log(`ℹ️ No scheduling information found for booking ${booking._id} - skipping automatic session creation`);
+                    // For 'later' bookings, just update booking status to 'confirmed' instead of 'session_created'
+                    await Booking.findByIdAndUpdate(booking._id, { status: 'confirmed' });
                 }
             }
 
@@ -1231,13 +1190,25 @@ const handleWebhook = async (req, res) => {
                             password: tempPassword,
                             phone: subscription.guestPhone,
                             role: 'patient',
-                            status: 'active'
+                            status: 'active',
+                            hasTempPassword: true
                         });
 
                         await newUser.save();
 
                         // Update the subscription record with the new user ID
                         await Subscription.findByIdAndUpdate(subscription._id, { userId: newUser._id });
+                    } else {
+                        // User already exists - generate a temporary password for them
+                        tempPassword = Math.random().toString(36).slice(-8) + 'Temp1!';
+                        
+                        // Update existing user with new temporary password
+                        existingUser.password = tempPassword;
+                        existingUser.hasTempPassword = true;
+                        await existingUser.save();
+                        
+                        // Update the subscription record with the existing user ID
+                        await Subscription.findByIdAndUpdate(subscription._id, { userId: existingUser._id });
                     }
                 }
 
@@ -2029,7 +2000,7 @@ const verifySubscriptionPayment = async (req, res, next) => {
                             console.log('DEBUG: subscription scheduledTime:', subscription.scheduledTime);
                             // Determine time to use for session based on available data
                             const sessionDate = subscription.scheduledDate || new Date().toISOString().split('T')[0];
-                            const sessionTime = subscription.timeSlot?.start || subscription.scheduledTime || '09:00';
+                            const sessionTime = subscription.timeSlot?.start || subscription.scheduledTime ;
 
                             // Calculate start and end times
                             const startTime = subscription.scheduledDate && (subscription.timeSlot?.start || subscription.scheduledTime)
@@ -2471,7 +2442,7 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
                         const plan = await SubscriptionPlan.findOne({ planId: subscription.planId });
                         if (plan) {
                             const sessionDate = subscription.scheduledDate || new Date().toISOString().split('T')[0];
-                            const sessionTime = subscription.timeSlot?.start || subscription.scheduledTime || '09:00';
+                            const sessionTime = subscription.timeSlot?.start || subscription.scheduledTime ;
 
                             const startTime = subscription.scheduledDate && (subscription.timeSlot?.start || subscription.scheduledTime)
                                 ? new Date(`${subscription.scheduledDate}T${sessionTime}`)

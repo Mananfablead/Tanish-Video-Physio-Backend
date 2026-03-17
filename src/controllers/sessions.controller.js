@@ -284,10 +284,46 @@ const getAllSessions = async (req, res, next) => {
 
     const sessions = await Session.find()
       .sort({ createdAt: -1 }) // Descending order by creation time
-      .populate("bookingId", "serviceName therapistName date time")
-      .populate("subscriptionId", "planId planName startDate endDate status")
-      .populate("therapistId", "name email role")
-      .populate("userId", "name email");
+      .populate({
+        path: "bookingId",
+        select: "-__v", // Exclude version key
+        populate: [
+          {
+            path: "serviceId",
+            select: "name price duration validity images description category"
+          },
+          {
+            path: "therapistId",
+            select: "name email role profilePicture specialization"
+          },
+          {
+            path: "userId",
+            select: "name email phone role profilePicture"
+          }
+        ]
+      })
+      .populate({
+        path: "subscriptionId",
+        select: "-__v",
+        populate: [
+          {
+            path: "planId",
+            select: "name planName sessions validity price description"
+          },
+          {
+            path: "userId",
+            select: "name email"
+          }
+        ]
+      })
+      .populate({
+        path: "therapistId",
+        select: "name email role profilePicture specialization"
+      })
+      .populate({
+        path: "userId",
+        select: "name email phone role"
+      });
 
     // Update statuses as needed
     // console.log("Updating session statuses...", sessions)
