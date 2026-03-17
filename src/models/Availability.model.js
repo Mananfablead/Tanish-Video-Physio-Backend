@@ -43,6 +43,12 @@ const availabilitySchema = new mongoose.Schema({
         type: String,
         required: true,
         description: 'Admin/Therapist timezone when creating the slot (e.g., "America/New_York")'
+    },
+    minimumNoticePeriod: {
+        type: Number,
+        default: 15, // Default 15 minutes
+        min: 0,
+        description: 'Minimum minutes in advance required for booking (e.g., 30 = must book 30 min before)'
     }
 }, {
     timestamps: true

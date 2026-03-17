@@ -302,7 +302,7 @@ const createAvailability = async (req, res, next) => {
 // Update availability - Store admin's LOCAL time (NOT UTC)
 const updateAvailability = async (req, res, next) => {
     try {
-        const { timeSlots, timezone } = req.body;
+        const { timeSlots, timezone, minimumNoticePeriod } = req.body;
 
         // Get existing availability to determine the date and admin timezone
         const existingAvailability = await Availability.findById(req.params.id);
@@ -323,7 +323,8 @@ const updateAvailability = async (req, res, next) => {
             req.params.id,
             {
                 timeSlots: validatedTimeSlots,
-                adminTimezone: timezone || existingAvailability.adminTimezone
+                adminTimezone: timezone || existingAvailability.adminTimezone,
+                minimumNoticePeriod: minimumNoticePeriod !== undefined ? minimumNoticePeriod : existingAvailability.minimumNoticePeriod
             },
             { new: true, runValidators: true }
         )
@@ -358,7 +359,7 @@ const deleteAvailability = async (req, res, next) => {
 // Bulk update availability - Store admin's LOCAL time (NOT UTC)
 const bulkUpdateAvailability = async (req, res, next) => {
     try {
-        const { therapistId, month, year, timeSlots, timezone } = req.body;
+        const { therapistId, month, year, timeSlots, timezone, minimumNoticePeriod } = req.body;
 
         // Validate required fields
         if (!therapistId || month === undefined || year === undefined) {
@@ -422,6 +423,10 @@ const bulkUpdateAvailability = async (req, res, next) => {
                     }));
                     availability.timeSlots = validatedTimeSlots;
                 }
+                // Update minimumNoticePeriod if provided
+                if (minimumNoticePeriod !== undefined) {
+                    availability.minimumNoticePeriod = minimumNoticePeriod;
+                }
                 availability.adminTimezone = timezone || availability.adminTimezone;
                 await availability.save();
             } else {
@@ -441,7 +446,8 @@ const bulkUpdateAvailability = async (req, res, next) => {
                     therapistId,
                     date,
                     timeSlots: validatedTimeSlots,
-                    adminTimezone: timezone
+                    adminTimezone: timezone,
+                    minimumNoticePeriod: minimumNoticePeriod || 15 // Default 15 minutes
                 });
                 await availability.save();
             }
