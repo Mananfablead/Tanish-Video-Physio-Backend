@@ -24,7 +24,7 @@ const getAllUsers = async (req, res, next) => {
                 bookingDate: booking.createdAt,
                 bookingId: booking._id
             }));
-            
+
             // Get user's subscription information
             const subscription = await Subscription.findOne({ userId: user._id }).sort({ createdAt: -1 });
             user._doc.subscriptionInfo = subscription ? {
@@ -37,13 +37,13 @@ const getAllUsers = async (req, res, next) => {
                 isExpired: subscription.checkExpirationStatus ? subscription.checkExpirationStatus().isExpired : (subscription.endDate ? new Date(subscription.endDate) < new Date() : false),
                 daysUntilExpiry: subscription.checkExpirationStatus ? subscription.checkExpirationStatus().daysRemaining : null
             } : null;
-            
+
             // Convert profile picture paths to full URLs
             if (user.profilePicture && user.profilePicture.startsWith('/uploads/')) {
                 const baseUrl = `${req.protocol}://${req.get('host')}`;
                 user.profilePicture = `${baseUrl}${user.profilePicture}`;
             }
-            
+
             resultUsers.push(user);
         }
 
@@ -64,7 +64,7 @@ const getUserById = async (req, res, next) => {
         if (!user) {
             return res.status(404).json(ApiResponse.error('User not found'));
         }
-        
+
         // Get user's recent bookings to identify services used
         const bookings = await Booking.find({ userId: req.params.id }).populate('serviceId').sort({ createdAt: -1 }).limit(10);
         user._doc.servicesUsed = bookings.map(booking => ({
@@ -73,7 +73,7 @@ const getUserById = async (req, res, next) => {
             bookingDate: booking.createdAt,
             bookingId: booking._id
         }));
-        
+
         // Get user's subscription information
         const subscription = await Subscription.findOne({ userId: req.params.id }).sort({ createdAt: -1 });
         user._doc.subscriptionInfo = subscription ? {
@@ -153,24 +153,24 @@ const createUser = async (req, res, next) => {
         }
 
         // Generate random password if not provided
-        tempPassword = Math.random().toString(36).slice(-8) + 'Temp1!';
+        tempPassword = 'TempPass123!';
 
         // Prepare subscription info if provided
         let processedSubscriptionInfo = null;
         let createdSubscription = null;
-        
+
         if (subscriptionInfo && subscriptionInfo.planId) {
             const SubscriptionPlan = mongoose.model('SubscriptionPlan');
             const plan = await SubscriptionPlan.findOne({ planId: subscriptionInfo.planId });
-            
+
             if (plan) {
                 const startDate = new Date();
-                
+
                 // Calculate end date based on plan validityDays or duration
                 const endDate = new Date(startDate);
-                const validityDays = plan.validityDays || 
-                    (function() {
-                        switch(plan.duration) {
+                const validityDays = plan.validityDays ||
+                    (function () {
+                        switch (plan.duration) {
                             case 'one-time': return 1;
                             case 'daily': return 1;
                             case 'weekly': return 7;
@@ -181,9 +181,9 @@ const createUser = async (req, res, next) => {
                             default: return 30;
                         }
                     })();
-                
+
                 endDate.setDate(endDate.getDate() + validityDays);
-                
+
                 processedSubscriptionInfo = {
                     planId: plan.planId,
                     planName: plan.name,
@@ -195,7 +195,7 @@ const createUser = async (req, res, next) => {
 
                 // Generate unique order ID for admin-created subscription
                 const orderId = `ADMIN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-                
+
                 // Create Subscription record without payment
                 const Subscription = mongoose.model('Subscription');
                 createdSubscription = new Subscription({
@@ -232,7 +232,7 @@ const createUser = async (req, res, next) => {
             hasTempPassword: tempPassword ? true : false,
             assignedServices: assignedServices || []
         };
-        
+
         // Only add subscriptionInfo if it's not null
         if (processedSubscriptionInfo) {
             userData.subscriptionInfo = processedSubscriptionInfo;
@@ -247,7 +247,7 @@ const createUser = async (req, res, next) => {
         if (createdSubscription) {
             createdSubscription.userId = user._id;
             await createdSubscription.save();
-            
+
             console.log(`✅ Subscription created for user ${user.email}: ${createdSubscription._id}`);
         }
 
@@ -313,7 +313,7 @@ const createUser = async (req, res, next) => {
                     </html>
                 `
             });
-            
+
             console.log(`📧 Welcome email sent to ${email}`);
         } catch (emailError) {
             console.error('Email sending failed:', emailError);
@@ -405,27 +405,27 @@ const updateUserProfile = async (req, res, next) => {
 const checkUserExists = async (req, res, next) => {
     try {
         const { email } = req.body;
-        
+
         if (!email) {
             return res.status(400).json(ApiResponse.error('Email is required'));
         }
-        
+
         // Validate email format
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
             return res.status(400).json(ApiResponse.error('Invalid email format'));
         }
-        
+
         // Check if user exists
         const user = await User.findOne({ email }).select('-password');
-        
+
         if (user) {
             // User exists - return user info and token for auto-login
-            const token = generateToken({ 
-                userId: user._id.toString(), 
-                role: user.role 
+            const token = generateToken({
+                userId: user._id.toString(),
+                role: user.role
             });
-            
+
             return res.status(200).json(ApiResponse.success({
                 exists: true,
                 user: {

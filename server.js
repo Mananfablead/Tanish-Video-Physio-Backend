@@ -409,7 +409,7 @@ const corsOptions = {
     credentials: true,
     optionsSuccessStatus: 200, // For legacy browser support
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
+    allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 'X-Timezone']
 };
 
 app.use(cors(corsOptions));

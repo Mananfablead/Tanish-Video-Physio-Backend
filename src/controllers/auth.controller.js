@@ -955,9 +955,9 @@ const forgotPassword = async (req, res, next) => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 
-<body style="margin:0; padding:0; background-color:#f4f6f8; font-family:Arial, Helvetica, sans-serif;">
+<body style="margin:0; padding:0; background-color:#F5F7FA; font-family:Arial, Helvetica, sans-serif;">
 
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f6f8; padding:30px 0;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F5F7FA; padding:30px 0;">
     <tr>
       <td align="center">
 
@@ -966,8 +966,8 @@ const forgotPassword = async (req, res, next) => {
 
           <!-- Header -->
           <tr>
-            <td style="background:linear-gradient(135deg,#667eea,#764ba2); padding:30px; text-align:center; color:#ffffff;">
-              <h1 style="margin:0; font-size:26px;">Tanish Physio</h1>
+            <td style="background:linear-gradient(135deg,#2FA69A,#1F8F85); padding:30px; text-align:center; color:#ffffff;">
+              <h1 style="margin:0; font-size:26px;">Tanish Online Physio & Fitness</h1>
               <p style="margin:8px 0 0; font-size:14px; opacity:0.9;">
                 Physical Therapy & Rehabilitation Center
               </p>
@@ -986,7 +986,7 @@ const forgotPassword = async (req, res, next) => {
               </p>
 
               <p style="font-size:15px; line-height:1.6;">
-                We received a request to reset the password for your <strong>Tanish Physio</strong> account.
+                We received a request to reset the password for your <strong>Tanish Online Physio & Fitness</strong> account.
                 Click the button below to securely reset your password.
               </p>
 
@@ -995,7 +995,7 @@ const forgotPassword = async (req, res, next) => {
                 <tr>
                   <td align="center">
                     <a href="${resetUrl}"
-                       style="background:linear-gradient(135deg,#667eea,#764ba2);
+                       style="background:linear-gradient(135deg,#2FA69A,#1F8F85);
                               color:#ffffff;
                               text-decoration:none;
                               padding:14px 34px;
@@ -1020,16 +1020,16 @@ const forgotPassword = async (req, res, next) => {
 
               <p style="font-size:15px; margin-top:30px;">
                 Regards,<br>
-                <strong>Tanish Physio Team</strong>
+                <strong>Tanish Online Physio & Fitness Team</strong>
               </p>
             </td>
           </tr>
 
           <!-- Footer -->
           <tr>
-            <td style="background:#f1f3f6; padding:20px; text-align:center; font-size:12px; color:#777;">
+            <td style="background:#E6F4F2; padding:20px; text-align:center; font-size:12px; color:#555;">
               <p style="margin:0;">
-                © 2024 Tanish Physio. All rights reserved.
+                © 2024 Tanish Online Physio & Fitness. All rights reserved.
               </p>
               <p style="margin:6px 0 0;">
                 This is an automated email. Please do not reply.
@@ -1051,7 +1051,7 @@ const forgotPassword = async (req, res, next) => {
             to: user.email,
             // from: emailCreds.user,
             from: `"Tanish Physio & Fitness" <${emailCreds.user}>`,
-            subject: 'Password Reset Request - Tanish Physio',
+            subject: 'Password Reset Request - Tanish Online Physio & Fitness',
             html: message
         };
 

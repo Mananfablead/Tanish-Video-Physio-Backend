@@ -116,7 +116,7 @@ const sendContactNotificationEmail = async (contactMessage) => {
                         color: #2a2a2a;
                         margin: 0;
                         padding: 0;
-                        background-color: #f0f9f9;
+                        background-color: #F5F7FA;
                     }
                     .container {
                         max-width: 600px;
@@ -124,10 +124,10 @@ const sendContactNotificationEmail = async (contactMessage) => {
                         background: white;
                         border-radius: 16px;
                         overflow: hidden;
-                        box-shadow: 0 10px 30px rgba(26, 188, 194, 0.15);
+                        box-shadow: 0 10px 30px rgba(47, 166, 154, 0.15);
                     }
                     .header {
-                        background: linear-gradient(135deg, #1abcbe 0%, #2dd4bf 100%);
+                        background: linear-gradient(135deg, #2FA69A 0%, #1F8F85 100%);
                         color: white;
                         padding: 30px 25px;
                         text-align: center;
@@ -145,19 +145,19 @@ const sendContactNotificationEmail = async (contactMessage) => {
                     }
                     .content {
                         padding: 35px 25px;
-                        background: #f8feff;
+                        background: #E6F4F2;
                     }
                     .field {
                         margin-bottom: 22px;
                         padding: 20px;
                         background: white;
                         border-radius: 12px;
-                        border-left: 4px solid #1abcbe;
-                        box-shadow: 0 4px 12px rgba(26, 188, 194, 0.08);
+                        border-left: 4px solid #2FA69A;
+                        box-shadow: 0 4px 12px rgba(47, 166, 154, 0.08);
                     }
                     .label {
                         font-weight: 600;
-                        color: #1abcbe;
+                        color: #2FA69A;
                         font-size: 14px;
                         text-transform: uppercase;
                         letter-spacing: 0.5px;
@@ -172,8 +172,8 @@ const sendContactNotificationEmail = async (contactMessage) => {
                         background: white;
                         padding: 25px;
                         border-radius: 12px;
-                        border-left: 4px solid #1abcbe;
-                        box-shadow: 0 4px 12px rgba(26, 188, 194, 0.08);
+                        border-left: 4px solid #2FA69A;
+                        box-shadow: 0 4px 12px rgba(47, 166, 154, 0.08);
                         margin-top: 8px;
                         white-space: pre-line;
                     }
@@ -187,7 +187,7 @@ const sendContactNotificationEmail = async (contactMessage) => {
                         background: white;
                         padding: 18px;
                         border-radius: 12px;
-                        box-shadow: 0 4px 12px rgba(26, 188, 194, 0.08);
+                        box-shadow: 0 4px 12px rgba(47, 166, 154, 0.08);
                     }
                     .info-item .label {
                         margin-bottom: 6px;
@@ -198,17 +198,17 @@ const sendContactNotificationEmail = async (contactMessage) => {
                     .footer {
                         text-align: center;
                         padding: 25px;
-                        background: #f0f9f9;
+                        background: #F5F7FA;
                         color: #666;
                         font-size: 13px;
-                        border-top: 1px solid #e0f2f1;
+                        border-top: 1px solid #E6F4F2;
                     }
                     .footer p {
                         margin: 5px 0;
                     }
                     .brand {
                         font-weight: 600;
-                        color: #1abcbe;
+                        color: #2FA69A;
                     }
                     @media (max-width: 600px) {
                         .container {
@@ -312,7 +312,7 @@ const sendContactReplyEmail = async (contactMessage) => {
                         color: #2a2a2a;
                         margin: 0;
                         padding: 0;
-                        background-color: #f0f9f9;
+                        background-color: #F5F7FA;
                     }
                     .container {
                         max-width: 600px;
@@ -320,10 +320,10 @@ const sendContactReplyEmail = async (contactMessage) => {
                         background: white;
                         border-radius: 16px;
                         overflow: hidden;
-                        box-shadow: 0 10px 30px rgba(26, 188, 194, 0.15);
+                        box-shadow: 0 10px 30px rgba(47, 166, 154, 0.15);
                     }
                     .header {
-                        background: linear-gradient(135deg, #1abcbe 0%, #2dd4bf 100%);
+                        background: linear-gradient(135deg, #2FA69A 0%, #1F8F85 100%);
                         color: white;
                         padding: 30px 25px;
                         text-align: center;
@@ -341,7 +341,7 @@ const sendContactReplyEmail = async (contactMessage) => {
                     }
                     .content {
                         padding: 35px 25px;
-                        background: #f8feff;
+                        background: #E6F4F2;
                     }
                     .greeting {
                         font-size: 18px;
@@ -354,11 +354,11 @@ const sendContactReplyEmail = async (contactMessage) => {
                         padding: 20px;
                         background: white;
                         border-radius: 12px;
-                        box-shadow: 0 4px 12px rgba(26, 188, 194, 0.08);
+                        box-shadow: 0 4px 12px rgba(47, 166, 154, 0.08);
                     }
                     .label {
                         font-weight: 600;
-                        color: #1abcbe;
+                        color: #2FA69A;
                         font-size: 14px;
                         text-transform: uppercase;
                         letter-spacing: 0.5px;
@@ -383,8 +383,8 @@ const sendContactReplyEmail = async (contactMessage) => {
                         background: white;
                         padding: 25px;
                         border-radius: 12px;
-                        border-left: 4px solid #1abcbe;
-                        box-shadow: 0 4px 12px rgba(26, 188, 194, 0.08);
+                        border-left: 4px solid #2FA69A;
+                        box-shadow: 0 4px 12px rgba(47, 166, 154, 0.08);
                         margin-top: 8px;
                         white-space: pre-line;
                     }
@@ -396,11 +396,11 @@ const sendContactReplyEmail = async (contactMessage) => {
                         box-shadow: 0 4px 12px rgba(16, 185, 129, 0.1);
                         margin-top: 8px;
                         white-space: pre-line;
-                        background: linear-gradient(145deg, #f0fdf4 0%, #dcfce7 100%);
+                        background: linear-gradient(145deg, #E6F4F2 0%, #F5F7FA 100%);
                     }
                     .divider {
                         height: 1px;
-                        background: linear-gradient(90deg, transparent, #1abcbe, transparent);
+                        background: linear-gradient(90deg, transparent, #2FA69A, transparent);
                         margin: 30px 0;
                     }
                     .closing {
@@ -409,7 +409,7 @@ const sendContactReplyEmail = async (contactMessage) => {
                         border-radius: 12px;
                         text-align: center;
                         margin: 25px 0;
-                        box-shadow: 0 4px 12px rgba(26, 188, 194, 0.08);
+                        box-shadow: 0 4px 12px rgba(47, 166, 154, 0.08);
                     }
                     .closing p {
                         margin: 0;
@@ -419,17 +419,17 @@ const sendContactReplyEmail = async (contactMessage) => {
                     .footer {
                         text-align: center;
                         padding: 25px;
-                        background: #f0f9f9;
+                        background: #F5F7FA;
                         color: #666;
                         font-size: 13px;
-                        border-top: 1px solid #e0f2f1;
+                        border-top: 1px solid #E6F4F2;
                     }
                     .footer p {
                         margin: 5px 0;
                     }
                     .brand {
                         font-weight: 700;
-                        color: #1abcbe;
+                        color: #2FA69A;
                         font-size: 18px;
                         margin: 10px 0;
                     }

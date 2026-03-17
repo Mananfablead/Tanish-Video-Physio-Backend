@@ -70,7 +70,7 @@ class EmailTemplates {
                     ${EmailTemplates.generateHeader(
             data.title || 'Important Notification',
             '',
-            { start: '#1e3a8a', end: '#3b82f6', text: '#e0f2fe' }
+                        { start: '#2FA69A', end: '#1F8F85', text: '#E6F4F2' }
         )}
                     
                     <tr>
@@ -79,8 +79,8 @@ class EmailTemplates {
                                 Dear <strong>${data.userName || 'Valued User'}</strong>,
                             </p>
                             
-                            <div style="background-color: #f8fafc; border-left: 4px solid #3b82f6; padding: 20px; margin: 25px 0; border-radius: 0 8px 8px 0;">
-                                <p style="font-size: 16px; color: #374151; line-height: 1.6; margin: 0;">
+                            <div style="background-color: #E6F4F2; border-left: 4px solid #2FA69A; padding: 20px; margin: 25px 0; border-radius: 0 8px 8px 0;">
+                                <p style="font-size: 16px; color: #1F2937; line-height: 1.6; margin: 0;">
                                     ${data.message || 'You have received an important notification.'}
                                 </p>
                             </div>
@@ -92,8 +92,8 @@ class EmailTemplates {
                     </tr>
                     
                     ${EmailTemplates.generateFooter(
-            '#1e293b',
-            { light: '#cbd5e1', accent: '#94a3b8', border: '#334155' },
+                        '#1F2937',
+                        { light: '#E6F4F2', accent: '#2FA69A', border: '#1F8F85' },
             'Best regards, Tanish Online Physio & Fitness Team'
         )}
                 </table>
@@ -116,30 +116,30 @@ class EmailTemplates {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #eef2ff;">
-    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #eef2ff; padding: 20px 0;">
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #F5F7FA;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #F5F7FA; padding: 20px 0;">
         <tr>
             <td align="center">
-                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 20px rgba(0,0,0,0.08); overflow: hidden; border: 1px solid #e0e7ff;">
+                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 20px rgba(0,0,0,0.08); overflow: hidden; border: 1px solid #E6F4F2;">
                     ${EmailTemplates.generateHeader(
             'Welcome to Tanish Online Physio & Fitness',
             'Your recovery journey starts here',
-            { start: '#4f46e5', end: '#6366f1', text: '#e0e7ff' }
+                        { start: '#2FA69A', end: '#1F8F85', text: '#E6F4F2' }
         )}
                     
                     <tr>
                         <td style="padding: 40px;">
-                            <p style="font-size: 20px; color: #312e81; margin: 0 0 20px 0; font-weight: 600;">
+                            <p style="font-size: 20px; color: #1F2937; margin: 0 0 20px 0; font-weight: 600;">
                                 Hi ${userName},
                             </p>
 
-                            <p style="font-size: 16px; color: #4338ca; margin: 0 0 18px 0; line-height: 1.7;">
+                            <p style="font-size: 16px; color: #2FA69A; margin: 0 0 18px 0; line-height: 1.7;">
                                 Thanks for creating your account with <strong>Tanish Online Physio & Fitness</strong>! We're excited to support your wellness goals.
                             </p>
 
-                            <div style="background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%); border-radius: 12px; padding: 20px 24px; margin: 20px 0; border: 1px solid #c7d2fe;">
-                                <h3 style="color: #312e81; margin: 0 0 12px 0; font-size: 18px;">Here's what you can do next:</h3>
-                                <ul style="color: #4338ca; margin: 0; padding-left: 18px; line-height: 1.6;">
+                            <div style="background: linear-gradient(135deg, #E6F4F2 0%, #F5F7FA 100%); border-radius: 12px; padding: 20px 24px; margin: 20px 0; border: 1px solid #2FA69A;">
+                                <h3 style="color: #1F2937; margin: 0 0 12px 0; font-size: 18px;">Here's what you can do next:</h3>
+                                <ul style="color: #1F2937; margin: 0; padding-left: 18px; line-height: 1.6;">
                                     <li>Book a physiotherapy session that fits your schedule</li>
                                     <li>Explore personalized programs crafted by our experts</li>
                                     <li>Get reminders and updates right on WhatsApp and email</li>
@@ -153,8 +153,8 @@ class EmailTemplates {
                     </tr>
 
                     ${EmailTemplates.generateFooter(
-            '#312e81',
-            { light: '#c7d2fe', accent: '#a5b4fc', border: '#4338ca' },
+                        '#1F2937',
+                        { light: '#E6F4F2', accent: '#2FA69A', border: '#1F8F85' },
             'Warm regards, Tanish Online Physio & Fitness'
         )}
                 </table>
@@ -176,49 +176,49 @@ class EmailTemplates {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Booking Request Submitted</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f9ff;">
-    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f0f9ff; padding: 20px 0;">
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #F5F7FA;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #F5F7FA; padding: 20px 0;">
         <tr>
             <td align="center">
-                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #e0f2fe;">
+                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #E6F4F2;">
                     ${EmailTemplates.generateHeader(
             'Booking Request Submitted!',
             "We've received your request",
-            { start: '#0ea5e9', end: '#0284c7', text: '#e0f2fe' }
+                        { start: '#2FA69A', end: '#1F8F85', text: '#E6F4F2' }
         )}
                     
                     <tr>
                         <td style="padding: 40px;">
-                            <p style="font-size: 20px; color: #0c4a6e; margin: 0 0 25px 0; font-weight: 600;">
+                            <p style="font-size: 20px; color: #1F2937; margin: 0 0 25px 0; font-weight: 600;">
                                 Hello ${data.clientName || 'Valued Customer'},
                             </p>
                             
-                            <div style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-radius: 12px; padding: 25px; margin: 25px 0; border: 1px solid #bae6fd;">
-                                <h2 style="color: #0c4a6e; margin: 0 0 15px 0; font-size: 22px;">📝 Booking Details</h2>
-                                <p style="font-size: 18px; color: #0369a1; margin: 0; line-height: 1.6;">
+                            <div style="background: linear-gradient(135deg, #E6F4F2 0%, #F5F7FA 100%); border-radius: 12px; padding: 25px; margin: 25px 0; border: 1px solid #2FA69A;">
+                                <h2 style="color: #1F2937; margin: 0 0 15px 0; font-size: 22px;">📝 Booking Details</h2>
+                                <p style="font-size: 18px; color: #1F2937; margin: 0; line-height: 1.6;">
                                     <strong>Service:</strong> ${data.serviceName || 'Not specified'}<br>
-                                    <strong>Status:</strong> <span style="background-color: #fef3c7; color: #92400e; padding: 4px 12px; border-radius: 20px; font-size: 14px; font-weight: 600;">Under Review</span>
+                                    <strong>Status:</strong> <span style="background-color: #E6F4F2; color: #1F2937; padding: 4px 12px; border-radius: 20px; font-size: 14px; font-weight: 600;">Under Review</span>
                                 </p>
                             </div>
                             
-                            <div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 20px; margin: 25px 0; border-radius: 0 8px 8px 0;">
-                                <h3 style="color: #92400e; margin: 0 0 10px 0; font-size: 18px;">⏰ What happens next?</h3>
-                                <ul style="color: #b45309; margin: 0; padding-left: 20px; line-height: 1.6;">
+                            <div style="background-color: #E6F4F2; border-left: 4px solid #2FA69A; padding: 20px; margin: 25px 0; border-radius: 0 8px 8px 0;">
+                                <h3 style="color: #1F2937; margin: 0 0 10px 0; font-size: 18px;">⏰ What happens next?</h3>
+                                <ul style="color: #1F2937; margin: 0; padding-left: 20px; line-height: 1.6;">
                                     <li>Our team will review your request shortly</li>
                                     <li>You'll receive a confirmation email once approved</li>
                                     <li>We'll contact you if any additional information is needed</li>
                                 </ul>
                             </div>
                             
-                            <p style="font-size: 16px; color: #475569; margin: 30px 0 0 0; line-height: 1.6;">
+                            <p style="font-size: 16px; color: #1F2937; margin: 30px 0 0 0; line-height: 1.6;">
                                 Thank you for choosing <strong>Tanish Online Physio & Fitness</strong>. We're excited to assist you with your healthcare journey!
                             </p>
                         </td>
                     </tr>
                     
                     ${EmailTemplates.generateFooter(
-            '#0c4a6e',
-            { light: '#bae6fd', accent: '#7dd3fc', border: '#1e5a8a' },
+                        '#1F2937',
+                        { light: '#E6F4F2', accent: '#2FA69A', border: '#1F8F85' },
             'Questions? Contact our support team'
         )}
                 </table>
@@ -253,33 +253,33 @@ class EmailTemplates {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Booking Confirmed</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #dcfce7;">
-    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #dcfce7; padding: 20px 0;">
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #F5F7FA;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #F5F7FA; padding: 20px 0;">
         <tr>
             <td align="center">
-                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #bbf7d0;">
+                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #E6F4F2;">
                     ${EmailTemplates.generateHeader(
             'Booking Confirmed!',
             'Your appointment is secured',
-            { start: '#16a34a', end: '#15803d', text: '#dcfce7' }
+                        { start: '#2FA69A', end: '#1F8F85', text: '#E6F4F2' }
         )}
                     
                     <tr>
                         <td style="padding: 40px;">
-                            <p style="font-size: 20px; color: #14532d; margin: 0 0 25px 0; font-weight: 600;">
+                            <p style="font-size: 20px; color: #1F2937; margin: 0 0 25px 0; font-weight: 600;">
                                 Congratulations ${data.clientName || 'Valued Customer'},
                             </p>
                             
-                            <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-radius: 12px; padding: 25px; margin: 25px 0; border: 1px solid #bbf7d0;">
-                                <h2 style="color: #14532d; margin: 0 0 20px 0; font-size: 24px;">📅 Appointment Details</h2>
+                            <div style="background: linear-gradient(135deg, #E6F4F2 0%, #F5F7FA 100%); border-radius: 12px; padding: 25px; margin: 25px 0; border: 1px solid #2FA69A;">
+                                <h2 style="color: #1F2937; margin: 0 0 20px 0; font-size: 24px;">📅 Appointment Details</h2>
                                 
                                 <div style="display: grid; grid-template-columns: auto 1fr; gap: 15px; align-items: center;">
-                                    <div style="background-color:hsl(142, 76.20%, 36.30%); color: white; padding: 12px; border-radius: 8px; text-align: center; min-width: 100px;">
+                                    <div style="background-color:#2FA69A; color: white; padding: 12px; border-radius: 8px; text-align: center; min-width: 100px;">
                                         <div style="font-size: 24px; font-weight: bold;">${new Date(data.date).getDate()}</div>
                                         <div style="font-size: 14px;">${new Date(data.date).toLocaleDateString('en-US', { month: 'short' })}</div>
                                     </div>
                                     <div>
-                                        <p style="font-size: 18px; color: #15803d; margin: 0; line-height: 1.5;">
+                                        <p style="font-size: 18px; color: #1F2937; margin: 0; line-height: 1.5;">
                                             <strong>Service:</strong> ${data.serviceName || 'Not specified'}<br>
                                             <strong>Date:</strong> ${formattedDate}<br>
                                             <strong>Time:</strong> ${formattedTime}
@@ -289,40 +289,40 @@ class EmailTemplates {
                             </div>
                             
                             ${isPaymentPending ? `
-                            <div style="background-color: #fff7ed; border-left: 4px solid #f97316; padding: 25px; margin: 25px 0; border-radius: 0 12px 12px 0;">
-                                <h3 style="color: #c2410c; margin: 0 0 15px 0; font-size: 20px;">💳 Payment Required</h3>
-                                <p style="color: #ea580c; margin: 0 0 15px 0; font-size: 16px; line-height: 1.6;">
+                            <div style="background-color: #E6F4F2; border-left: 4px solid #2FA69A; padding: 25px; margin: 25px 0; border-radius: 0 12px 12px 0;">
+                                <h3 style="color: #1F2937; margin: 0 0 15px 0; font-size: 20px;">💳 Payment Required</h3>
+                                <p style="color: #1F2937; margin: 0 0 15px 0; font-size: 16px; line-height: 1.6;">
                                     <strong>Action Required:</strong> Please complete your payment to secure this appointment.
                                 </p>
-                                <a href="${data.paymentLink || '#'}" style="background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); color: white; text-decoration: none; padding: 12px 25px; border-radius: 8px; font-weight: 600; display: inline-block;">Complete Payment Now</a>
+                                <a href="${data.paymentLink || '#'}" style="background: linear-gradient(135deg, #2FA69A 0%, #1F8F85 100%); color: white; text-decoration: none; padding: 12px 25px; border-radius: 8px; font-weight: 600; display: inline-block;">Complete Payment Now</a>
                             </div>
                             ` : `
-                            <div style="background-color: #f0fdf4; border-left: 4px solid #16a34a; padding: 25px; margin: 25px 0; border-radius: 0 12px 12px 0;">
-                                <h3 style="color: #15803d; margin: 0 0 15px 0; font-size: 20px;">✅ Payment Confirmed</h3>
-                                <p style="color: #16a34a; margin: 0; font-size: 16px; line-height: 1.6;">
+                            <div style="background-color: #E6F4F2; border-left: 4px solid #2FA69A; padding: 25px; margin: 25px 0; border-radius: 0 12px 12px 0;">
+                                <h3 style="color: #1F2937; margin: 0 0 15px 0; font-size: 20px;">✅ Payment Confirmed</h3>
+                                <p style="color: #1F2937; margin: 0; font-size: 16px; line-height: 1.6;">
                                     <strong>Great News:</strong> Your payment has been received and your session is fully confirmed!
                                 </p>
                             </div>
                             `}
                             
-                            <div style="background-color: #eff6ff; border-radius: 12px; padding: 20px; margin: 25px 0; border: 1px solid #dbeafe;">
-                                <h3 style="color: #1e40af; margin: 0 0 15px 0; font-size: 18px;">💡 Helpful Tips</h3>
-                                <ul style="color: #1e3a8a; margin: 0; padding-left: 20px; line-height: 1.6;">
+                            <div style="background-color: #E6F4F2; border-radius: 12px; padding: 20px; margin: 25px 0; border: 1px solid #2FA69A;">
+                                <h3 style="color: #1F2937; margin: 0 0 15px 0; font-size: 18px;">💡 Helpful Tips</h3>
+                                <ul style="color: #1F2937; margin: 0; padding-left: 20px; line-height: 1.6;">
                                     <li>Please arrive 10-15 minutes early for your appointment</li>
                                     <li>Bring any relevant medical documents or reports</li>
                                     <li>Contact us if you need to reschedule</li>
                                 </ul>
                             </div>
                             
-                            <p style="font-size: 16px; color: #475569; margin: 30px 0 0 0; line-height: 1.6;">
+                            <p style="font-size: 16px; color: #1F2937; margin: 30px 0 0 0; line-height: 1.6;">
                                 We're looking forward to helping you achieve your health goals. <strong>Tanish Online Physio & Fitness</strong> is committed to providing you with exceptional care!
                             </p>
                         </td>
                     </tr>
                     
                     ${EmailTemplates.generateFooter(
-            '#14532d',
-            { light: '#bbf7d0', accent: '#86efac', border: '#166534' },
+                        '#1F2937',
+                        { light: '#E6F4F2', accent: '#2FA69A', border: '#1F8F85' },
             'Need to make changes to your appointment?'
         )}
                 </table>
@@ -344,29 +344,29 @@ class EmailTemplates {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Booking Cancelled</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #fef2f2;">
-    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #fef2f2; padding: 20px 0;">
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #F5F7FA;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #F5F7FA; padding: 20px 0;">
         <tr>
             <td align="center">
-                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #fecaca;">
+                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #E6F4F2;">
                     ${EmailTemplates.generateHeader(
             'Booking Cancelled',
             'We sincerely apologize',
-            { start: '#dc2626', end: '#b91c1c', text: '#fecaca' }
+                        { start: '#EF4446', end: '#DC2626', text: '#FEE2E2' }
         )}
                     
                     <tr>
                         <td style="padding: 40px;">
-                            <p style="font-size: 20px; color: #7f1d1d; margin: 0 0 25px 0; font-weight: 600;">
+                            <p style="font-size: 20px; color: #1F2937; margin: 0 0 25px 0; font-weight: 600;">
                                 Dear ${data.clientName || 'Valued Customer'},
                             </p>
                             
-                            <div style="background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%); border-radius: 12px; padding: 25px; margin: 25px 0; border: 1px solid #fecaca;">
-                                <h2 style="color: #7f1d1d; margin: 0 0 15px 0; font-size: 22px;">📋 Cancellation Details</h2>
-                                <p style="font-size: 18px; color: #b91c1c; margin: 0; line-height: 1.6;">
+                            <div style="background: linear-gradient(135deg, #E6F4F2 0%, #F5F7FA 100%); border-radius: 12px; padding: 25px; margin: 25px 0; border: 1px solid #2FA69A;">
+                                <h2 style="color: #1F2937; margin: 0 0 15px 0; font-size: 22px;">📋 Cancellation Details</h2>
+                                <p style="font-size: 18px; color: #1F2937; margin: 0; line-height: 1.6;">
                                     <strong>Service:</strong> ${data.serviceName || 'Not specified'}<br>
                                     ${data.reason ? `<strong>Reason:</strong> ${data.reason}<br>` : ''}
-                                    <strong>Status:</strong> <span style="background-color: #fee2e2; color: #b91c1c; padding: 4px 12px; border-radius: 20px; font-size: 14px; font-weight: 600;">Cancelled</span>
+                                    <strong>Status:</strong> <span style="background-color: #FEE2E2; color: #DC2626; padding: 4px 12px; border-radius: 20px; font-size: 14px; font-weight: 600;">Cancelled</span>
                                 </p>
                             </div>
                             
@@ -379,27 +379,27 @@ class EmailTemplates {
                             </div>
                             ` : ``}
                             
-                            <div style="background-color: #eff6ff; border-radius: 12px; padding: 25px; margin: 25px 0; border: 1px solid #dbeafe;">
-                                <h3 style="color: #1e3a8a; margin: 0 0 15px 0; font-size: 20px;">🔄 What's Next?</h3>
-                                <ul style="color: #1e40af; margin: 0; padding-left: 20px; line-height: 1.6;">
+                            <div style="background-color: #E6F4F2; border-left: 4px solid #2FA69A; padding: 25px; margin: 25px 0; border-radius: 0 12px 12px 0;">
+                                <h3 style="color: #1F2937; margin: 0 0 15px 0; font-size: 20px;">🔄 What's Next?</h3>
+                                <ul style="color: #1F2937; margin: 0; padding-left: 20px; line-height: 1.6;">
                                     <li>You can book a new appointment at your convenience</li>
                                     <li>Our team is available to assist with rescheduling</li>
                                     <li>Contact us for any questions about this cancellation</li>
                                 </ul>
                                 <div style="margin-top: 20px; text-align: center;">
-                                    <a href="#" style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: white; text-decoration: none; padding: 12px 25px; border-radius: 8px; font-weight: 600; display: inline-block;">Book New Appointment</a>
+                                    <a href="#" style="background: linear-gradient(135deg, #2FA69A 0%, #1F8F85 100%); color: white; text-decoration: none; padding: 12px 25px; border-radius: 8px; font-weight: 600; display: inline-block;">Book New Appointment</a>
                                 </div>
                             </div>
                             
-                            <p style="font-size: 16px; color: #64748b; margin: 30px 0 0 0; line-height: 1.6;">
+                            <p style="font-size: 16px; color: #1F2937; margin: 30px 0 0 0; line-height: 1.6;">
                                 We truly value your trust in <strong>Tanish Online Physio & Fitness</strong> and apologize for any inconvenience this cancellation may have caused. Our team is here to support you every step of the way.
                             </p>
                         </td>
                     </tr>
                     
                     ${EmailTemplates.generateFooter(
-            '#7f1d1d',
-            { light: '#fecaca', accent: '#fca5a5', border: '#991b1b' },
+                        '#1F2937',
+                        { light: '#E6F4F2', accent: '#2FA69A', border: '#1F8F85' },
             'Need immediate assistance?'
         )}
                 </table>
@@ -500,44 +500,44 @@ class EmailTemplates {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Payment Successful</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0fdf4;">
-    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f0fdf4; padding: 20px 0;">
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #F5F7FA;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #F5F7FA; padding: 20px 0;">
         <tr>
             <td align="center">
-                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #bbf7d0;">
+                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #E6F4F2;">
                     ${EmailTemplates.generateHeader(
             'Payment Successful!',
             'Transaction confirmed',
-            { start: '#16a34a', end: '#15803d', text: '#dcfce7' }
+                        { start: '#2FA69A', end: '#1F8F85', text: '#E6F4F2' }
         )}
                     
                     <tr>
                         <td style="padding: 40px;">
-                            <p style="font-size: 20px; color: #14532d; margin: 0 0 25px 0; font-weight: 600;">
+                            <p style="font-size: 20px; color: #1F2937; margin: 0 0 25px 0; font-weight: 600;">
                                 Thank you ${data.clientName || 'Valued Customer'},
                             </p>
                             
-                            <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-radius: 12px; padding: 25px; margin: 25px 0; border: 1px solid #bbf7d0; text-align: center;">
-                                <h2 style="color: #14532d; margin: 0 0 20px 0; font-size: 24px;">💰 Payment Confirmation</h2>
+                            <div style="background: linear-gradient(135deg, #E6F4F2 0%, #F5F7FA 100%); border-radius: 12px; padding: 25px; margin: 25px 0; border: 1px solid #2FA69A; text-align: center;">
+                                <h2 style="color: #1F2937; margin: 0 0 20px 0; font-size: 24px;">💰 Payment Confirmation</h2>
                                 
                                 <div style="background-color: white; border-radius: 12px; padding: 25px; margin: 15px 0; box-shadow: 0 4px 15px rgba(0,0,0,0.08); display: inline-block; min-width: 300px;">
-                                    <div style="font-size: 36px; font-weight: 700; color: #16a34a; margin-bottom: 10px;">₹${data.amount || '0'}</div>
-                                    <div style="font-size: 16px; color: #4b5563;">Amount Paid</div>
+                                    <div style="font-size: 36px; font-weight: 700; color: #2FA69A; margin-bottom: 10px;">₹${data.amount || '0'}</div>
+                                    <div style="font-size: 16px; color: #1F2937;">Amount Paid</div>
                                 </div>
                                 
                                 <div style="margin: 20px 0;">
-                                    <p style="font-size: 18px; color: #15803d; margin: 10px 0;">
+                                    <p style="font-size: 18px; color: #1F2937; margin: 10px 0;">
                                         <strong>Service:</strong> ${data.serviceName || 'Not specified'}
                                     </p>
-                                    <p style="font-size: 16px; color: #059669; margin: 10px 0; background-color: #ecfdf5; padding: 10px; border-radius: 8px; display: inline-block;">
+                                    <p style="font-size: 16px; color: #1F2937; margin: 10px 0; background-color: #E6F4F2; padding: 10px; border-radius: 8px; display: inline-block;">
                                         <strong>Transaction ID:</strong> ${data.transactionId || 'N/A'}
                                     </p>
                                 </div>
                             </div>
                             
-                            <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 25px; margin: 25px 0; border-radius: 0 12px 12px 0;">
-                                <h3 style="color: #1e40af; margin: 0 0 15px 0; font-size: 20px;">📅 Next Steps</h3>
-                                <ul style="color: #1e3a8a; margin: 0; padding-left: 20px; line-height: 1.6;">
+                            <div style="background-color: #E6F4F2; border-left: 4px solid #2FA69A; padding: 25px; margin: 25px 0; border-radius: 0 12px 12px 0;">
+                                <h3 style="color: #1F2937; margin: 0 0 15px 0; font-size: 20px;">📅 Next Steps</h3>
+                                <ul style="color: #1F2937; margin: 0; padding-left: 20px; line-height: 1.6;">
                                     <li>Your appointment is now fully confirmed</li>
                                     <li>You'll receive a calendar invitation shortly</li>
                                     <li>Prepare any relevant medical documents before your session</li>
@@ -545,15 +545,15 @@ class EmailTemplates {
                                 </ul>
                             </div>
                         
-                            <p style="font-size: 16px; color: #475569; margin: 30px 0 0 0; line-height: 1.6;">
+                            <p style="font-size: 16px; color: #1F2937; margin: 30px 0 0 0; line-height: 1.6;">
                                 We're grateful for your trust in <strong>Tanish Online Physio & Fitness</strong>. Our team is dedicated to providing you with the highest quality healthcare services and personalized attention.
                             </p>
                         </td>
                     </tr>
                     
                     ${EmailTemplates.generateFooter(
-            '#14532d',
-            { light: '#bbf7d0', accent: '#86efac', border: '#166534' },
+                        '#1F2937',
+                        { light: '#E6F4F2', accent: '#2FA69A', border: '#1F8F85' },
             'Have questions about your payment or appointment?'
         )}
                 </table>
@@ -575,85 +575,85 @@ class EmailTemplates {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Session Reminder</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #e0f2fe;">
-    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #e0f2fe; padding: 20px 0;">
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #F5F7FA;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #F5F7FA; padding: 20px 0;">
         <tr>
             <td align="center">
-                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #bae6fd;">
+                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #E6F4F2;">
                     ${EmailTemplates.generateHeader(
             'Session Reminder',
             'Your appointment is coming up',
-            { start: '#0284c7', end: '#0369a1', text: '#bae6fd' }
+                        { start: '#2FA69A', end: '#1F8F85', text: '#E6F4F2' }
         )}
                     
                     <tr>
                         <td style="padding: 40px;">
-                            <p style="font-size: 20px; color: #083344; margin: 0 0 25px 0; font-weight: 600;">
+                            <p style="font-size: 20px; color: #1F2937; margin: 0 0 25px 0; font-weight: 600;">
                                 Hello ${data.clientName || 'Valued Patient'},
                             </p>
                             
-                            <div style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-radius: 12px; padding: 25px; margin: 25px 0; border: 1px solid #bae6fd;">
-                                <h2 style="color: #083344; margin: 0 0 20px 0; font-size: 24px;">📅 Upcoming Session</h2>
+                            <div style="background: linear-gradient(135deg, #E6F4F2 0%, #F5F7FA 100%); border-radius: 12px; padding: 25px; margin: 25px 0; border: 1px solid #2FA69A;">
+                                <h2 style="color: #1F2937; margin: 0 0 20px 0; font-size: 24px;">📅 Upcoming Session</h2>
                                 
                                 <div style="display: grid; gap: 15px;">
                                     <div style="display: flex; align-items: center; gap: 15px; padding: 15px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-                                        <div style="background-color: #0284c7; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;">
+                                        <div style="background-color: #2FA69A; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;">
                                             S
                                         </div>
                                         <div>
-                                            <div style="font-weight: 600; color: #083344;">${data.serviceName || 'Service'}</div>
-                                            <div style="font-size: 14px; color: #0369a1;">Service</div>
+                                            <div style="font-weight: 600; color: #1F2937;">${data.serviceName || 'Service'}</div>
+                                            <div style="font-size: 14px; color: #1F2937;">Service</div>
                                         </div>
                                     </div>
                                     
                                     <div style="display: flex; align-items: center; gap: 15px; padding: 15px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-                                        <div style="background-color: #0ea5e9; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;">
+                                        <div style="background-color: #2FA69A; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;">
                                             T
                                         </div>
                                         <div>
-                                            <div style="font-weight: 600; color: #083344;">${data.therapistName || 'Therapist'}</div>
-                                            <div style="font-size: 14px; color: #0369a1;">Your Therapist</div>
+                                            <div style="font-weight: 600; color: #1F2937;">${data.therapistName || 'Therapist'}</div>
+                                            <div style="font-size: 14px; color: #1F2937;">Your Therapist</div>
                                         </div>
                                     </div>
                                     
                                     <div style="display: flex; align-items: center; gap: 15px; padding: 15px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-                                        <div style="background-color: #3b82f6; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;">
+                                        <div style="background-color: #2FA69A; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;">
                                             D
                                         </div>
                                         <div>
-                                            <div style="font-weight: 600; color: #083344;">${data.date || 'Date'}</div>
-                                            <div style="font-size: 14px; color: #0369a1;">Date</div>
+                                            <div style="font-weight: 600; color: #1F2937;">${data.date || 'Date'}</div>
+                                            <div style="font-size: 14px; color: #1F2937;">Date</div>
                                         </div>
                                     </div>
                                     
                                     <div style="display: flex; align-items: center; gap: 15px; padding: 15px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-                                        <div style="background-color: #6366f1; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;">
+                                        <div style="background-color: #2FA69A; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;">
                                             T
                                         </div>
                                         <div>
-                                            <div style="font-weight: 600; color: #083344;">${data.time || 'Time'}</div>
-                                            <div style="font-size: 14px; color: #0369a1;">Time</div>
+                                            <div style="font-weight: 600; color: #1F2937;">${data.time || 'Time'}</div>
+                                            <div style="font-size: 14px; color: #1F2937;">Time</div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                             
                             ${data.meetLink ? `
-                            <div style="background-color: #f5f3ff; border-left: 4px solid #8b5cf6; padding: 25px; margin: 25px 0; border-radius: 0 12px 12px 0; text-align: center;">
-                                <h3 style="color: #5b21b6; margin: 0 0 15px 0; font-size: 20px;">🔗 Join Session</h3>
-                                <p style="color: #6d28d9; margin: 0 0 20px 0; font-size: 16px; line-height: 1.6;">
+                            <div style="background-color: #E6F4F2; border-left: 4px solid #2FA69A; padding: 25px; margin: 25px 0; border-radius: 0 12px 12px 0; text-align: center;">
+                                <h3 style="color: #1F2937; margin: 0 0 15px 0; font-size: 20px;">🔗 Join Session</h3>
+                                <p style="color: #1F2937; margin: 0 0 20px 0; font-size: 16px; line-height: 1.6;">
                                     Your virtual session link is ready. Click below to join:
                                 </p>
-                                <a href="${data.meetLink}" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white; text-decoration: none; padding: 15px 30px; border-radius: 10px; font-weight: 600; font-size: 16px; display: inline-block; box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);">Join Session Now</a>
-                                <p style="color: #7c3aed; margin: 15px 0 0 0; font-size: 14px;">
+                                <a href="${data.meetLink}" style="background: linear-gradient(135deg, #2FA69A 0%, #1F8F85 100%); color: white; text-decoration: none; padding: 15px 30px; border-radius: 10px; font-weight: 600; font-size: 16px; display: inline-block; box-shadow: 0 4px 15px rgba(47, 166, 154, 0.3);">Join Session Now</a>
+                                <p style="color: #1F2937; margin: 15px 0 0 0; font-size: 14px;">
                                     Please join 5-10 minutes before the scheduled time
                                 </p>
                             </div>
                             ` : ``}
                             
-                            <div style="background-color: #fffbeb; border-radius: 12px; padding: 20px; margin: 25px 0; border: 1px solid #fed7aa;">
-                                <h3 style="color: #92400e; margin: 0 0 15px 0; font-size: 18px;">💡 Preparation Tips</h3>
-                                <ul style="color: #c2410c; margin: 0; padding-left: 20px; line-height: 1.6;">
+                            <div style="background-color: #E6F4F2; border-radius: 12px; padding: 20px; margin: 25px 0; border: 1px solid #2FA69A;">
+                                <h3 style="color: #1F2937; margin: 0 0 15px 0; font-size: 18px;">💡 Preparation Tips</h3>
+                                <ul style="color: #1F2937; margin: 0; padding-left: 20px; line-height: 1.6;">
                                     <li>Find a quiet, comfortable space for your session</li>
                                     <li>Have water nearby and ensure good lighting</li>
                                     <li>Prepare any questions or concerns you'd like to discuss</li>
@@ -661,15 +661,15 @@ class EmailTemplates {
                                 </ul>
                             </div>
                             
-                            <p style="font-size: 16px; color: #475569; margin: 30px 0 0 0; line-height: 1.6;">
+                            <p style="font-size: 16px; color: #1F2937; margin: 30px 0 0 0; line-height: 1.6;">
                                 Looking forward to seeing you at your session. <strong>Tanish Online Physio & Fitness</strong> is committed to supporting your health and wellness journey.
                             </p>
                         </td>
                     </tr>
                     
                     ${EmailTemplates.generateFooter(
-            '#083344',
-            { light: '#bae6fd', accent: '#7dd3fc', border: '#0c4a6e' },
+                        '#1F2937',
+                        { light: '#E6F4F2', accent: '#2FA69A', border: '#1F8F85' },
             'Need to reschedule or have questions?'
         )}
                 </table>
@@ -691,74 +691,74 @@ class EmailTemplates {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>New Booking Request - Admin</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #eff6ff;">
-    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #eff6ff; padding: 20px 0;">
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #F5F7FA;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #F5F7FA; padding: 20px 0;">
         <tr>
             <td align="center">
-                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 25px rgba(2, 132, 199, 0.15); overflow: hidden; border: 1px solid #bae6fd;">
+                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 8px 25px rgba(47, 166, 154, 0.15); overflow: hidden; border: 1px solid #E6F4F2;">
                     ${EmailTemplates.generateHeader(
             'New Booking Request',
             'Action required: Review and confirm',
-            { start: '#0284c7', end: '#0369a1', text: '#bae6fd' }
+                        { start: '#2FA69A', end: '#1F8F85', text: '#E6F4F2' }
         )}
                     
                     <tr>
                         <td style="padding: 40px;">
-                            <p style="font-size: 20px; color: #083344; margin: 0 0 25px 0; font-weight: 600;">
+                            <p style="font-size: 20px; color: #1F2937; margin: 0 0 25px 0; font-weight: 600;">
                                 Hello Admin Team,
                             </p>
                             
-                            <div style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-radius: 12px; padding: 25px; margin: 25px 0; border: 2px solid #7dd3fc;">
-                                <h2 style="color: #083344; margin: 0 0 25px 0; font-size: 24px; font-weight: 700;">Booking Details</h2>
+                            <div style="background: linear-gradient(135deg, #E6F4F2 0%, #F5F7FA 100%); border-radius: 12px; padding: 25px; margin: 25px 0; border: 2px solid #2FA69A;">
+                                <h2 style="color: #1F2937; margin: 0 0 25px 0; font-size: 24px; font-weight: 700;">Booking Details</h2>
                                 
                                 <div style="display: grid; gap: 12px;">
-                                    <div style="display: flex; align-items: center; gap: 15px; padding: 18px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #0284c7;">
+                                    <div style="display: flex; align-items: center; gap: 15px; padding: 18px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #2FA69A;">
                                         <div style="flex: 1;">
-                                            <div style="font-weight: 600; color: #083344; font-size: 16px;">${data.clientName || data.patientName || 'N/A'}</div>
-                                            <div style="font-size: 13px; color: #0369a1;">Client / Patient Name</div>
+                                            <div style="font-weight: 600; color: #1F2937; font-size: 16px;">${data.clientName || data.patientName || 'N/A'}</div>
+                                            <div style="font-size: 13px; color: #1F2937;">Client / Patient Name</div>
                                         </div>
                                     </div>
                                     
-                                    <div style="display: flex; align-items: center; gap: 15px; padding: 18px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #0ea5e9;">
+                                    <div style="display: flex; align-items: center; gap: 15px; padding: 18px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #2FA69A;">
                                         <div style="flex: 1;">
-                                            <div style="font-weight: 600; color: #083344; font-size: 16px;">${data.phone || 'N/A'}</div>
-                                            <div style="font-size: 13px; color: #0369a1;">Contact Number</div>
+                                            <div style="font-weight: 600; color: #1F2937; font-size: 16px;">${data.phone || 'N/A'}</div>
+                                            <div style="font-size: 13px; color: #1F2937;">Contact Number</div>
                                         </div>
                                     </div>
                                     
-                                    <div style="display: flex; align-items: center; gap: 15px; padding: 18px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #38bdf8;">
+                                    <div style="display: flex; align-items: center; gap: 15px; padding: 18px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #2FA69A;">
                                         <div style="flex: 1;">
-                                            <div style="font-weight: 600; color: #083344; font-size: 16px;">${data.serviceName || 'Service'}</div>
-                                            <div style="font-size: 13px; color: #0369a1;">Booked Service</div>
+                                            <div style="font-weight: 600; color: #1F2937; font-size: 16px;">${data.serviceName || 'Service'}</div>
+                                            <div style="font-size: 13px; color: #1F2937;">Booked Service</div>
                                         </div>
                                     </div>
                                     
-                                    <div style="display: flex; align-items: center; gap: 15px; padding: 18px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #0284c7;">
+                                    <div style="display: flex; align-items: center; gap: 15px; padding: 18px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #2FA69A;">
                                         <div style="flex: 1;">
-                                            <div style="font-weight: 600; color: #083344; font-size: 16px;">${data.date || 'N/A'}</div>
-                                            <div style="font-size: 13px; color: #0369a1;">Scheduled Date</div>
+                                            <div style="font-weight: 600; color: #1F2937; font-size: 16px;">${data.date || 'N/A'}</div>
+                                            <div style="font-size: 13px; color: #1F2937;">Scheduled Date</div>
                                         </div>
                                     </div>
                                     
-                                    <div style="display: flex; align-items: center; gap: 15px; padding: 18px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #0ea5e9;">
+                                    <div style="display: flex; align-items: center; gap: 15px; padding: 18px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #2FA69A;">
                                         <div style="flex: 1;">
-                                            <div style="font-weight: 600; color: #083344; font-size: 16px;">${data.time || 'N/A'}</div>
-                                            <div style="font-size: 13px; color: #0369a1;">Scheduled Time</div>
+                                            <div style="font-weight: 600; color: #1F2937; font-size: 16px;">${data.time || 'N/A'}</div>
+                                            <div style="font-size: 13px; color: #1F2937;">Scheduled Time</div>
                                         </div>
                                     </div>
                                     
-                                    <div style="display: flex; align-items: center; gap: 15px; padding: 18px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #14b8a6;">
+                                    <div style="display: flex; align-items: center; gap: 15px; padding: 18px; background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #2FA69A;">
                                         <div style="flex: 1;">
-                                            <div style="font-weight: 600; color: #083344; font-size: 18px;">₹${data.amount && data.amount !== '0' ? data.amount : (data.bookingAmount || '0')}</div>
-                                            <div style="font-size: 13px; color: #0369a1;">Booking Amount</div>
+                                            <div style="font-weight: 600; color: #1F2937; font-size: 18px;">₹${data.amount && data.amount !== '0' ? data.amount : (data.bookingAmount || '0')}</div>
+                                            <div style="font-size: 13px; color: #1F2937;">Booking Amount</div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                             
-                            <div style="background-color: #fef3c7; border-radius: 12px; padding: 20px; margin: 25px 0; border-left: 4px solid #f59e0b;">
-                                <h3 style="color: #92400e; margin: 0 0 12px 0; font-size: 18px; font-weight: 700;">Immediate Actions Required</h3>
-                                <ul style="color: #b45309; margin: 0; padding-left: 20px; line-height: 1.8;">
+                            <div style="background-color: #E6F4F2; border-radius: 12px; padding: 20px; margin: 25px 0; border-left: 4px solid #2FA69A;">
+                                <h3 style="color: #1F2937; margin: 0 0 12px 0; font-size: 18px; font-weight: 700;">Immediate Actions Required</h3>
+                                <ul style="color: #1F2937; margin: 0; padding-left: 20px; line-height: 1.8;">
                                     <li style="margin-bottom: 6px;">Review the booking details above</li>
                                     <li style="margin-bottom: 6px;">Confirm or reschedule the appointment</li>
                                     <li style="margin-bottom: 6px;">Assign appropriate therapist if needed</li>
@@ -767,31 +767,31 @@ class EmailTemplates {
                             </div>
                             
                             <div style="text-align: center; margin: 35px 0;">
-                                <a href="#" style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color: white; text-decoration: none; padding: 16px 40px; border-radius: 12px; font-weight: 600; font-size: 16px; display: inline-block; box-shadow: 0 4px 15px rgba(2, 132, 199, 0.3); transition: all 0.3s ease;">
+                                <a href="#" style="background: linear-gradient(135deg, #2FA69A 0%, #1F8F85 100%); color: white; text-decoration: none; padding: 16px 40px; border-radius: 12px; font-weight: 600; font-size: 16px; display: inline-block; box-shadow: 0 4px 15px rgba(47, 166, 154, 0.3); transition: all 0.3s ease;">
                                     View Full Booking Details
                                 </a>
                             </div>
                             
-                            <div style="background-color: #f0fdf4; border-radius: 12px; padding: 20px; margin: 25px 0; text-align: center; border: 1px solid #bbf7d0;">
-                                <p style="color: #15803d; margin: 0; font-size: 15px; line-height: 1.6;">
+                            <div style="background-color: #E6F4F2; border-radius: 12px; padding: 20px; margin: 25px 0; text-align: center; border: 1px solid #2FA69A;">
+                                <p style="color: #1F2937; margin: 0; font-size: 15px; line-height: 1.6;">
                                     <strong>Request Time:</strong> ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
                                 </p>
                             </div>
                             
-                            <p style="font-size: 16px; color: #475569; margin: 30px 0 0 0; line-height: 1.6; text-align: center;">
+                            <p style="font-size: 16px; color: #1F2937; margin: 30px 0 0 0; line-height: 1.6; text-align: center;">
                                 Please process this booking at your earliest convenience to ensure excellent customer service.
                             </p>
                             
-                            <p style="font-size: 14px; color: #64748b; margin: 25px 0 0 0; text-align: center;">
+                            <p style="font-size: 14px; color: #1F2937; margin: 25px 0 0 0; text-align: center;">
                                 Best regards,<br>
-                                <strong style="color: #0284c7; font-size: 16px;">Tanish Online Physio & Fitness Administration</strong>
+                                <strong style="color: #2FA69A; font-size: 16px;">Tanish Online Physio & Fitness Administration</strong>
                             </p>
                         </td>
                     </tr>
 
                     ${EmailTemplates.generateFooter(
-            '#083344',
-            { light: '#bae6fd', accent: '#7dd3fc', border: '#0c4a6e' },
+                        '#1F2937',
+                        { light: '#E6F4F2', accent: '#2FA69A', border: '#1F8F85' },
             'Tanish Online Physio & Fitness Operations Management'
         )}
                 </table>
@@ -949,7 +949,7 @@ class EmailTemplates {
                                 <h2 style="color: #14532d; margin: 0 0 20px 0; font-size: 24px;">💳 Transaction Details</h2>
                                 
                                 <div style="background-color: white; border-radius: 12px; padding: 25px; margin: 15px 0; box-shadow: 0 4px 15px rgba(0,0,0,0.08); display: inline-block; min-width: 300px;">
-                                    <div style="font-size: 36px; font-weight: 700; color: #16a34a; margin-bottom: 10px;">₹${data.amount || '0'}</div>
+                                    <div style="font-size: 36px; font-weight: 700; color: #2FA69A; margin-bottom: 10px;">₹${data.amount || '0'}</div>
                                     <div style="font-size: 16px; color: #4b5563;">Amount Received</div>
                                 </div>
                                 
@@ -1263,7 +1263,7 @@ class EmailTemplates {
         return `
 <!DOCTYPE html>
 <html>
-<head>s
+<head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>

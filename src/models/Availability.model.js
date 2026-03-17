@@ -13,12 +13,12 @@ const availabilitySchema = new mongoose.Schema({
     },
     timeSlots: [{
         start: {
-            type: String, // Format: "HH:MM"
+            type: String, // Format: "HH:MM" (stored as admin's local time)
             required: true,
             match: [/^([01]\d|2[0-3]):([0-5]\d)$/, 'Start time must be in HH:MM format']
         },
         end: {
-            type: String, // Format: "HH:MM"
+            type: String, // Format: "HH:MM" (stored as admin's local time)
             required: true,
             match: [/^([01]\d|2[0-3]):([0-5]\d)$/, 'End time must be in HH:MM format']
         },
@@ -38,7 +38,12 @@ const availabilitySchema = new mongoose.Schema({
             enum: ['regular', 'free-consultation'],
             default: 'regular'
         }
-    }]
+    }],
+    adminTimezone: {
+        type: String,
+        required: true,
+        description: 'Admin/Therapist timezone when creating the slot (e.g., "America/New_York")'
+    }
 }, {
     timestamps: true
 });

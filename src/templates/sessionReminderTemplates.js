@@ -76,9 +76,9 @@ class SessionReminderTemplates {
                                 </div>
                             </div>
                             
-                            <div style="background-color: #f0fdf4; border-radius: 12px; padding: 20px; margin: 25px 0; border: 1px solid #bbf7d0;">
-                                <h3 style="color: #15803d; margin: 0 0 15px 0; font-size: 18px;">📋 Preparation Tips</h3>
-                                <ul style="color: #16a34a; margin: 0; padding-left: 20px; line-height: 1.8;">
+                            <div style="background-color: #E6F4F2; border-radius: 12px; padding: 20px; margin: 25px 0; border: 1px solid #2FA69A;">
+                                <h3 style="color: #1F2937; margin: 0 0 15px 0; font-size: 18px;">📋 Preparation Tips</h3>
+                                <ul style="color: #1F2937; margin: 0; padding-left: 20px; line-height: 1.8;">
                                     <li style="margin-bottom: 8px;">Ensure you have a stable internet connection</li>
                                     <li style="margin-bottom: 8px;">Find a quiet, comfortable space for your session</li>
                                     <li style="margin-bottom: 8px;">Have any relevant medical documents ready</li>
@@ -204,9 +204,9 @@ class SessionReminderTemplates {
                                 </div>
                             </div>
                             
-                            <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 12px; padding: 20px; margin: 25px 0; border: 2px solid #f59e0b;">
-                                <h3 style="color: #b45309; margin: 0 0 15px 0; font-size: 18px; font-weight: 700;">🚨 Final Checklist</h3>
-                                <ul style="color: #92400e; margin: 0; padding-left: 20px; line-height: 1.8;">
+                            <div style="background-color: #E6F4F2; border-radius: 12px; padding: 20px; margin: 25px 0; border: 1px solid #2FA69A;">
+                                <h3 style="color: #1F2937; margin: 0 0 15px 0; font-size: 18px; font-weight: 700;">🚨 Final Checklist</h3>
+                                <ul style="color: #1F2937; margin: 0; padding-left: 20px; line-height: 1.8;">
                                     <li style="margin-bottom: 8px;"><strong>Join now:</strong> Click the "Join Session Now" button below</li>
                                     <li style="margin-bottom: 8px;"><strong>Test equipment:</strong> Check camera, microphone, and internet connection</li>
                                     <li style="margin-bottom: 8px;"><strong>Prepare documents:</strong> Have any relevant medical information ready</li>
@@ -280,7 +280,7 @@ Your *${data.serviceName || 'physiotherapy session'}* with *${data.therapistName
 
 We're looking forward to seeing you tomorrow! If you need to reschedule, please contact us at least 2 hours before your session.
 
-*- Tanish Physio Team*`;
+*-Tanish Online Physio & Fitness Team*`;
     }
     
     static sessionReminder1hWhatsApp(data) {
@@ -303,7 +303,7 @@ Your *${data.serviceName || 'physiotherapy session'}* starts in *1 hour!*
 
 ⏰ *TIME SENSITIVE!* Please join within the next 15-20 minutes. If running late, message your therapist immediately.
 
-*- Tanish Physio Team*`;
+*-Tanish Online Physio & Fitness Team*`;
     }
 }
 

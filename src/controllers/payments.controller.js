@@ -783,16 +783,9 @@ const verifyGuestPayment = async (req, res, next) => {
     try {
         const { paymentId, orderId, signature } = req.body;
 
-
         // Fetch payment details from our database
         const payment = await Payment.findOne({ orderId });
-        console.log('🔍 Payment lookup', {
-            found: !!payment,
-            status: payment?.status,
-            amount: payment?.amount,
-            guestEmail: payment?.guestEmail,
-            bookingId: payment?.bookingId
-        });
+
         if (!payment) {
             return res.status(404).json(ApiResponse.error('Payment not found'));
         }
@@ -838,7 +831,7 @@ const verifyGuestPayment = async (req, res, next) => {
 
                 if (!existingUser) {
                     // Create the user account with temporary passwords
-                    tempPassword = Math.random().toString(36).slice(-8) + 'Temp1!';
+                    tempPassword = 'TempPass123!';
 
                     const newUser = new User({
                         name: payment.guestName,
@@ -1034,12 +1027,6 @@ const verifyGuestPayment = async (req, res, next) => {
                     });
                 }
             }
-
-            console.log('📧 Sending welcome email to guest user', {
-                email: payment.guestEmail,
-                name: payment.guestName
-            });
-            await sendWelcomeEmailWithCredentials(payment.guestEmail, payment.guestName, payment.guestEmail, tempPassword);
 
             // Send new booking notification to ADMIN (not to guest user)
             try {
