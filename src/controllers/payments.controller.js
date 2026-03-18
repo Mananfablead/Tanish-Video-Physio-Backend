@@ -456,13 +456,27 @@ const verifyPayment = async (req, res, next) => {
 
         // Compare signatures
         if (expectedSignature === signature) {
+            // Fetch payment details from Razorpay to get payment method
+            const razorpay = require('../config/razorpay');
+            let paymentMethod = 'card'; // default fallback
+            try {
+                const razorpayPayment = await razorpay.payments.fetch(paymentId);
+                if (razorpayPayment && razorpayPayment.method) {
+                    paymentMethod = razorpayPayment.method;
+                    console.log(`💳 Payment method fetched from Razorpay: ${paymentMethod}`);
+                }
+            } catch (fetchError) {
+                console.error('⚠️ Could not fetch payment method from Razorpay:', fetchError.message);
+            }
+
             // Payment verified successfully
             await Payment.findOneAndUpdate(
                 { orderId },
                 {
                     paymentId,
                     status: 'paid',
-                    verifiedAt: new Date()
+                    verifiedAt: new Date(),
+                    paymentMethod // Store the actual payment method from Razorpay
                 }
             );
 
@@ -863,8 +877,20 @@ const verifyGuestPayment = async (req, res, next) => {
 
         // Compare signatures
         if (expectedSignature === signature) {
-            // Payment verified successfully
+            // Fetch payment details from Razorpay to get payment method
+            const razorpay = require('../config/razorpay');
+            let paymentMethod = 'card'; // default fallback
+            try {
+                const razorpayPayment = await razorpay.payments.fetch(paymentId);
+                if (razorpayPayment && razorpayPayment.method) {
+                    paymentMethod = razorpayPayment.method;
+                    console.log(`💳 Payment method fetched from Razorpay: ${paymentMethod}`);
+                }
+            } catch (fetchError) {
+                console.error('⚠️ Could not fetch payment method from Razorpay:', fetchError.message);
+            }
 
+            // Payment verified successfully
             let tempPassword = null; // Initialize to track if we created a new user with temp password
 
             // If this is a guest payment, create the user account first
@@ -919,6 +945,7 @@ const verifyGuestPayment = async (req, res, next) => {
                 {
                     paymentId,
                     status: 'paid',
+                    paymentMethod, // Store the actual payment method from Razorpay
                     verifiedAt: new Date()
                 }
             );
@@ -984,7 +1011,7 @@ const verifyGuestPayment = async (req, res, next) => {
                             slot.start === booking.timeSlot.start &&
                             slot.end === booking.timeSlot.end
                         );
-
+  
                         if (slotIndex !== -1) {
                             availability.timeSlots[slotIndex].status = 'booked';
                             await availability.save();
@@ -1100,6 +1127,19 @@ const handleWebhook = async (req, res) => {
             // Payment was successful
             const paymentId = payload.payment.entity.id;
             const orderId = payload.payment.entity.order_id;
+            
+            // Fetch payment details from Razorpay to get payment method
+            const razorpay = require('../config/razorpay');
+            let paymentMethod = 'card'; // default fallback
+            try {
+                const razorpayPayment = await razorpay.payments.fetch(paymentId);
+                if (razorpayPayment && razorpayPayment.method) {
+                    paymentMethod = razorpayPayment.method;
+                    console.log(`💳 Payment method fetched from Razorpay webhook: ${paymentMethod}`);
+                }
+            } catch (fetchError) {
+                console.error('⚠️ Could not fetch payment method from Razorpay:', fetchError.message);
+            }
 
             // Update payment status in our database
             await Payment.findOneAndUpdate(
@@ -1107,7 +1147,8 @@ const handleWebhook = async (req, res) => {
                 {
                     paymentId,
                     status: 'paid',
-                    captured: true
+                    captured: true,
+                    paymentMethod // Store the actual payment method from Razorpay
                 }
             );
 
@@ -1272,6 +1313,17 @@ const handleWebhook = async (req, res) => {
                     }
                 );
 
+                // Update the payment record status to 'paid'
+                await Payment.findOneAndUpdate(
+                    { orderId },
+                    {
+                        paymentId,
+                        status: 'paid',
+                        captured: true,
+                        paymentMethod // Store the actual payment method from Razorpay
+                    }
+                );
+
                 // Activate the subscription with calculated end date
                 await activateSubscription(subscription._id);
 
@@ -1318,11 +1370,23 @@ const handleWebhook = async (req, res) => {
             // Payment failed
             const orderId = payload.payment.entity.order_id;
 
+            // Update payment record
             await Payment.findOneAndUpdate(
                 { orderId },
                 {
                     status: 'failed',
-                    captured: false
+                    captured: false,
+                    failureReason: payload.payment.entity.error?.description || 'Payment failed'
+                }
+            );
+
+            // Also update subscription if it exists
+            await Subscription.findOneAndUpdate(
+                { orderId },
+                {
+                    status: 'failed',
+                    captured: false,
+                    failureReason: payload.payment.entity.error?.description || 'Payment failed'
                 }
             );
         }
@@ -1491,6 +1555,20 @@ const createSubscriptionOrder = async (req, res, next) => {
 
         await subscription.save();
 
+        // Create payment record for the subscription
+        const payment = new Payment({
+            subscriptionId: subscription._id,
+            userId: req.user.userId,
+            amount: validatedAmount,
+            currency,
+            orderId: order.id,
+            status: 'created',
+            couponCode: couponCode || null,
+            planName: plan.name
+        });
+
+        await payment.save();
+
         // Get Razorpay credentials from database
         const { getRazorpayCredentials } = require('../utils/credentialsManager');
         const razorpayCreds = await getRazorpayCredentials();
@@ -1652,6 +1730,22 @@ const createGuestSubscriptionOrder = async (req, res, next) => {
 
         await subscription.save();
 
+        // Create payment record for the guest subscription
+        const payment = new Payment({
+            subscriptionId: subscription._id,
+            amount: validatedAmount,
+            currency,
+            orderId: order.id,
+            status: 'created',
+            couponCode: couponCode || null,
+            planName: plan.name,
+            guestName: clientName,
+            guestEmail: clientEmail,
+            guestPhone: clientPhone
+        });
+
+        await payment.save();
+
         // Get Razorpay credentials from database
         const { getRazorpayCredentials } = require('../utils/credentialsManager');
         const razorpayCreds = await getRazorpayCredentials();
@@ -1702,6 +1796,19 @@ const verifySubscriptionPayment = async (req, res, next) => {
 
         // Compare signatures
         if (expectedSignature === signature) {
+            // Fetch payment details from Razorpay to get payment method
+            const razorpay = require('../config/razorpay');
+            let paymentMethod = 'card'; // default fallback
+            try {
+                const razorpayPayment = await razorpay.payments.fetch(paymentId);
+                if (razorpayPayment && razorpayPayment.method) {
+                    paymentMethod = razorpayPayment.method;
+                    console.log(`💳 Payment method fetched from Razorpay: ${paymentMethod}`);
+                }
+            } catch (fetchError) {
+                console.error('⚠️ Could not fetch payment method from Razorpay:', fetchError.message);
+            }
+
             // Payment verified successfully
             await Subscription.findOneAndUpdate(
                 { orderId },
@@ -1714,7 +1821,19 @@ const verifySubscriptionPayment = async (req, res, next) => {
                     discountAmount: subscription.discountAmount,
                     couponCode: subscription.couponCode,
                     // Preserve therapistId if it exists
-                    therapistId: subscription.therapistId
+                    therapistId: subscription.therapistId,
+                    paymentMethod // Store the actual payment method from Razorpay
+                }
+            );
+
+            // Update the payment record status to 'paid'
+            await Payment.findOneAndUpdate(
+                { orderId },
+                {
+                    paymentId,
+                    status: 'paid',
+                    verifiedAt: new Date(),
+                    paymentMethod // Store the actual payment method from Razorpay
                 }
             );
 
@@ -2184,6 +2303,19 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
 
         // Compare signatures
         if (expectedSignature === signature) {
+            // Fetch payment details from Razorpay to get payment method
+            const razorpay = require('../config/razorpay');
+            let paymentMethod = 'card'; // default fallback
+            try {
+                const razorpayPayment = await razorpay.payments.fetch(paymentId);
+                if (razorpayPayment && razorpayPayment.method) {
+                    paymentMethod = razorpayPayment.method;
+                    console.log(`💳 Payment method fetched from Razorpay: ${paymentMethod}`);
+                }
+            } catch (fetchError) {
+                console.error('⚠️ Could not fetch payment method from Razorpay:', fetchError.message);
+            }
+
             // Payment verified successfully
             let tempPassword = null;
             let newUser = null;
@@ -2229,7 +2361,19 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
                     discountAmount: subscription.discountAmount,
                     couponCode: subscription.couponCode,
                     // Preserve therapistId if it exists
-                    therapistId: subscription.therapistId
+                    therapistId: subscription.therapistId,
+                    paymentMethod // Store the actual payment method from Razorpay
+                }
+            );
+
+            // Update the payment record status to 'paid'
+            await Payment.findOneAndUpdate(
+                { orderId },
+                {
+                    paymentId,
+                    status: 'paid',
+                    verifiedAt: new Date(),
+                    paymentMethod // Store the actual payment method from Razorpay
                 }
             );
 
@@ -2605,13 +2749,75 @@ const getPaymentById = async (req, res, next) => {
     try {
         const { paymentId } = req.params;
 
-        const payment = await Payment.findById(paymentId)
+        // First try to find in Payment model
+        let payment = await Payment.findById(paymentId)
             .populate('userId', 'name email phone role status createdAt')
             .populate('bookingId', 'serviceName therapistName date time status paymentStatus clientName purchaseDate serviceExpiryDate serviceValidityDays')
             .populate('subscriptionId', 'planName status startDate endDate nextBillingDate');
 
         if (!payment) {
-            return res.status(404).json(ApiResponse.error('Payment not found'));
+            // If not found, try Subscription model
+            payment = await Subscription.findById(paymentId)
+                .populate('userId', 'name email phone role status createdAt')
+                .populate('therapistId', 'name email');
+            
+            if (!payment) {
+                return res.status(404).json(ApiResponse.error('Payment not found'));
+            }
+            
+            // Transform subscription to match payment structure
+            const transformedPayment = {
+                _id: payment._id,
+                isSubscription: true,
+                subscriptionId: payment._id,
+                planName: payment.planName,
+                userId: payment.userId,
+                guestName: payment.guestName,
+                guestEmail: payment.guestEmail,
+                amount: payment.amount,
+                finalAmount: payment.finalAmount || payment.amount,
+                currency: payment.currency,
+                status: payment.status,
+                paymentMethod: payment.paymentMethod || 'card',
+                orderId: payment.orderId,
+                paymentId: payment.paymentId,
+                createdAt: payment.createdAt,
+                updatedAt: payment.updatedAt
+            };
+
+            return res.status(200).json(ApiResponse.success({ payment: transformedPayment }, 'Payment details retrieved successfully'));
+        }
+
+        // For regular payments, fetch latest status from Razorpay if payment was not completed
+        if (payment.status === 'created' && payment.orderId) {
+            try {
+                const razorpay = require('../config/razorpay');
+                const razorpayPayment = await razorpay.payments.fetch(payment.orderId.replace('order_', ''));
+                
+                if (razorpayPayment) {
+                    // Update payment status based on Razorpay data
+                    const newStatus = razorpayPayment.status === 'captured' ? 'paid' : 
+                                     razorpayPayment.status === 'failed' ? 'failed' : 'created';
+                    
+                    if (newStatus !== payment.status) {
+                        await Payment.findByIdAndUpdate(paymentId, {
+                            status: newStatus,
+                            paymentId: razorpayPayment.id,
+                            paymentMethod: razorpayPayment.method,
+                            updatedAt: new Date()
+                        });
+                        
+                        // Reload payment with updated data
+                        payment = await Payment.findById(paymentId)
+                            .populate('userId', 'name email phone role status createdAt')
+                            .populate('bookingId', 'serviceName therapistName date time status paymentStatus clientName purchaseDate serviceExpiryDate serviceValidityDays')
+                            .populate('subscriptionId', 'planName status startDate endDate nextBillingDate');
+                    }
+                }
+            } catch (razorpayError) {
+                console.log('⚠️ Could not fetch payment status from Razorpay:', razorpayError.message);
+                // Continue with cached data
+            }
         }
 
         // Fetch additional payment details from Razorpay if payment was captured
@@ -2653,12 +2859,42 @@ const getPaymentById = async (req, res, next) => {
 // Get all payments (Admin only)
 const getAllPayments = async (req, res, next) => {
     try {
+        // Fetch all payments from Payment model (includes both booking and subscription payments)
         const payments = await Payment.find()
-            .populate('userId', 'name email')
-            .populate('bookingId', 'serviceName therapistName date time')
+            .populate('userId', 'name email phone role status createdAt')
+            .populate('bookingId', 'serviceName therapistName date time status paymentStatus purchaseDate serviceExpiryDate serviceValidityDays')
+            .populate('subscriptionId', 'planName status startDate endDate nextBillingDate scheduleType scheduledDate scheduledTime')
             .sort({ createdAt: -1 });
 
-        res.status(200).json(ApiResponse.success({ payments }, 'All payments retrieved successfully'));
+        // Transform payments for frontend consistency
+        const transformedPayments = payments.map(payment => {
+            const isSubscription = !!payment.subscriptionId;
+            
+            return {
+                ...payment.toObject(),
+                isSubscription,
+                serviceName: isSubscription ? null : (payment.bookingId?.serviceName || 'N/A'),
+                planName: isSubscription ? (payment.subscriptionId?.planName || payment.planName) : null,
+                therapistName: payment.bookingId?.therapistName || 'N/A',
+                // Subscription-specific fields
+                scheduleType: payment.subscriptionId?.scheduleType || payment.scheduleType,
+                scheduledDate: payment.subscriptionId?.scheduledDate || payment.scheduledDate,
+                scheduledTime: payment.subscriptionId?.scheduledTime || payment.scheduledTime,
+                // Booking-specific fields
+                date: payment.bookingId?.date,
+                time: payment.bookingId?.time,
+                paymentStatus: payment.bookingId?.paymentStatus,
+                purchaseDate: payment.bookingId?.purchaseDate,
+                serviceExpiryDate: payment.bookingId?.serviceExpiryDate,
+                serviceValidityDays: payment.bookingId?.serviceValidityDays,
+                // Subscription dates
+                startDate: payment.subscriptionId?.startDate,
+                endDate: payment.subscriptionId?.endDate,
+                nextBillingDate: payment.subscriptionId?.nextBillingDate
+            };
+        });
+
+        res.status(200).json(ApiResponse.success({ payments: transformedPayments }, 'All payments retrieved successfully'));
     } catch (error) {
         next(error);
     }
@@ -2685,6 +2921,112 @@ const getRazorpayConfig = async (req, res, next) => {
     }
 };
 
+// Utility function to expire stale payments (payments that were created but not completed)
+const expireStalePayments = async (req, res, next) => {
+    try {
+        // Set expiry time to 1 minute (60000 ms)
+        const expiryTime = new Date(Date.now() - 1 * 60 * 1000); // 1 minute ago
+        
+        console.log(`⏰ Checking for stale payments created before: ${expiryTime.toISOString()}`);
+        
+        // Find all payments with status 'created' that are older than 1 minute
+        const stalePayments = await Payment.find({
+            status: 'created',
+            createdAt: { $lt: expiryTime }
+        });
+        
+        console.log(`📊 Found ${stalePayments.length} stale payment(s)`);
+        
+        let updatedCount = 0;
+        let failedCount = 0;
+        
+        for (const payment of stalePayments) {
+            try {
+                // First, check Razorpay for the actual payment status
+                const razorpay = require('../config/razorpay');
+                let razorpayStatus = 'unknown';
+                
+                try {
+                    // Extract order ID and fetch from Razorpay
+                    const orderId = payment.orderId;
+                    if (orderId) {
+                        const razorpayOrder = await razorpay.orders.fetch(orderId.replace('order_', ''));
+                        if (razorpayOrder) {
+                            razorpayStatus = razorpayOrder.status;
+                            console.log(`💳 Razorpay status for order ${orderId}: ${razorpayStatus}`);
+                        }
+                    }
+                } catch (razorpayError) {
+                    console.warn(`⚠️ Could not fetch Razorpay status for order ${payment.orderId}:`, razorpayError.message);
+                }
+                
+                // Determine new status based on Razorpay data
+                let newStatus = 'failed';
+                let failureReason = 'Payment not completed within 1 minute';
+                
+                if (razorpayStatus === 'paid') {
+                    newStatus = 'paid';
+                    console.log(`✅ Payment ${payment._id} was actually paid, updating status`);
+                } else if (razorpayStatus === 'partially_paid') {
+                    // Keep as created for partially paid
+                    console.log(`⏳ Payment ${payment._id} is partially paid, keeping status as created`);
+                    continue;
+                } else {
+                    console.log(`❌ Payment ${payment._id} marked as failed (Razorpay status: ${razorpayStatus})`);
+                }
+                
+                // Update payment status
+                await Payment.findByIdAndUpdate(payment._id, {
+                    status: newStatus,
+                    captured: newStatus === 'paid',
+                    failureReason: newStatus === 'failed' ? failureReason : undefined,
+                    updatedAt: new Date()
+                });
+                
+                // Also update subscription if it exists
+                if (payment.subscriptionId) {
+                    await Subscription.findByIdAndUpdate(payment.subscriptionId, {
+                        status: newStatus,
+                        captured: newStatus === 'paid',
+                        failureReason: newStatus === 'failed' ? failureReason : undefined,
+                        updatedAt: new Date()
+                    });
+                }
+                
+                // Also update booking if it exists
+                if (payment.bookingId) {
+                    await Booking.findByIdAndUpdate(payment.bookingId, {
+                        paymentStatus: newStatus,
+                        updatedAt: new Date()
+                    });
+                }
+                
+                updatedCount++;
+                console.log(`✅ Updated payment ${payment._id} to status: ${newStatus}`);
+                
+            } catch (updateError) {
+                failedCount++;
+                console.error(`❌ Failed to update payment ${payment._id}:`, updateError.message);
+            }
+        }
+        
+        const message = `Processed ${stalePayments.length} stale payments: ${updatedCount} updated, ${failedCount} failed`;
+        console.log(`✅ ${message}`);
+        
+        res.status(200).json(
+            ApiResponse.success({
+                processed: stalePayments.length,
+                updated: updatedCount,
+                failed: failedCount,
+                expiryTime: expiryTime
+            }, message)
+        );
+    } catch (error) {
+        console.error('❌ Error in expireStalePayments:', error);
+        next(error);
+    }
+};
+
 module.exports = {
     createOrder,
     createGuestOrder,
@@ -2698,5 +3040,7 @@ module.exports = {
     getUserPayments,
     getAllPayments,
     getPaymentById,
-    getRazorpayConfig
+    getRazorpayConfig,
+    // Utility function to expire stale payments
+    expireStalePayments
 };

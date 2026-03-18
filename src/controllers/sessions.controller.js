@@ -1949,16 +1949,10 @@ const acceptSession = async (req, res, next) => {
       return res.status(404).json(ApiResponse.error("Session not found"));
     }
 
-    // Generate video call join links for both user and therapist
-    // Check if userId exists before calling toString()
-    if (!session.userId) {
-      return res.status(400).json(ApiResponse.error("Session does not have a valid user ID"));
-    }
-    
     // Handle case where therapistId might be null
     // Try to populate it from related booking or subscription if missing
     let therapistId = session.therapistId;
-    
+
     if (!therapistId && session.bookingId) {
       // If therapistId is null but booking exists, get therapistId from booking
       const booking = await Booking.findById(session.bookingId);
@@ -1971,20 +1965,43 @@ const acceptSession = async (req, res, next) => {
       // We'll need to get it from the request body or find another way
       console.log("Session has subscription but no therapistId. This might need manual assignment.");
     }
-    
+
     if (!therapistId) {
       return res.status(400).json(ApiResponse.error("Session does not have a valid therapist ID and cannot determine it from related records"));
     }
-    
-    const userJoinLink = generateJoinLink(session.sessionId, session.userId.toString(), 'user');
+
+    // Build join links based on session type (1-on-1 vs group)
     const therapistJoinLink = generateJoinLink(session.sessionId, therapistId.toString(), 'therapist');
-    
-    // Update session with join links and status
-    // Only update status if it's not already 'scheduled'
+
     const updateData = {
-        joinLink: userJoinLink, // Store user join link in the main field
-        therapistJoinLink: therapistJoinLink // Store therapist link separately
+      therapistJoinLink: therapistJoinLink
     };
+
+    const isGroupSession = session.sessionType === 'group' || session.type === 'group';
+
+    if (isGroupSession) {
+      // Provide a base participant join link so participants can join
+      // (Client should request the approved participant list and their own join link from the backend)
+      updateData.joinLink = generateJoinLink(session.sessionId, session.sessionId, 'participant');
+
+      // Optionally attach a list of participant join links for each user
+      const participantLinks = (session.participants || [])
+        .filter(p => p.status !== 'rejected')
+        .map(p => ({
+          userId: p.userId,
+          bookingId: p.bookingId,
+          status: p.status,
+          joinLink: generateJoinLink(session.sessionId, p.userId.toString(), 'participant')
+        }));
+
+      updateData.participantLinks = participantLinks;
+    } else {
+      // 1-on-1 session: require a specific userId
+      if (!session.userId) {
+        return res.status(400).json(ApiResponse.error("Session does not have a valid user ID"));
+      }
+      updateData.joinLink = generateJoinLink(session.sessionId, session.userId.toString(), 'user');
+    }
     
     // Always set status to 'scheduled' when accepting
     updateData.status = 'scheduled';

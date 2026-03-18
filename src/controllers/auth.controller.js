@@ -1127,6 +1127,52 @@ const resetPassword = async (req, res, next) => {
     }
 };
 
+// Change password for authenticated user
+const changePassword = async (req, res, next) => {
+    try {
+        const { oldPassword, newPassword } = req.body;
+
+        // Validation
+        if (!oldPassword || !newPassword) {
+            return res.status(400).json(ApiResponse.error('Old password and new password are required'));
+        }
+
+        if (newPassword.length < 6) {
+            return res.status(400).json(ApiResponse.error('New password must be at least 6 characters long'));
+        }
+
+        if (oldPassword === newPassword) {
+            return res.status(400).json(ApiResponse.error('New password must be different from old password'));
+        }
+
+        // Get user from token (req.user is populated by auth middleware)
+        const user = await User.findById(req.user.userId).select('+password');
+
+        if (!user) {
+            return res.status(404).json(ApiResponse.error('User not found'));
+        }
+
+        // Check current/old password
+        const isMatch = await comparePassword(oldPassword, user.password);
+
+        if (!isMatch) {
+            return res.status(400).json(ApiResponse.error('Old password is incorrect'));
+        }
+
+        // Set new password (will be hashed by pre-save hook)
+        user.password = newPassword;
+        user.hasTempPassword = false; // Clear temp password flag when user sets new password
+        await user.save();
+
+        console.log(`✅ Password changed successfully for user: ${user.email}`);
+
+        res.status(200).json(ApiResponse.success(null, 'Password changed successfully'));
+    } catch (error) {
+        console.error('❌ Error changing password:', error.message);
+        next(error);
+    }
+};
+
 // Update password for authenticated user
 const updatePassword = async (req, res, next) => {
     try {
@@ -1208,5 +1254,6 @@ module.exports = {
     forgotPassword,
     resetPassword,
     updatePassword,
+    changePassword,
     refreshToken
 };

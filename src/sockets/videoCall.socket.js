@@ -7,6 +7,10 @@ const logger = require('../utils/logger');
 const mongoose = require('mongoose');
 const { createGoogleMeetEvent } = require('../utils/googleMeet.utils');
 
+// SOCKET MODULE LOADED - Backend restart detected
+console.log('🔌 Video Call Socket Handler Loaded:', new Date().toISOString());
+console.log('✅ Dual-collection lookup for group sessions is ACTIVE');
+
 // Room-based participant registry
 // Map<roomId, Map<socketId, Participant>>
 const roomParticipants = new Map();
@@ -140,14 +144,15 @@ const setupVideoCallHandlers = (io, socket) => {
             });
         } catch (error) {
             logger.error('Error joining video session:', error);
-            socket.emit('error', { message: 'Failed to join video session' });
+            // Don't emit error to client for non-critical issues like invalid ObjectId format
+            console.log(`Join video session error (non-blocking):`, error.message);
         }
     });
     
-    // Handle patient request to join waiting room
+    // Handle patient request to join waiting room (supports 1-on-1 and group)
     socket.on('request-to-join', async (data) => {
         try {
-            const { sessionId } = data;
+            const { sessionId } = data; // For groups, this can be the groupSessionId
             const userId = socket.user.userId;
             
             if (!sessionId) {
@@ -155,30 +160,90 @@ const setupVideoCallHandlers = (io, socket) => {
                 return;
             }
 
+            let isGroupWaiting = false;
+
             // Verify session exists and user has access
-            const session = await Session.findById(sessionId)
+            // 1) Try to find a regular Session by MongoDB _id
+            let session = await Session.findById(sessionId)
                 .populate('userId')
                 .populate('therapistId');
 
+            // 2) If not found, try to find by custom sessionId field
             if (!session) {
-                socket.emit('error', { message: 'Session not found' });
+                logger.warn(`Session not found by _id ${sessionId}, trying sessionId field...`);
+                session = await Session.findOne({ sessionId: sessionId })
+                    .populate('userId')
+                    .populate('therapistId');
+                
+                if (session) {
+                    logger.info(`Found session by sessionId field: ${sessionId}`);
+                }
+            }
+
+            // 3) If we have a Session that belongs to a group, mark as group waiting
+            if (session && session.groupSessionId) {
+                isGroupWaiting = true;
+                logger.info(`Session ${session._id} belongs to group ${session.groupSessionId} - using group waiting room`);
+            }
+
+            // 4) If still not found at all, treat this as a GROUP waiting-room using GroupSession directly
+            if (!session) {
+                logger.warn(`Session not found, checking GroupSession collection for ID: ${sessionId}`);
+                const groupSession = await GroupSession.findById(sessionId)
+                    .populate('therapistId')
+                    .populate('participants.userId');
+
+                if (groupSession) {
+                    isGroupWaiting = true;
+                    session = groupSession;
+                    logger.info(`Found group session for waiting room: ${sessionId}`);
+                }
+            }
+
+            if (!session) {
+                socket.emit('error', { message: 'Session not found. Please verify the session ID is correct.' });
                 return;
             }
 
-            // Check if user is authorized to join this session
-            const isUser = session.userId && session.userId._id.toString() === userId;
+            // Check if user is authorized to join this session/group
+            const isUser = !isGroupWaiting && session.userId && session.userId._id.toString() === userId;
             const isTherapist = session.therapistId && session.therapistId._id.toString() === userId;
             const isAdmin = socket.user.role === 'admin';
 
+            // For 1-on-1 sessions, enforce strict auth (user/therapist/admin).
+            // For group waiting rooms, allow any authenticated user to enter the waiting room;
+            // actual participation is gated later by approval and group join checks.
             if (!isUser && !isTherapist && !isAdmin) {
-                socket.emit('error', { message: 'Unauthorized to join this session' });
-                return;
+                if (!isGroupWaiting) {
+                    socket.emit('error', { message: 'Unauthorized to join this session' });
+                    return;
+                } else {
+                    logger.warn(`Allowing user ${userId} into group waiting room ${sessionId} without direct session membership (will be validated on approval/join).`);
+                }
             }
 
-            // Check session status
+            // Check status (for group, allow same statuses)
             if (session.status !== 'pending' && session.status !== 'scheduled' && session.status !== 'live') {
                 socket.emit('error', { message: 'Session is not active at this time' });
                 return;
+            }
+
+            // Compute canonical waiting key:
+            // - For regular sessions: use the Session _id (session._id)
+            // - For group sessions: always use the GroupSession _id (groupSession._id),
+            //   whether we got here via GroupSession or Session.groupSessionId
+            let waitingKey = sessionId;
+            if (isGroupWaiting) {
+                // For group flows we ALWAYS want the canonical GroupSession _id as the waiting key
+                if (session instanceof mongoose.Model && session.collection.name === GroupSession.collection.name) {
+                    waitingKey = session._id.toString();
+                } else if (session.groupSessionId) {
+                    // Session document that references a GroupSession
+                    waitingKey = session.groupSessionId.toString();
+                }
+            } else if (session && session._id) {
+                // Pure 1-on-1: use Session _id
+                waitingKey = session._id.toString();
             }
 
             // Create standardized waiting room patient object
@@ -192,15 +257,15 @@ const setupVideoCallHandlers = (io, socket) => {
                     socket.user.displayName || socket.user.email || `User ${userId.substring(0, 5)}`,
                 role: socket.user.role,
                 email: socket.user.email,
-                sessionId: sessionId,
+                sessionId: waitingKey, // normalized key used by both admin and patient
                 requestedAt: new Date().toISOString()
             };
 
-            // Add patient to waiting room
-            addPatientToWaitingRoom(sessionId, waitingPatient);
+            // Add patient to waiting room, keyed by canonical waitingKey
+            addPatientToWaitingRoom(waitingKey, waitingPatient);
 
             // Join the waiting room socket room for real-time notifications
-            const waitingRoomId = `waiting-room-${sessionId}`;
+            const waitingRoomId = `waiting-room-${waitingKey}`;
             socket.join(waitingRoomId);
 
             // Update session status to 'pending' if it's currently 'scheduled'
@@ -210,7 +275,7 @@ const setupVideoCallHandlers = (io, socket) => {
             }
 
             // Get all waiting patients to send to newly joined admins/therapists
-            const allWaitingPatients = getWaitingPatients(sessionId);
+            const allWaitingPatients = getWaitingPatients(waitingKey);
             
             // Notify therapist and all admins in the waiting room
             const therapistId = session.therapistId._id.toString();
@@ -228,7 +293,7 @@ const setupVideoCallHandlers = (io, socket) => {
                     
                     // Send the complete waiting list to ensure no missed patients
                     clientSocket.emit('waiting-list', {
-                        sessionId: sessionId,
+                        sessionId: waitingKey,
                         patients: allWaitingPatients
                     });
                     
@@ -249,10 +314,10 @@ const setupVideoCallHandlers = (io, socket) => {
             socket.emit('waiting-room-joined', {
                 success: true,
                 message: 'You have been added to the waiting room. Please wait for the therapist to admit you.',
-                sessionId: sessionId
+                sessionId: waitingKey
             });
 
-            logger.info(`Patient ${userId} joined waiting room for session ${sessionId}`);
+            logger.info(`Patient ${userId} joined waiting room for session ${waitingKey}`);
         } catch (error) {
             logger.error('Error handling request-to-join:', error);
             socket.emit('error', { message: 'Failed to join waiting room' });
@@ -276,11 +341,66 @@ const setupVideoCallHandlers = (io, socket) => {
                 return;
             }
 
-            // Verify session exists
-            const session = await Session.findById(sessionId);
+            // Verify session or group session exists
+            let session = await Session.findById(sessionId);
+            let groupSession = null;
+            
             if (!session) {
-                socket.emit('error', { message: 'Session not found' });
-                return;
+                // For group flows, sessionId may already be the GroupSession _id
+                logger.info(`Session not found by _id ${sessionId}, checking GroupSession collection...`);
+                groupSession = await GroupSession.findById(sessionId)
+                    .populate('therapistId')
+                    .populate('participants.userId');
+                if (groupSession) {
+                    logger.info(`✅ Found GroupSession for approval: ${groupSession._id} with ${groupSession.participants?.length || 0} participants`);
+                } else {
+                    socket.emit('error', { message: 'Session not found' });
+                    return;
+                }
+            }
+
+            // For group sessions, ensure max participants is not exceeded and record acceptance
+            const isGroupSession = (session && (session.sessionType === 'group' || session.type === 'group')) || !!groupSession;
+            if (isGroupSession) {
+                // Use whichever document we have (Session or GroupSession) to check capacity
+                const capacitySource = session || groupSession;
+                const targetUserId = io.sockets.sockets.get(patientSocketId)?.user?.userId;
+                
+                logger.info(`📊 Group session capacity check:`);
+                logger.info(`   - Capacity source: ${capacitySource.constructor.name}`);
+                logger.info(`   - Max participants: ${capacitySource.maxParticipants}`);
+                logger.info(`   - Target user ID: ${targetUserId}`);
+                
+                // Check if the patient being approved is already in the participants list
+                const alreadyParticipant = (capacitySource.participants || []).some(
+                    p => p.userId.toString() === targetUserId && p.status === 'accepted'
+                );
+                
+                logger.info(`   - Already participant: ${alreadyParticipant}`);
+                
+                // Only check capacity if patient is not already an accepted participant
+                if (!alreadyParticipant) {
+                    // Count UNIQUE accepted participants (by userId)
+                    const uniqueAcceptedUserIds = new Set();
+                    const acceptedCount = (capacitySource.participants || []).filter(p => {
+                        if (p.status !== 'accepted' || !p.userId) return false;
+                        const userIdStr = p.userId.toString();
+                        if (uniqueAcceptedUserIds.has(userIdStr)) return false; // Skip duplicates
+                        uniqueAcceptedUserIds.add(userIdStr);
+                        return true;
+                    }).length;
+                    
+                    const maxPatients = capacitySource.maxParticipants || 0;
+                    logger.info(`   - Unique accepted count: ${acceptedCount}/${maxPatients}`);
+                    
+                    if (maxPatients > 0 && acceptedCount >= maxPatients) {
+                        logger.error(`❌ Group session is full - rejecting approval`);
+                        socket.emit('error', { message: 'Group session is already full' });
+                        return;
+                    }
+                } else {
+                    logger.info(`✅ Patient is already an accepted participant - skipping capacity check`);
+                }
             }
 
             // Get the patient's socket to verify they're still connected
@@ -297,6 +417,80 @@ const setupVideoCallHandlers = (io, socket) => {
                 return;
             }
 
+            // Persist approval in session and/or group session document for group sessions
+            if (isGroupSession) {
+                const targetUserId = targetPatientSocket.user.userId;
+
+                logger.info(`📝 Persisting approval for user ${targetUserId} in group session`);
+
+                // 1) Update Session document if it exists
+                if (session) {
+                    const participantIndex = (session.participants || []).findIndex(
+                        p => p.userId.toString() === targetUserId
+                    );
+
+                    if (participantIndex === -1) {
+                        logger.info(`   ➕ Adding new participant to Session document`);
+                        session.participants = session.participants || [];
+                        session.participants.push({
+                            userId: targetUserId,
+                            bookingId: null,
+                            status: 'accepted'
+                        });
+                    } else {
+                        logger.info(`   ✏️ Updating existing participant status to 'accepted'`);
+                        session.participants[participantIndex].status = 'accepted';
+                    }
+
+                    await session.save();
+                    logger.info(`✅ Session document updated`);
+                }
+
+                // 2) Also update GroupSession participants, since group join-room checks this
+                const effectiveGroupSession = groupSession || (session && session.groupSessionId
+                    ? await GroupSession.findById(session.groupSessionId)
+                    : null);
+
+                if (effectiveGroupSession) {
+                    logger.info(`📋 Updating GroupSession ${effectiveGroupSession._id}`);
+                    
+                    // Check if user is already in GroupSession participants (prevent duplicates)
+                    const existingParticipantIndex = (effectiveGroupSession.participants || []).findIndex(
+                        p => p.userId && p.userId.toString() === targetUserId
+                    );
+                    
+                    if (existingParticipantIndex === -1) {
+                        // User not in GroupSession yet - add them
+                        logger.info(`   ➕ Adding new participant to GroupSession document`);
+                        effectiveGroupSession.participants.push({
+                            userId: targetUserId,
+                            status: 'accepted',
+                            joinedAt: new Date()
+                        });
+                    } else {
+                        // User already exists - just update status to accepted
+                        logger.info(`   ✏️ Updating existing participant status to 'accepted' in GroupSession`);
+                        effectiveGroupSession.participants[existingParticipantIndex].status = 'accepted';
+                        // Also update joinedAt if not set
+                        if (!effectiveGroupSession.participants[existingParticipantIndex].joinedAt) {
+                            effectiveGroupSession.participants[existingParticipantIndex].joinedAt = new Date();
+                        }
+                    }
+
+                    await effectiveGroupSession.save();
+                    logger.info(`✅ GroupSession document updated`);
+                    
+                    // Log final participant count for verification
+                    const finalUniqueCount = new Set(effectiveGroupSession.participants
+                        .filter(p => p.status === 'accepted')
+                        .map(p => p.userId.toString())
+                    ).size;
+                    logger.info(`📊 Final GroupSession stats: ${effectiveGroupSession.participants.length} total entries, ${finalUniqueCount} unique accepted participants`);
+                } else {
+                    logger.warn(`⚠️ No GroupSession document found to update`);
+                }
+            }
+
             // Add participant to video room registry FIRST
             const participant = {
                 socketId: patientSocketId,
@@ -309,27 +503,36 @@ const setupVideoCallHandlers = (io, socket) => {
                 joinedAt: new Date().toISOString()
             };
 
-            console.log(`✅ Adding participant ${participant.userId} to video room registry for session ${sessionId}`);
-            console.log(`📋 Current video room participants before add:`, getAllParticipantsInRoom(sessionId));
-            addParticipantToRoom(sessionId, patientSocketId, participant);
-            console.log(`📋 Video room participants after add:`, getAllParticipantsInRoom(sessionId));
+            // For group sessions, use the groupSessionId as the room ID
+            const videoRoomId = isGroupSession ? (groupSession?._id || session?.groupSessionId || sessionId) : sessionId;
+            
+            console.log(`✅ Adding participant ${participant.userId} to video room registry`);
+            console.log(`📋 Video room ID: ${videoRoomId}`);
+            console.log(`📋 Is group session: ${isGroupSession}`);
+            console.log(`📋 Current video room participants before add:`, getAllParticipantsInRoom(videoRoomId));
+            addParticipantToRoom(videoRoomId, patientSocketId, participant);
+            console.log(`📋 Video room participants after add:`, getAllParticipantsInRoom(videoRoomId));
 
             // Move patient from waiting room to video room
             const approvalWaitingRoomId = `waiting-room-${sessionId}`;
-            const videoRoomId = `video-call-${sessionId}`;
+            const actualVideoRoomId = `video-call-${videoRoomId}`;
             
             targetPatientSocket.leave(approvalWaitingRoomId);
-            targetPatientSocket.join(videoRoomId);
+            targetPatientSocket.join(actualVideoRoomId);
 
             // Longer delay to ensure registry update is fully processed
             setTimeout(() => {
                 console.log(`🕒 Sending approval notification after delay for user ${waitingPatient.userId}`);
-                // Notify the approved patient
-                targetPatientSocket.emit('join-approved', {
+                // Notify the approved patient with group session info if applicable
+                const joinData = {
                     sessionId: sessionId,
                     approvedBy: adminId,
-                    message: 'Your request to join has been approved. Redirecting to video call...'
-                });
+                    message: 'Your request to join has been approved. Redirecting to video call...',
+                    groupSessionId: isGroupSession ? videoRoomId : undefined
+                };
+                
+                console.log(`📤 Sending join-approved event:`, joinData);
+                targetPatientSocket.emit('join-approved', joinData);
             }, 500);
 
             // Notify admin of successful approval
@@ -398,15 +601,92 @@ const setupVideoCallHandlers = (io, socket) => {
         }
     });
 
-    // Handle approved patient joining video room
+    // Handle approved patient joining video room (1-on-1 and group)
     socket.on('join-video-room', async (data) => {
         try {
             console.log(`📥 join-video-room event received from ${socket.id}:`, data);
             console.log(`📥 Socket user:`, socket.user);
-            const { sessionId } = data;
+            const { sessionId, groupSessionId } = data;
             const userId = socket.user.userId;
             console.log(`📥 User ID from socket: ${userId}`);
 
+            // Determine if this is a group or 1-on-1 join
+            const isGroupJoin = !!groupSessionId;
+            const roomId = isGroupJoin ? groupSessionId : sessionId;
+
+            if (!roomId) {
+                socket.emit('error', { message: 'Session ID is required' });
+                return;
+            }
+
+            if (isGroupJoin) {
+                // GROUP SESSION JOIN AFTER APPROVAL
+                console.log(`🔍 Handling approved GROUP join for groupSessionId ${roomId}`);
+
+                // Verify group session exists and user is allowed
+                const groupSession = await GroupSession.findById(roomId)
+                    .populate('therapistId')
+                    .populate('participants.userId');
+
+                if (!groupSession) {
+                    socket.emit('error', { message: 'Group session not found' });
+                    return;
+                }
+
+                const isTherapist = groupSession.therapistId && groupSession.therapistId._id.toString() === userId;
+                const isParticipant = Array.isArray(groupSession.participants)
+                    ? groupSession.participants.some(p => p.userId && p.userId._id.toString() === userId && p.status === 'accepted')
+                    : false;
+                const isAdmin = socket.user.role === 'admin';
+
+                if (!isTherapist && !isParticipant && !isAdmin) {
+                    socket.emit('error', { message: 'Unauthorized to join this group session' });
+                    return;
+                }
+
+                // Join the group room (use groupSessionId as room)
+                const videoRoomId = roomId;
+                socket.join(videoRoomId);
+
+                const participant = {
+                    socketId: socket.id,
+                    userId: userId,
+                    name: socket.user.name && socket.user.name !== 'Clinician' && socket.user.name !== 'User Unknown' 
+                        ? socket.user.name 
+                        : (socket.user.firstName && socket.user.lastName ? 
+                            `${socket.user.firstName} ${socket.user.lastName}` : null) ||
+                        socket.user.displayName || socket.user.email || `User ${userId.substring(0, 5)}`,
+                    role: socket.user.role,
+                    email: socket.user.email,
+                    isTherapist: isTherapist,
+                    isUser: isParticipant,
+                    joinedAt: new Date().toISOString()
+                };
+
+                // Add participant to room registry
+                addParticipantToRoom(videoRoomId, socket.id, participant);
+
+                const currentParticipants = getAllParticipantsInRoom(videoRoomId);
+
+                socket.emit('room-participants', {
+                    participants: currentParticipants,
+                    roomId: videoRoomId,
+                    roomType: 'group'
+                });
+
+                socket.to(videoRoomId).emit('participant-joined', participant);
+
+                socket.emit('joined-video-room', {
+                    success: true,
+                    roomId: videoRoomId,
+                    message: 'Successfully joined group video room'
+                });
+
+                logger.info(`User ${userId} joined group video room ${videoRoomId}`);
+                return;
+            }
+
+            // ORIGINAL 1-ON-1 LOGIC
             if (!sessionId) {
                 socket.emit('error', { message: 'Session ID is required' });
                 return;
@@ -556,7 +836,7 @@ const setupVideoCallHandlers = (io, socket) => {
                 return;
             }
 
-            // Join the waiting room
+            // Join the waiting room (uses same canonical key as request-to-join)
             const adminWaitingRoomId = `waiting-room-${sessionId}`;
             socket.join(adminWaitingRoomId);
             
@@ -630,6 +910,17 @@ const setupVideoCallHandlers = (io, socket) => {
     socket.on('join-room', async (data) => {
         try {
             const { sessionId, groupSessionId } = data;
+            
+            // LOG EVERYTHING for debugging
+            // FIX APPLIED: 2026-03-16 - Added dual-collection lookup for group sessions
+            logger.info(`=== JOIN-ROOM REQUEST RECEIVED ===`);
+            logger.info(`Socket ID: ${socket.id}`);
+            logger.info(`User ID: ${socket.user.userId}`);
+            logger.info(`User Role: ${socket.user.role}`);
+            logger.info(`Request data:`, JSON.stringify(data, null, 2));
+            logger.info(`sessionId: ${sessionId}`);
+            logger.info(`groupSessionId: ${groupSessionId}`);
+            
             // If this is a special non-session room (support/admin/notifications), join and return early
             const specialRoom = (id) => typeof id === 'string' && (id.startsWith('support-') || id === 'admin-support-room' || id === 'admin_notifications' || id === 'default-chat-room');
             if (specialRoom(sessionId) || specialRoom(groupSessionId)) {
@@ -648,21 +939,51 @@ const setupVideoCallHandlers = (io, socket) => {
             if (sessionId) {
                 // 1-on-1 session
                 roomType = 'session';
+                logger.info(`Processing as 1-on-1 session with ID: ${sessionId}`);
                 
                 // Verify session exists and user has access
-                const session = await Session.findById(sessionId)
+                // First try to find by MongoDB _id
+                let session = await Session.findById(sessionId)
                     .populate('userId')
                     .populate('therapistId');
 
+                // If not found, try to find by custom sessionId field
                 if (!session) {
-                    socket.emit('error', { message: 'Session not found' });
+                    logger.warn(`Session not found by _id ${sessionId}, trying sessionId field...`);
+                    session = await Session.findOne({ sessionId: sessionId })
+                        .populate('userId')
+                        .populate('therapistId');
+                    
+                    if (session) {
+                        logger.info(`Found session by sessionId field: ${sessionId}`);
+                    } else {
+                        logger.error(`❌ Session still not found after checking both _id and sessionId fields`);
+                        logger.error(`Session collection stats:`);
+                        const sessionCount = await Session.countDocuments();
+                        logger.error(`Total sessions in DB: ${sessionCount}`);
+                        if (sessionCount > 0) {
+                            const sampleSessions = await Session.find().limit(5).select('_id sessionId');
+                            logger.error(`Sample sessions:`, JSON.stringify(sampleSessions, null, 2));
+                        }
+                    }
+                }
+
+                if (!session) {
+                    logger.error(`🛑 Emitting "Session not found" error to client`);
+                    socket.emit('error', { message: 'Session not found. Please verify the session ID is correct.' });
                     return;
                 }
 
                 // Check if user has permission to join the call
                 isUser = session.userId && session.userId._id.toString() === userId;
+                const isParticipant = Array.isArray(session.participants)
+                    ? session.participants.some(p => p.userId.toString() === userId && p.status === 'accepted')
+                    : false;
                 isTherapist = session.therapistId && session.therapistId._id.toString() === userId;
                 const isAdmin = socket.user.role === 'admin';
+
+                // Attach group indicator for later logic
+                const isGroupSession = session.sessionType === 'group' || session.type === 'group';
 
                 // Check if patient was approved (should be in video room registry)
                 const videoRoomParticipants = getAllParticipantsInRoom(sessionId);
@@ -761,16 +1082,48 @@ const setupVideoCallHandlers = (io, socket) => {
             } else if (groupSessionId) {
                 // Group session
                 roomType = 'group';
+                logger.info(`Processing as GROUP session with ID: ${groupSessionId}`);
 
                 // Verify group session exists and user has access
-                const groupSession = await GroupSession.findById(groupSessionId)
+                logger.info(`Searching for group session by _id: ${groupSessionId}`);
+                let groupSession = await GroupSession.findById(groupSessionId)
                     .populate('therapistId')
                     .populate('participants.userId');
 
+                // If not found in GroupSession collection, check if it exists in Session collection as a reference
                 if (!groupSession) {
-                    socket.emit('error', { message: 'Group session not found' });
+                    logger.warn(`Group session not found by _id: ${groupSessionId}, checking Session collection...`);
+                    const sessionWithGroupRef = await Session.findOne({ groupSessionId: groupSessionId })
+                        .populate('therapistId')
+                        .populate('userId');
+                    
+                    if (sessionWithGroupRef) {
+                        logger.info(`Found session referencing groupSessionId: ${groupSessionId}`);
+                        // Retrieve the actual group session using the reference
+                        groupSession = await GroupSession.findById(sessionWithGroupRef.groupSessionId)
+                            .populate('therapistId')
+                            .populate('participants.userId');
+                        
+                        if (groupSession) {
+                            logger.info(`✅ Successfully retrieved group session via Session reference: ${groupSessionId}`);
+                        }
+                    }
+                }
+
+                if (!groupSession) {
+                    logger.error(`❌ Group session not found by _id: ${groupSessionId}`);
+                    logger.error(`GroupSession collection stats:`);
+                    const groupCount = await GroupSession.countDocuments();
+                    logger.error(`Total group sessions in DB: ${groupCount}`);
+                    if (groupCount > 0) {
+                        const sampleGroups = await GroupSession.find().limit(5).select('_id title');
+                        logger.error(`Sample group sessions:`, JSON.stringify(sampleGroups, null, 2));
+                    }
+                    socket.emit('error', { message: 'Group session not found. Please verify the group session ID is correct.' });
                     return;
                 }
+                
+                logger.info(`✅ Found group session: ${groupSession.title || 'Untitled'}`);
 
                 // Check if user has permission to join the group call
                 isTherapist = groupSession.therapistId._id.toString() === userId;
@@ -785,9 +1138,10 @@ const setupVideoCallHandlers = (io, socket) => {
                     return;
                 }
 
-                // Check if max participants reached
+                // Check if max participants reached (maxParticipants counts patients; therapist is extra)
                 const activeParticipants = Array.from(io.sockets.adapter.rooms.get(groupSessionId) || []).length;
-                if (activeParticipants >= groupSession.maxParticipants && !isTherapist) {
+                const maxAllowed = (groupSession.maxParticipants || 0) + 1;
+                if (activeParticipants >= maxAllowed && !isTherapist) {
                     socket.emit('error', { message: 'Maximum participants reached for this group session' });
                     return;
                 }
@@ -1107,7 +1461,7 @@ const setupVideoCallHandlers = (io, socket) => {
     socket.on('send-video-message', async (data) => {
         try {
             console.log(`📨 Video call message received:`, data);
-            const { sessionId, message, senderId } = data;
+            const { sessionId, message, senderId, attachments = [] } = data;
 
             // Join the unified video call room for messaging
             const videoRoomId = `video-call-${sessionId}`;
@@ -1117,13 +1471,21 @@ const setupVideoCallHandlers = (io, socket) => {
             // Save message to database with video-call-chat type
             const senderType = socket.user.role === 'therapist' || socket.user.role === 'admin' ? 'therapist' : 'user';
 
-            const chatMessage = new ChatMessage({
+            const chatMessageData = {
                 sessionId: sessionId,
                 senderId: socket.user.userId,
                 senderType: senderType,
                 message: message,
-                messageType: 'video-call-chat' // Use specific type for video call messages
-            });
+                messageType: 'video-call-chat', // Use specific type for video call messages
+                attachments: attachments
+            };
+
+            // If there are attachments, update the message text
+            if (attachments && attachments.length > 0) {
+                chatMessageData.message = attachments.length > 1 ? '📎 Multiple attachments' : '📎 File attachment';
+            }
+
+            const chatMessage = new ChatMessage(chatMessageData);
 
             await chatMessage.save();
             await chatMessage.populate('senderId', 'name');
@@ -1135,28 +1497,70 @@ const setupVideoCallHandlers = (io, socket) => {
                 senderName: chatMessage.senderId.name,
                 message: chatMessage.message,
                 messageType: chatMessage.messageType,
-                timestamp: chatMessage.createdAt
+                timestamp: chatMessage.createdAt,
+                attachments: chatMessage.attachments?.length || 0
             });
 
-            // Broadcast message to all participants in the room except sender
-            socket.to(videoRoomId).emit('receive-video-message', {
-                message,
-                senderId: senderId || socket.user.userId,
+            // Create standardized message payload
+            const messagePayload = {
+                message: chatMessage.message,
+                senderId: socket.user.userId,
+                senderName: chatMessage.senderId.name || socket.user.name || `User ${socket.user.userId.substring(0, 5)}`,
                 timestamp: chatMessage.createdAt.toISOString(),
-                senderName: chatMessage.senderId.name || `User ${socket.user.userId.substring(0, 5)}`
-            });
+                attachments: chatMessage.attachments || [],
+                messageId: chatMessage.messageId || chatMessage._id.toString()
+            };
 
-            // Also send confirmation to sender
-            socket.emit('message-sent', {
-                success: true,
-                message: 'Message sent successfully',
-                messageId: chatMessage._id
+            console.log(`📨 Broadcasting message to room ${videoRoomId}:`, messagePayload);
+            
+            // Broadcast message to ALL OTHER participants (not sender)
+            socket.to(videoRoomId).emit('receive-video-message', messagePayload);
+            
+            // Send confirmation back to sender with full details
+            socket.emit('receive-video-message', {
+                ...messagePayload,
+                senderName: messagePayload.senderName
             });
 
             console.log(`✅ Message broadcast to room ${videoRoomId}`);
         } catch (error) {
             console.error('❌ Error handling video message:', error);
             socket.emit('error', { message: 'Failed to send message' });
+        }
+    });
+
+    // Handle request to establish peer connection in group calls
+    socket.on('request-peer-connection', (data) => {
+        try {
+            const { roomId, targetUserId, targetSocketId } = data;
+            
+            console.log(`🔗 Peer connection request received:`, data);
+            
+            // Get the target socket
+            const targetSocket = io.sockets.sockets.get(targetSocketId);
+            if (!targetSocket) {
+                console.warn(`⚠️ Target socket not found: ${targetSocketId}`);
+                return;
+            }
+            
+            // Notify both parties to create peer connections
+            // This triggers the WebRTC handshake process
+            socket.emit('create-peer-connection', {
+                targetUserId,
+                targetSocketId,
+                initiator: true // This socket will create the offer
+            });
+            
+            targetSocket.emit('create-peer-connection', {
+                targetUserId: socket.user.userId,
+                targetSocketId: socket.id,
+                initiator: false // Target will receive the offer
+            });
+            
+            console.log(`✅ Peer connection setup initiated between ${socket.id} and ${targetSocketId}`);
+        } catch (error) {
+            logger.error('Error handling request-peer-connection:', error);
+            socket.emit('error', { message: 'Failed to establish peer connection' });
         }
     });
 

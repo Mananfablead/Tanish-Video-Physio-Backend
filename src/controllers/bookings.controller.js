@@ -4,6 +4,7 @@ const User = require('../models/User.model');
 const Payment = require('../models/Payment.model');
 const Subscription = require('../models/Subscription.model');
 const Session = require('../models/Session.model');
+const Availability = require('../models/Availability.model'); // Added for group session support
 const ApiResponse = require('../utils/apiResponse');
 const BookingStatusHandler = require('../services/bookingStatusHandler');
 const NotificationService = require('../services/notificationService');
@@ -22,7 +23,28 @@ const getAllBookings = async (req, res, next) => {
             .populate('serviceId', 'name price duration validity images')
             .populate('therapistId', 'name email role profilePicture');
 
-        res.status(200).json(ApiResponse.success({ bookings }, 'Bookings retrieved successfully'));
+        // Add duration information for subscription-covered bookings
+        const bookingsWithDuration = bookings.map(booking => {
+            const bookingObj = booking.toObject();
+
+            // For subscription-covered bookings without serviceId, add plan duration
+            if (booking.bookingType === 'subscription-covered' && !booking.serviceId) {
+                // Try to get duration from timeSlot
+                if (booking.timeSlot?.start && booking.timeSlot?.end) {
+                    const [startHours, startMinutes] = booking.timeSlot.start.split(':').map(Number);
+                    const [endHours, endMinutes] = booking.timeSlot.end.split(':').map(Number);
+                    const duration = (endHours * 60 + endMinutes) - (startHours * 60 + startMinutes);
+                    bookingObj.planDuration = `${duration} min`;
+                } else {
+                    // Default duration for subscription bookings
+                    bookingObj.planDuration = '45 min';
+                }
+            }
+
+            return bookingObj;
+        });
+
+        res.status(200).json(ApiResponse.success({ bookings: bookingsWithDuration }, 'Bookings retrieved successfully'));
     } catch (error) {
         next(error);
     }
@@ -82,6 +104,20 @@ const getBookingById = async (req, res, next) => {
             bookingObject.serviceExpiryDate = expiryDate;
             bookingObject.serviceValidityDays = validityDays;
             bookingObject.isServiceExpired = new Date() > expiryDate;
+        }
+
+        // Add duration information for subscription-covered bookings
+        if (booking.bookingType === 'subscription-covered' && !booking.serviceId) {
+            // Try to get duration from timeSlot
+            if (booking.timeSlot?.start && booking.timeSlot?.end) {
+                const [startHours, startMinutes] = booking.timeSlot.start.split(':').map(Number);
+                const [endHours, endMinutes] = booking.timeSlot.end.split(':').map(Number);
+                const duration = (endHours * 60 + endMinutes) - (startHours * 60 + startMinutes);
+                bookingObject.planDuration = `${duration} min`;
+            } else {
+                // Default duration for subscription bookings
+                bookingObject.planDuration = '45 min';
+            }
         }
 
         res.status(200).json(ApiResponse.success({
@@ -174,6 +210,50 @@ const createBooking = async (req, res, next) => {
         }
 
         const { serviceId, date, time, notes, clientName, scheduleType, scheduledDate, scheduledTime, timeSlot, couponCode, discountAmount, finalAmount, bookingType, isScheduledLater } = req.body;
+
+        // Validate user's subscription plan type matches the slot session type
+        if (scheduledDate && scheduledTime && timeSlot) {
+            const availability = await Availability.findOne({
+                therapistId: req.body.therapistId || (await User.findOne({ role: 'admin', status: 'active' }))._id,
+                date: scheduledDate
+            });
+
+            if (availability) {
+                const slot = availability.timeSlots.find(s => 
+                    s.start === timeSlot.start && s.end === timeSlot.end
+                );
+
+                if (slot) {
+                    // Get user's subscription info to validate plan type
+                    const user = await User.findById(req.user.userId);
+                    
+                    if (user && user.subscriptionInfo && user.subscriptionInfo.planId) {
+                        const SubscriptionPlan = require('../models/SubscriptionPlan.model');
+                        const userPlan = await SubscriptionPlan.findOne({ 
+                            $or: [
+                                { _id: user.subscriptionInfo.planId },
+                                { planId: user.subscriptionInfo.planId }
+                            ]
+                        });
+
+                        if (userPlan) {
+                            // Validate session type matches plan type
+                            const planSessionType = userPlan.session_type || 'individual';
+                            const slotSessionType = slot.sessionType || 'one-to-one';
+                            
+                            // Map 'one-to-one' to 'individual' for comparison
+                            const normalizedSlotType = slotSessionType === 'one-to-one' ? 'individual' : slotSessionType;
+                            
+                            if (planSessionType !== normalizedSlotType) {
+                                return res.status(403).json(ApiResponse.error(
+                                    `Your ${userPlan.name} plan only allows ${userPlan.session_type} sessions. This slot is for ${slot.sessionType} sessions.`
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         // Check for duplicate booking to prevent multiple submissions
         // Only check for bookings that are confirmed or completed (not pending payment)
@@ -388,7 +468,7 @@ const createBooking = async (req, res, next) => {
         // Always validate the scheduled date and time if provided, regardless of schedule type
         if (scheduledDate && scheduledTime) {
             // Check if the requested time slot is available
-            const slotAvailability = await checkTimeSlotAvailability(therapist._id, scheduledDate, scheduledTime, timeSlot, bookingType);
+            const slotAvailability = await checkTimeSlotAvailability(therapist._id, scheduledDate, scheduledTime, timeSlot, bookingType, req.user.userId);
 
             if (!slotAvailability.available) {
                 return res.status(409).json(ApiResponse.error(slotAvailability.message));
@@ -571,7 +651,7 @@ Looking forward to helping you!
 };
 
 // Helper function to check time slot availability
-async function checkTimeSlotAvailability(therapistId, date, time, timeSlot, bookingType) {
+async function checkTimeSlotAvailability(therapistId, date, time, timeSlot, bookingType, userId) {
     const mongoose = require('mongoose');
 
     console.log('[checkTimeSlotAvailability] Checking availability:', { therapistId, date, time, timeSlot, bookingType });
@@ -592,7 +672,6 @@ async function checkTimeSlotAvailability(therapistId, date, time, timeSlot, book
     }
 
     // Check if there's availability for the therapist on the given date
-    const Availability = require('../models/Availability.model');
     const availability = await Availability.findOne({
         therapistId,
         date
@@ -603,6 +682,7 @@ async function checkTimeSlotAvailability(therapistId, date, time, timeSlot, book
         timeSlotsCount: availability.timeSlots.length,
         timeSlots: availability.timeSlots
     } : 'No availability found');
+    let requestedSlot = null;
 
     if (availability) {
         console.log('[checkTimeSlotAvailability] Found availability with', availability.timeSlots.length, 'slots');
@@ -618,10 +698,9 @@ async function checkTimeSlotAvailability(therapistId, date, time, timeSlot, book
             console.log('[checkTimeSlotAvailability] Available slots:', availability.timeSlots.map(s => `${s.start}-${s.end} (${s.status}, ${s.bookingType})`));
 
             // For booking type validation, we need to check if the slot duration matches the booking type
-            const requestedSlot = availability.timeSlots.find(slot =>
+            requestedSlot = availability.timeSlots.find(slot =>
                 slot.start === timeSlot.start &&
-                slot.end === timeSlot.end &&
-                slot.status !== 'booked'
+                slot.end === timeSlot.end
             );
 
             if (!requestedSlot) {
@@ -650,6 +729,48 @@ async function checkTimeSlotAvailability(therapistId, date, time, timeSlot, book
                 return { available: false, message: 'Requested time slot is not available' };
             }
 
+            // If slot is marked booked, it is not available
+            if (requestedSlot.status === 'booked') {
+                return { available: false, message: 'Requested time slot is not available' };
+            }
+
+            // Group slot availability is based on bookedParticipants
+            if (requestedSlot.sessionType === 'group') {
+                if (typeof requestedSlot.bookedParticipants !== 'number') {
+                    requestedSlot.bookedParticipants = 0;
+                }
+                if (requestedSlot.bookedParticipants >= (requestedSlot.maxParticipants || 1)) {
+                    return { available: false, message: 'Requested time slot is full' };
+                }
+            }
+
+            // Validate user's subscription plan type matches the slot session type (if userId provided)
+            if (userId) {
+                const user = await User.findById(userId);
+                if (user && user.subscriptionInfo && user.subscriptionInfo.planId) {
+                    const SubscriptionPlan = require('../models/SubscriptionPlan.model');
+                    const userPlan = await SubscriptionPlan.findOne({ 
+                        $or: [
+                            { _id: user.subscriptionInfo.planId },
+                            { planId: user.subscriptionInfo.planId }
+                        ]
+                    });
+
+                    if (userPlan) {
+                        const planSessionType = userPlan.session_type || 'individual';
+                        const slotSessionType = requestedSlot.sessionType || 'one-to-one';
+                        const normalizedSlotType = slotSessionType === 'one-to-one' ? 'individual' : slotSessionType;
+                        
+                        if (planSessionType !== normalizedSlotType) {
+                            return { 
+                                available: false, 
+                                message: `Your ${userPlan.name} plan only allows ${userPlan.session_type} sessions. This slot is for ${requestedSlot.sessionType} sessions.` 
+                            };
+                        }
+                    }
+                }
+            }
+
             // Validate that the slot duration matches the expected duration for the booking type
             if (bookingType === 'free-consultation' && requestedSlot.duration !== 15) {
                 return { available: false, message: 'Free consultation requires 15-minute time slots' };
@@ -658,7 +779,7 @@ async function checkTimeSlotAvailability(therapistId, date, time, timeSlot, book
             }
         } else {
             // If no specific timeSlot provided, just check if the time exists and is available
-            const requestedSlot = availability.timeSlots.find(slot =>
+            requestedSlot = availability.timeSlots.find(slot =>
                 slot.start === time && slot.status !== 'booked'
             );
 
@@ -683,19 +804,21 @@ async function checkTimeSlotAvailability(therapistId, date, time, timeSlot, book
         return { available: false, message: `No availability found for the selected date (${date}). Please choose a different date.` };
     }
 
-    // Check if there's already a PAID booking for this therapist at the same time
-    const existingPaidBooking = await Booking.findOne({
-        therapistId,
-        scheduledDate: date,
-        paymentStatus: 'paid', // Only consider paid bookings as blocking
-        $or: [
-            { 'timeSlot.start': timeSlot ? timeSlot.start : time },
-            { scheduledTime: time }
-        ]
-    });
+    // For one-to-one slots, prevent double booking even if a paid booking exists
+    if (!requestedSlot || requestedSlot.sessionType !== 'group') {
+        const existingPaidBooking = await Booking.findOne({
+            therapistId,
+            scheduledDate: date,
+            paymentStatus: 'paid', // Only consider paid bookings as blocking
+            $or: [
+                { 'timeSlot.start': timeSlot ? timeSlot.start : time },
+                { scheduledTime: time }
+            ]
+        });
 
-    if (existingPaidBooking) {
-        return { available: false, message: 'A booking already exists for this time slot' };
+        if (existingPaidBooking) {
+            return { available: false, message: 'A booking already exists for this time slot' };
+        }
     }
 
     return { available: true, message: 'Time slot is available' };
@@ -703,8 +826,6 @@ async function checkTimeSlotAvailability(therapistId, date, time, timeSlot, book
 
 // Helper function to update availability slot status
 async function updateAvailabilitySlot(therapistId, date, startTime, endTime, status) {
-    const Availability = require('../models/Availability.model');
-
     try {
         // First, find the availability document
         const availability = await Availability.findOne({
@@ -723,10 +844,37 @@ async function updateAvailabilitySlot(therapistId, date, startTime, endTime, sta
         );
 
         if (slotIndex !== -1) {
-            // Preserve the duration and bookingType while updating the status
-            availability.timeSlots[slotIndex].status = status;
+            const slot = availability.timeSlots[slotIndex];
+
+            // Handle group slots: increment bookedParticipants and only mark booked when full.
+            if (slot.sessionType === 'group') {
+                if (status === 'booked') {
+                    slot.bookedParticipants = (slot.bookedParticipants || 0) + 1;
+
+                    // Ensure bookedParticipants does not exceed maxParticipants
+                    if (slot.maxParticipants && slot.bookedParticipants >= slot.maxParticipants) {
+                        slot.status = 'booked';
+                    } else {
+                        // keep it available until full
+                        slot.status = 'available';
+                    }
+                } else if (status === 'available') {
+                    // If we are freeing a slot, decrement bookedParticipants
+                    slot.bookedParticipants = Math.max((slot.bookedParticipants || 1) - 1, 0);
+                    if (slot.bookedParticipants < (slot.maxParticipants || 1)) {
+                        slot.status = 'available';
+                    }
+                } else {
+                    // Other statuses should still be applied
+                    slot.status = status;
+                }
+            } else {
+                // Standard 1-on-1 flow
+                slot.status = status;
+            }
+
             await availability.save();
-            console.log(`Successfully updated slot ${startTime}-${endTime} to ${status} for therapist ${therapistId} on ${date}`);
+            console.log(`Successfully updated slot ${startTime}-${endTime} to ${slot.status} for therapist ${therapistId} on ${date}`);
         } else {
             console.log(`Time slot ${startTime}-${endTime} not found for therapist ${therapistId} on ${date}`);
         }
@@ -1010,6 +1158,28 @@ const updateBooking = async (req, res, next) => {
                     // For free consultations, create a session immediately
                     const Session = require('../models/Session.model');
 
+                    // Get the slot's session type
+                    let slotSessionType = 'one-to-one';
+                    let slotMaxParticipants = 1;
+                    
+                    if (currentBooking.timeSlot && currentBooking.date) {
+                        const availability = await Availability.findOne({
+                            therapistId: currentBooking.therapistId,
+                            date: currentBooking.date
+                        });
+
+                        if (availability) {
+                            const slot = availability.timeSlots.find(s => 
+                                s.start === currentBooking.timeSlot.start && s.end === currentBooking.timeSlot.end
+                            );
+
+                            if (slot) {
+                                slotSessionType = slot.sessionType || 'one-to-one';
+                                slotMaxParticipants = slot.maxParticipants || 1;
+                            }
+                        }
+                    }
+
                     // Calculate session time based on the booking time slot
                     const sessionStartTime = currentBooking.timeSlot ?
                         new Date(`${currentBooking.date}T${currentBooking.timeSlot.start}:00`) :
@@ -1024,7 +1194,9 @@ const updateBooking = async (req, res, next) => {
                         time: currentBooking.timeSlot ? currentBooking.timeSlot.start : (currentBooking.scheduledTime || currentBooking.time),
                         startTime: sessionStartTime,
                         endTime: sessionEndTime,
-                        type: "1-on-1",
+                        type: slotSessionType === 'group' ? 'group' : '1-on-1',
+                        sessionType: slotSessionType,
+                        maxParticipants: slotMaxParticipants,
                         status: "pending", // Schedule the session immediately
                         duration: 15,
                     };
@@ -1041,7 +1213,6 @@ const updateBooking = async (req, res, next) => {
                     updateData.serviceExpiryDate = expiryDate;
 
                     // Update availability to mark slot as booked
-                    const Availability = require('../models/Availability.model');
                     if (currentBooking.timeSlot && currentBooking.timeSlot.start && currentBooking.timeSlot.end) {
                         await Availability.updateOne(
                             { therapistId: currentBooking.therapistId, date: currentBooking.date },
@@ -1120,8 +1291,6 @@ const updateBooking = async (req, res, next) => {
         // If payment status changed to 'paid', update the availability slot from 'tentative' to 'booked'
         if (updateData.paymentStatus === 'paid' && currentBooking.paymentStatus !== 'paid') {
             if (booking.scheduledDate && booking.timeSlot && booking.timeSlot.start && booking.timeSlot.end) {
-                const Availability = require('../models/Availability.model');
-
                 // Find the availability record for this therapist and date
                 const availability = await Availability.findOne({
                     therapistId: booking.therapistId,
@@ -1174,6 +1343,78 @@ const updateBooking = async (req, res, next) => {
                         trigger.data
                     );
                 }
+            }
+        }
+
+        // If this booking uses a group slot, ensure a shared group session exists and the user is added
+        if (booking.status === 'confirmed') {
+            try {
+                const Session = require('../models/Session.model');
+
+                const bookingDate = booking.scheduledDate || booking.date;
+                const bookingTime = booking.timeSlot?.start || (booking.scheduledTime || booking.time);
+
+                const availability = await Availability.findOne({
+                    therapistId: booking.therapistId,
+                    date: bookingDate
+                });
+
+                const slot = availability?.timeSlots?.find(s =>
+                    s.start === (booking.timeSlot?.start || bookingTime) &&
+                    s.end === (booking.timeSlot?.end || (booking.timeSlot?.end || ''))
+                );
+
+                if (slot && slot.sessionType === 'group') {
+                    const sessionTime = booking.timeSlot?.start || bookingTime;
+                    const startTime = new Date(`${bookingDate}T${sessionTime}:00`);
+                    const duration = slot.duration || 45;
+                    const endTime = new Date(startTime.getTime() + duration * 60000);
+
+                    // Find existing group session for this slot
+                    let session = await Session.findOne({
+                        therapistId: booking.therapistId,
+                        date: bookingDate,
+                        time: sessionTime,
+                        sessionType: 'group'
+                    });
+
+                    if (!session) {
+                        session = await Session.create({
+                            bookingId: booking._id,
+                            therapistId: booking.therapistId,
+                            date: bookingDate,
+                            time: sessionTime,
+                            startTime,
+                            endTime,
+                            type: 'group',
+                            sessionType: 'group',
+                            maxParticipants: slot.maxParticipants || 1,
+                            duration,
+                            status: 'pending',
+                            participants: [
+                                {
+                                    userId: booking.userId,
+                                    bookingId: booking._id,
+                                    status: 'pending'
+                                }
+                            ]
+                        });
+                    } else {
+                        const already = session.participants.some(
+                            p => p.userId.toString() === booking.userId.toString()
+                        );
+                        if (!already) {
+                            session.participants.push({
+                                userId: booking.userId,
+                                bookingId: booking._id,
+                                status: 'pending'
+                            });
+                            await session.save();
+                        }
+                    }
+                }
+            } catch (sessionErr) {
+                console.error('Error ensuring group session exists for booking', booking._id, sessionErr);
             }
         }
 
@@ -1341,7 +1582,56 @@ const updateBookingStatus = async (req, res, next) => {
                 // Use only the start time for session creation, not the time range
                 const sessionTime = booking.timeSlot?.start || booking.scheduledTime || booking.time;
 
+                // Get the slot's session type
+                let slotSessionType = 'one-to-one';
+                let slotMaxParticipants = 1;
+                
+                if (booking.timeSlot && booking.scheduledDate) {
+                    const availability = await Availability.findOne({
+                        therapistId: booking.therapistId,
+                        date: booking.scheduledDate
+                    });
+
+                    if (availability) {
+                        const slot = availability.timeSlots.find(s => 
+                            s.start === booking.timeSlot.start && s.end === booking.timeSlot.end
+                        );
+
+                        if (slot) {
+                            slotSessionType = slot.sessionType || 'one-to-one';
+                            slotMaxParticipants = slot.maxParticipants || 1;
+                        }
+                    }
+                }
+
                 const startTime = new Date(`${sessionDate}T${sessionTime}`);
+
+                // For group sessions, find the GroupSession to link to
+                let groupSessionId = null;
+                if (slotSessionType === 'group' && booking.timeSlot && booking.scheduledDate) {
+                    try {
+                        const GroupSession = require('../models/GroupSession.model');
+                        const sessionEndTime = booking.timeSlot?.end || booking.scheduledTime || booking.time || '10:00';
+                        const groupSessionStartTime = new Date(`${booking.scheduledDate}T${booking.timeSlot.start}:00`);
+                        const groupSessionEndTime = new Date(`${booking.scheduledDate}T${booking.timeSlot.end}:00`);
+                        
+                        // Find existing GroupSession for this time slot
+                        const existingGroupSession = await GroupSession.findOne({
+                            therapistId: booking.therapistId,
+                            startTime: groupSessionStartTime,
+                            endTime: groupSessionEndTime,
+                            status: 'scheduled'
+                        });
+                        
+                        if (existingGroupSession) {
+                            groupSessionId = existingGroupSession._id;
+                            console.log(`✅ Found existing GroupSession ${groupSessionId} for group booking ${booking._id}`);
+                        }
+                    } catch (groupError) {
+                        console.error('❌ Error finding GroupSession:', groupError);
+                        // Continue without failing the session creation
+                    }
+                }
 
                 const session = new Session({
                     bookingId: booking._id,
@@ -1350,10 +1640,13 @@ const updateBookingStatus = async (req, res, next) => {
                     date: sessionDate,
                     time: sessionTime,
                     startTime,
-                    type: '1-on-1',
+                    type: slotSessionType === 'group' ? 'group' : '1-on-1',
+                    sessionType: slotSessionType,
+                    maxParticipants: slotMaxParticipants,
                     status: 'pending',
                     duration: 45,
-                    notes: `Auto-created from confirmed subscription booking #${booking._id}`
+                    notes: `Auto-created from confirmed subscription booking #${booking._id}`,
+                    ...(groupSessionId && { groupSessionId }) // Link to GroupSession if exists
                 });
 
                 const endTime = new Date(startTime);
@@ -1361,7 +1654,7 @@ const updateBookingStatus = async (req, res, next) => {
                 session.endTime = endTime;
 
                 await session.save();
-                console.log(`✅ Session created for subscription booking ${booking._id}`);
+                console.log(`✅ Session created for subscription booking ${booking._id} with sessionType: ${slotSessionType}`);
             }
         }
 
@@ -1383,6 +1676,28 @@ const updateBookingStatus = async (req, res, next) => {
                 // Use only the start time for session creation, not the time range
                 const sessionTime = booking.timeSlot?.start || booking.scheduledTime || booking.time;
 
+                // Get the slot's session type
+                let slotSessionType = 'one-to-one';
+                let slotMaxParticipants = 1;
+                
+                if (booking.timeSlot && booking.scheduledDate) {
+                    const availability = await Availability.findOne({
+                        therapistId: booking.therapistId,
+                        date: booking.scheduledDate
+                    });
+
+                    if (availability) {
+                        const slot = availability.timeSlots.find(s => 
+                            s.start === booking.timeSlot.start && s.end === booking.timeSlot.end
+                        );
+
+                        if (slot) {
+                            slotSessionType = slot.sessionType || 'one-to-one';
+                            slotMaxParticipants = slot.maxParticipants || 1;
+                        }
+                    }
+                }
+
                 const startTime = new Date(`${sessionDate}T${sessionTime}`);
 
                 const session = new Session({
@@ -1392,7 +1707,9 @@ const updateBookingStatus = async (req, res, next) => {
                     date: sessionDate,
                     time: sessionTime,
                     startTime,
-                    type: '1-on-1',
+                    type: slotSessionType === 'group' ? 'group' : '1-on-1',
+                    sessionType: slotSessionType,
+                    maxParticipants: slotMaxParticipants,
                     status: 'pending',
                     duration: 45,
                     notes: `Auto-created from confirmed booking #${booking._id}`
@@ -1403,7 +1720,7 @@ const updateBookingStatus = async (req, res, next) => {
                 session.endTime = endTime;
 
                 await session.save();
-                console.log(`✅ Session created for regular booking ${booking._id}`);
+                console.log(`✅ Session created for booking ${booking._id} with sessionType: ${slotSessionType}`);
             }
         }
 
@@ -1437,8 +1754,6 @@ const updateBookingStatus = async (req, res, next) => {
             booking.timeSlot?.start &&
             booking.timeSlot?.end
         ) {
-
-            const Availability = require('../models/Availability.model');
 
             const availability = await Availability.findOne({
                 therapistId: booking.therapistId,
@@ -1610,20 +1925,21 @@ const getAllBookingsForAdmin = async (req, res, next) => {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
 
-        // Build query
-        let query = {};
+        // Build query - Show ONLY PAID bookings by default
+        let query = {
+            paymentStatus: 'paid' // Only show bookings with paid status
+        };
 
-        // Show all bookings to admin by default, but allow filtering by payment status
-        // Only apply default paymentStatus filter if no specific paymentStatus is requested
-        if (!paymentStatus) {
-            // Optionally filter to paid bookings only, but this can be overridden
-            // For now, removing the hardcoded filter to show all bookings to admin
-        } else {
-            query.paymentStatus = paymentStatus; // Filter by specific paymentStatus if provided
-        }
-
+        // Allow additional filtering
         if (status) query.status = status;
-        if (req.query.paymentStatus) query.paymentStatus = req.query.paymentStatus; // Override with specific paymentStatus if provided
+        
+        // Override paymentStatus if explicitly provided (to view cancelled/pending if needed)
+        if (req.query.paymentStatus && req.query.paymentStatus !== 'all') {
+            query.paymentStatus = req.query.paymentStatus;
+        } else if (req.query.paymentStatus === 'all') {
+            // If 'all' is specified, remove the paymentStatus filter
+            delete query.paymentStatus;
+        }
 
         if (dateFrom || dateTo) {
             query.date = {};
@@ -1648,7 +1964,7 @@ const getAllBookingsForAdmin = async (req, res, next) => {
             .skip(skip)
             .limit(limit);
 
-        const total = await Booking.countDocuments(query); // Count all bookings matching the query
+        const total = await Booking.countDocuments(query); // Count only paid bookings
 
         // Add status evaluation to each booking
         const bookingsWithStatus = bookings.map(booking => ({
@@ -1663,7 +1979,7 @@ const getAllBookingsForAdmin = async (req, res, next) => {
                 pages: Math.ceil(total / limit),
                 total
             }
-        }, 'All bookings retrieved successfully'));
+        }, 'Paid bookings retrieved successfully'));
     } catch (error) {
         next(error);
     }
@@ -1866,7 +2182,7 @@ const createGuestBooking = async (req, res, next) => {
         // Always validate the scheduled date and time if provided, regardless of schedule type
         if (scheduledDate && scheduledTime) {
             // Check if the requested time slot is available
-            const slotAvailability = await checkTimeSlotAvailability(therapist._id, scheduledDate, scheduledTime, timeSlot, bookingType);
+            const slotAvailability = await checkTimeSlotAvailability(therapist._id, scheduledDate, scheduledTime, timeSlot, bookingType, user._id);
 
             console.log('[createGuestBooking] Slot availability result:', slotAvailability);
 
@@ -2312,6 +2628,37 @@ const createBookingWithSubscription = async (req, res, next) => {
             return res.status(404).json(ApiResponse.error('No active therapists available'));
         }
 
+        // Validate user's subscription plan type matches the slot session type
+        let slotSessionType = 'one-to-one';
+        let slotMaxParticipants = 1;
+        if (scheduledDate && scheduledTime && timeSlot) {
+            const availability = await Availability.findOne({
+                therapistId: therapist._id,
+                date: scheduledDate
+            });
+
+            if (availability) {
+                const slot = availability.timeSlots.find(s => 
+                    s.start === timeSlot.start && s.end === timeSlot.end
+                );
+
+                if (slot) {
+                    slotSessionType = slot.sessionType || 'one-to-one';
+                    slotMaxParticipants = slot.maxParticipants || 1;
+                    
+                    // Validate plan type matches slot type
+                    const planSessionType = plan.session_type || 'individual';
+                    const normalizedSlotType = slotSessionType === 'one-to-one' ? 'individual' : slotSessionType;
+                    
+                    if (planSessionType !== normalizedSlotType) {
+                        return res.status(403).json(ApiResponse.error(
+                            `Your ${plan.name} plan only allows ${plan.session_type} sessions. This slot is for ${slotSessionType} sessions.`
+                        ));
+                    }
+                }
+            }
+        }
+
         // Create booking with paid status (since it's covered by subscription)
         const booking = new Booking({
             ...(serviceId && { serviceId }),
@@ -2348,15 +2695,86 @@ const createBookingWithSubscription = async (req, res, next) => {
         // Populate the response
         await booking.populate('serviceId', 'name price duration validity images');
         await booking.populate('therapistId', 'name email role profilePicture');
-  const session = new Session({
+        
+        let groupSessionId = null;
+        
+        // For group sessions, find or create a GroupSession for this time slot
+        if (slotSessionType === 'group' && scheduledDate && timeSlot) {
+            try {
+                const GroupSession = require('../models/GroupSession.model');
+                
+                // Calculate start and end times
+                const sessionStartTime = new Date(`${scheduledDate}T${timeSlot.start}:00`);
+                const sessionEndTime = new Date(`${scheduledDate}T${timeSlot.end}:00`);
+                
+                // Find existing GroupSession for this time slot
+                let existingGroupSession = await GroupSession.findOne({
+                    therapistId: therapist._id,
+                    startTime: sessionStartTime,
+                    endTime: sessionEndTime,
+                    status: 'scheduled'
+                });
+                
+                if (!existingGroupSession) {
+                    // Create new GroupSession for this time slot
+                    existingGroupSession = new GroupSession({
+                        title: `Group Session - ${therapist.name || 'Therapist'} - ${timeSlot.start}`,
+                        description: 'Group physiotherapy session',
+                        therapistId: therapist._id,
+                        startTime: sessionStartTime,
+                        endTime: sessionEndTime,
+                        maxParticipants: slotMaxParticipants,
+                        participants: [],
+                        status: 'scheduled',
+                        isActiveCall: false
+                    });
+                    
+                    await existingGroupSession.save();
+                    console.log(`✅ Created new GroupSession for time slot ${timeSlot.start}-${timeSlot.end}`);
+                }
+                
+                // Add user to GroupSession participants if not already added
+                const userAlreadyInGroup = existingGroupSession.participants.some(
+                    p => p.userId.toString() === req.user.userId.toString()
+                );
+                
+                if (!userAlreadyInGroup) {
+                    existingGroupSession.participants.push({
+                        userId: req.user.userId,
+                        joinedAt: new Date(),
+                        status: 'accepted', // Auto-accept for now, admin can review later
+                        bookingId: booking._id
+                    });
+                    
+                    await existingGroupSession.save();
+                    console.log(`✅ Added user ${req.user.userId} to GroupSession ${existingGroupSession._id}`);
+                }
+                
+                groupSessionId = existingGroupSession._id;
+                
+                // Update booking with groupSessionId
+                booking.groupSessionId = groupSessionId;
+                await booking.save();
+                
+            } catch (groupError) {
+                console.error('❌ Error creating/finding GroupSession:', groupError);
+                // Don't fail the booking if GroupSession creation fails
+            }
+        }
+        
+        // Create session with correct session type based on the slot
+        const session = new Session({
             subscriptionId: subscription._id,
             bookingId: booking._id,
+            ...(groupSessionId && { groupSessionId }), // Link to GroupSession if exists
             therapistId: therapist._id,
             userId: req.user.userId,
             date: date,
             time: time,
             startTime: new Date(`${date}T${time}:00`),
-            type: '1-on-1',
+            type: slotSessionType === 'group' ? 'group' : '1-on-1',
+            sessionType: slotSessionType,
+            maxParticipants: slotMaxParticipants,
             status: 'pending', // Session status matches booking status
             notes: `Session created from subscription booking #${booking._id}`,
             sessionId: `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
@@ -2376,7 +2794,40 @@ const createBookingWithSubscription = async (req, res, next) => {
         
         await session.save();
         
- 
+        // Update availability slot to increment bookedParticipants for group sessions
+        if (scheduledDate && scheduledTime && timeSlot && slotSessionType === 'group') {
+            try {
+                const availability = await Availability.findOne({
+                    therapistId: therapist._id,
+                    date: scheduledDate
+                });
+
+                if (availability) {
+                    const slotIndex = availability.timeSlots.findIndex(s => 
+                        s.start === timeSlot.start && s.end === timeSlot.end
+                    );
+
+                    if (slotIndex !== -1) {
+                        const slot = availability.timeSlots[slotIndex];
+                        slot.bookedParticipants = (slot.bookedParticipants || 0) + 1;
+                        
+                        // Mark as booked only if full
+                        if (slot.bookedParticipants >= slot.maxParticipants) {
+                            slot.status = 'booked';
+                        } else {
+                            slot.status = 'available'; // Keep available until full
+                        }
+                        
+                        await availability.save();
+                        console.log(`✅ Updated group slot: ${slot.bookedParticipants}/${slot.maxParticipants} participants booked`);
+                    }
+                }
+            } catch (availError) {
+                console.error('❌ Error updating availability slot for group session:', availError);
+                // Continue without failing the booking
+            }
+        }
+
         // Send new session request notification to admin
         try {
             const User = require('../models/User.model');

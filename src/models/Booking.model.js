@@ -118,6 +118,10 @@ const bookingSchema = new mongoose.Schema({
     originalAmount: {
         type: Number,
         min: 0
+    },
+    groupSessionId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'GroupSession'
     }
 }, {
     timestamps: true
