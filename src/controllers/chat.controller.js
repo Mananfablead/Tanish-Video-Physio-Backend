@@ -1,8 +1,9 @@
 const ChatMessage = require('../models/ChatMessage.model');
 const Session = require('../models/Session.model');
+const GroupSession = require('../models/GroupSession.model');
 const ApiResponse = require('../utils/apiResponse');
 
-// Get chat messages for a session
+// Get chat messages for a session (supports both regular sessions and group sessions)
 const getChatMessages = async (req, res, next) => {
     try {
         const { sessionId } = req.params;
@@ -13,38 +14,57 @@ const getChatMessages = async (req, res, next) => {
         console.log('- User ID from token:', req.user.userId);
         console.log('- User role:', req.user.role);
 
-        // First, try to find the session regardless of user
-        const sessionExists = await Session.findById(sessionId);
-        console.log('- Session exists in DB:', !!sessionExists);
-        if (sessionExists) {
-            console.log('- Session userId:', sessionExists.userId);
-            console.log('- Session therapistId:', sessionExists.therapistId);
-            console.log('- Session status:', sessionExists.status);
-        }
+        let session = null;
+        let isGroupSession = false;
 
-        // Verify the session belongs to the user or therapist
-        let session = await Session.findOne({
-            _id: sessionId,
-            $or: [
-                { userId: req.user.userId },
-                { therapistId: req.user.userId }
-            ]
-        });
-
-        if (!session) {
-            // If not found, check if user is admin
-            if (req.user.role === 'admin') {
-                session = await Session.findById(sessionId);
+        // First, try to find as a regular session
+        session = await Session.findById(sessionId);
+        if (session) {
+            console.log('- Found regular session in DB');
+            console.log('- Session userId:', session.userId);
+            console.log('- Session therapistId:', session.therapistId);
+            console.log('- Session status:', session.status);
+        } else {
+            // Try to find as a group session
+            session = await GroupSession.findById(sessionId);
+            if (session) {
+                console.log('- Found group session in DB');
+                isGroupSession = true;
+                console.log('- Group session participants:', session.participants?.length || 0);
             }
         }
 
         if (!session) {
-            return res.status(404).json(ApiResponse.error('Session not found or unauthorized access'));
+            return res.status(404).json(ApiResponse.error('Session not found'));
+        }
+
+        // Verify user has access to this session
+        let hasAccess = false;
+        
+        if (isGroupSession) {
+            // For group sessions, check if user is a participant or admin
+            const isParticipant = session.participants && 
+                session.participants.some(p => p.userId.toString() === req.user.userId);
+            hasAccess = isParticipant || req.user.role === 'admin';
+            console.log('- User is group session participant:', isParticipant);
+        } else {
+            // For regular sessions, check if user is owner or therapist
+            hasAccess = 
+                session.userId.toString() === req.user.userId ||
+                session.therapistId.toString() === req.user.userId ||
+                req.user.role === 'admin';
+            console.log('- User has access to regular session:', hasAccess);
+        }
+
+        if (!hasAccess) {
+            return res.status(403).json(ApiResponse.error('Unauthorized access to session'));
         }
 
         const messages = await ChatMessage.find({ sessionId })
-            .populate('senderId', 'name')
+            .populate('senderId', 'name email role')
             .sort({ timestamp: 1 });
+
+        console.log(`- Retrieved ${messages.length} messages for ${isGroupSession ? 'group' : 'regular'} session`);
 
         res.status(200).json(ApiResponse.success({ messages }, 'Chat messages retrieved successfully'));
     } catch (error) {

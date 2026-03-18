@@ -315,10 +315,32 @@ const getCallDetails = async (req, res) => {
         const userId = req.user.userId;
         const userRole = req.user.role;
 
-        // Verify session exists and user has access
-        const session = await Session.findById(sessionId)
+        console.log('📞 Get call details request:', {
+            sessionId,
+            userId,
+            userRole
+        });
+
+        let session = null;
+        let isGroupSession = false;
+
+        // First, try to find as a regular session
+        session = await Session.findById(sessionId)
             .populate('userId', 'name email')
             .populate('therapistId', 'name email');
+
+        if (session) {
+            console.log('✅ Found regular session');
+        } else {
+            // Try to find as a group session
+            session = await GroupSession.findById(sessionId)
+                .populate('participants.userId', 'name email role');
+            
+            if (session) {
+                console.log('✅ Found group session');
+                isGroupSession = true;
+            }
+        }
 
         if (!session) {
             return res.status(404).json({
@@ -328,11 +350,39 @@ const getCallDetails = async (req, res) => {
         }
 
         // Check if user has access to this session
-        const isTherapist = session.therapistId && session.therapistId._id.toString() === userId;
-        const isAdmin = userRole === 'admin';
-        const isUser = session.userId && session.userId._id.toString() === userId;
+        let hasAccess = false;
+        let isTherapist = false;
+        let isAdmin = false;
+        let isUser = false;
 
-        if (!isTherapist && !isAdmin && !isUser) {
+        if (isGroupSession) {
+            // For group sessions, check if user is admin or participant
+            isAdmin = userRole === 'admin';
+            const isParticipant = session.participants && 
+                session.participants.some(p => p.userId && p.userId._id.toString() === userId);
+            hasAccess = isAdmin || isParticipant;
+            
+            console.log('Group session access check:', {
+                isAdmin,
+                isParticipant,
+                hasAccess
+            });
+        } else {
+            // For regular sessions
+            isTherapist = session.therapistId && session.therapistId._id.toString() === userId;
+            isAdmin = userRole === 'admin';
+            isUser = session.userId && session.userId._id.toString() === userId;
+            hasAccess = isTherapist || isAdmin || isUser;
+            
+            console.log('Regular session access check:', {
+                isTherapist,
+                isAdmin,
+                isUser,
+                hasAccess
+            });
+        }
+
+        if (!hasAccess) {
             return res.status(403).json({
                 success: false,
                 message: 'Unauthorized to access call details'
@@ -349,18 +399,31 @@ const getCallDetails = async (req, res) => {
             success: true,
             session: {
                 id: session._id,
-                date: session.date,
-                time: session.time,
-                status: session.status,
-                user: session.userId,
-                therapist: session.therapistId,
-                type: session.type,
-                sessionType: session.sessionType,
-                groupSessionId: session.groupSessionId,
-                googleMeetLink: session.googleMeetLink,
-                googleMeetCode: session.googleMeetCode,
-                googleMeetExpiresAt: session.googleMeetExpiresAt,
-                googleMeetEventId: session.googleMeetEventId
+                ...(isGroupSession ? {
+                    // Group session specific fields
+                    name: session.name,
+                    description: session.description,
+                    participants: session.participants,
+                    startTime: session.startTime,
+                    endTime: session.endTime,
+                    isActive: session.isActive,
+                    type: 'Group',
+                    sessionType: 'group'
+                } : {
+                    // Regular session fields
+                    date: session.date,
+                    time: session.time,
+                    status: session.status,
+                    user: session.userId,
+                    therapist: session.therapistId,
+                    type: session.type,
+                    sessionType: session.sessionType,
+                    groupSessionId: session.groupSessionId,
+                    googleMeetLink: session.googleMeetLink,
+                    googleMeetCode: session.googleMeetCode,
+                    googleMeetExpiresAt: session.googleMeetExpiresAt,
+                    googleMeetEventId: session.googleMeetEventId
+                })
             },
             callLogs
         });

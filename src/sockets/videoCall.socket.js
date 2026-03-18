@@ -144,7 +144,8 @@ const setupVideoCallHandlers = (io, socket) => {
             });
         } catch (error) {
             logger.error('Error joining video session:', error);
-            socket.emit('error', { message: 'Failed to join video session' });
+            // Don't emit error to client for non-critical issues like invalid ObjectId format
+            console.log(`Join video session error (non-blocking):`, error.message);
         }
     });
     
@@ -1460,7 +1461,7 @@ const setupVideoCallHandlers = (io, socket) => {
     socket.on('send-video-message', async (data) => {
         try {
             console.log(`📨 Video call message received:`, data);
-            const { sessionId, message, senderId } = data;
+            const { sessionId, message, senderId, attachments = [] } = data;
 
             // Join the unified video call room for messaging
             const videoRoomId = `video-call-${sessionId}`;
@@ -1470,13 +1471,21 @@ const setupVideoCallHandlers = (io, socket) => {
             // Save message to database with video-call-chat type
             const senderType = socket.user.role === 'therapist' || socket.user.role === 'admin' ? 'therapist' : 'user';
 
-            const chatMessage = new ChatMessage({
+            const chatMessageData = {
                 sessionId: sessionId,
                 senderId: socket.user.userId,
                 senderType: senderType,
                 message: message,
-                messageType: 'video-call-chat' // Use specific type for video call messages
-            });
+                messageType: 'video-call-chat', // Use specific type for video call messages
+                attachments: attachments
+            };
+
+            // If there are attachments, update the message text
+            if (attachments && attachments.length > 0) {
+                chatMessageData.message = attachments.length > 1 ? '📎 Multiple attachments' : '📎 File attachment';
+            }
+
+            const chatMessage = new ChatMessage(chatMessageData);
 
             await chatMessage.save();
             await chatMessage.populate('senderId', 'name');
@@ -1488,28 +1497,70 @@ const setupVideoCallHandlers = (io, socket) => {
                 senderName: chatMessage.senderId.name,
                 message: chatMessage.message,
                 messageType: chatMessage.messageType,
-                timestamp: chatMessage.createdAt
+                timestamp: chatMessage.createdAt,
+                attachments: chatMessage.attachments?.length || 0
             });
 
-            // Broadcast message to all participants in the room except sender
-            socket.to(videoRoomId).emit('receive-video-message', {
-                message,
-                senderId: senderId || socket.user.userId,
+            // Create standardized message payload
+            const messagePayload = {
+                message: chatMessage.message,
+                senderId: socket.user.userId,
+                senderName: chatMessage.senderId.name || socket.user.name || `User ${socket.user.userId.substring(0, 5)}`,
                 timestamp: chatMessage.createdAt.toISOString(),
-                senderName: chatMessage.senderId.name || `User ${socket.user.userId.substring(0, 5)}`
-            });
+                attachments: chatMessage.attachments || [],
+                messageId: chatMessage.messageId || chatMessage._id.toString()
+            };
 
-            // Also send confirmation to sender
-            socket.emit('message-sent', {
-                success: true,
-                message: 'Message sent successfully',
-                messageId: chatMessage._id
+            console.log(`📨 Broadcasting message to room ${videoRoomId}:`, messagePayload);
+            
+            // Broadcast message to ALL OTHER participants (not sender)
+            socket.to(videoRoomId).emit('receive-video-message', messagePayload);
+            
+            // Send confirmation back to sender with full details
+            socket.emit('receive-video-message', {
+                ...messagePayload,
+                senderName: messagePayload.senderName
             });
 
             console.log(`✅ Message broadcast to room ${videoRoomId}`);
         } catch (error) {
             console.error('❌ Error handling video message:', error);
             socket.emit('error', { message: 'Failed to send message' });
+        }
+    });
+
+    // Handle request to establish peer connection in group calls
+    socket.on('request-peer-connection', (data) => {
+        try {
+            const { roomId, targetUserId, targetSocketId } = data;
+            
+            console.log(`🔗 Peer connection request received:`, data);
+            
+            // Get the target socket
+            const targetSocket = io.sockets.sockets.get(targetSocketId);
+            if (!targetSocket) {
+                console.warn(`⚠️ Target socket not found: ${targetSocketId}`);
+                return;
+            }
+            
+            // Notify both parties to create peer connections
+            // This triggers the WebRTC handshake process
+            socket.emit('create-peer-connection', {
+                targetUserId,
+                targetSocketId,
+                initiator: true // This socket will create the offer
+            });
+            
+            targetSocket.emit('create-peer-connection', {
+                targetUserId: socket.user.userId,
+                targetSocketId: socket.id,
+                initiator: false // Target will receive the offer
+            });
+            
+            console.log(`✅ Peer connection setup initiated between ${socket.id} and ${targetSocketId}`);
+        } catch (error) {
+            logger.error('Error handling request-peer-connection:', error);
+            socket.emit('error', { message: 'Failed to establish peer connection' });
         }
     });
 

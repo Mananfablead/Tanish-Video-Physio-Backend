@@ -128,10 +128,10 @@ const getAllGroupSessionsWithParticipants = async (req, res) => {
         }
 
         const groupSessions = await GroupSession.find(query)
-            .populate('therapistId', 'firstName lastName email role profilePicture')
+            .populate('therapistId', 'name email role profilePicture')
             .populate({
                 path: 'participants.userId',
-                select: 'firstName lastName email phone profilePicture subscriptionInfo'
+                select: 'name email phone profilePicture subscriptionInfo'
             })
             .populate({
                 path: 'participants.bookingId',
@@ -140,6 +140,10 @@ const getAllGroupSessionsWithParticipants = async (req, res) => {
                     path: 'serviceId',
                     select: 'name price duration images'
                 }
+            })
+            .populate({
+                path: 'currentParticipants.userId',
+                select: 'name email phone profilePicture'
             })
             .sort({ startTime: -1 });
 
@@ -162,7 +166,7 @@ const getAllGroupSessionsWithParticipants = async (req, res) => {
                 isActiveCall: session.isActiveCall,
                 participants: session.participants.map(p => ({
                     userId: p.userId?._id,
-                    name: `${p.userId?.firstName || ''} ${p.userId?.lastName || ''}`.trim(),
+                    name: p.userId?.name || 'Unknown',
                     email: p.userId?.email,
                     phone: p.userId?.phone,
                     profilePicture: p.userId?.profilePicture,
@@ -174,6 +178,16 @@ const getAllGroupSessionsWithParticipants = async (req, res) => {
                     bookedAt: p.bookingId?.createdAt,
                     joinedGroupAt: p.joinedAt,
                     status: p.status
+                })),
+                currentParticipantsList: session.currentParticipants.map(p => ({
+                    userId: p.userId?._id,
+                    name: p.userId?.name || 'Participant',
+                    email: p.userId?.email,
+                    phone: p.userId?.phone,
+                    profilePicture: p.userId?.profilePicture,
+                    joinedAt: p.joinedAt,
+                    isMuted: p.isMuted,
+                    isVideoOff: p.isVideoOff
                 }))
             };
         });
@@ -200,8 +214,9 @@ const getGroupSessionById = async (req, res) => {
         const userId = req.user.userId;
 
         const groupSession = await GroupSession.findById(id)
-            .populate('therapistId', 'firstName lastName email')
-            .populate('participants.userId', 'firstName lastName email');
+            .populate('therapistId', 'name email')
+            .populate('participants.userId', 'name email')
+            .populate('currentParticipants.userId', 'name email');
 
         if (!groupSession) {
             return res.status(404).json({

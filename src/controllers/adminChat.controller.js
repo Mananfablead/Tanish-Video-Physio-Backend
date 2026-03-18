@@ -34,7 +34,15 @@ const getAdminChatMessages = async (req, res, next) => {
             if (sessionId === 'null' || sessionId === 'undefined') {
                 filter.sessionId = null;
             } else {
-                filter.sessionId = sessionId;
+                // Check if it's a valid ObjectId before adding to filter
+                const mongoose = require('mongoose');
+                if (mongoose.Types.ObjectId.isValid(sessionId)) {
+                    filter.sessionId = new mongoose.Types.ObjectId(sessionId);
+                } else {
+                    // If not a valid ObjectId, it might be a custom ID - search by messageId or skip
+                    console.log(`Invalid ObjectId format for sessionId: ${sessionId}`);
+                    // Don't add to filter, will return empty or we could search other fields
+                }
             }
         }
 
