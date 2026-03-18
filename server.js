@@ -233,7 +233,7 @@
 //                 // Fetch complete user data from database
 //                 const User = require('./src/models/User.model');
 //                 const userData = await User.findById(decoded.userId).select('name firstName lastName displayName email').lean();
-                
+
 //                 // Construct name with proper fallbacks
 //                 let constructedName;
 //                 if (userData?.name && userData.name !== 'Clinician' && userData.name !== 'User Unknown') {
@@ -247,7 +247,7 @@
 //                 } else {
 //                     constructedName = `User ${decoded.userId.substring(0, 5)}`;
 //                 }
-                
+
 //                 // Attach complete user info to socket
 //                 socket.user = {
 //                     userId: decoded.userId.toString(), // Ensure string format
@@ -350,7 +350,9 @@ app.use(
                     "http://localhost:8081",
                     "https://tanishvideo.fableadtech.in",
                     "https://apitanishvideo.fableadtech.in",
-                    "https://tanishphysiofitness.in/physio-admin"
+                    "https://tanishphysiofitness.in/physio-admin",
+                    "https://www.tanishphysiofitness.in",
+                    "https://www.tanishphysiofitness.in/physio-admin"
                 ],
                 mediaSrc: [
                     "'self'",
@@ -362,7 +364,9 @@ app.use(
                     "https://tanishvideo.fableadtech.in",
                     "https://tanishvideo.fableadtech.in/admin",
                     "https://apitanishvideo.fableadtech.in",
-                    "https://tanishphysiofitness.in/physio-admin"
+                    "https://tanishphysiofitness.in/physio-admin",
+                    "https://www.tanishphysiofitness.in",
+                    "https://www.tanishphysiofitness.in/physio-admin"
                 ],
             },
         },
@@ -390,7 +394,9 @@ const corsOptions = {
                     origin === 'https://tanishvideo.fableadtech.in' ||
                     origin === 'https://tanishphysiofitness.in/physio-admin' ||
                     origin === 'https://tanishphysiofitness.in' ||
-                    origin === 'https://tanishphysiofitness.in/physio-admin'
+                    origin === 'https://tanishphysiofitness.in/physio-admin' ||
+                    origin === 'https://www.tanishphysiofitness.in' ||
+                    origin === 'https://www.tanishphysiofitness.in/physio-admin'
                 ) {
                     callback(null, true);
                 } else {
@@ -552,7 +558,7 @@ const startServer = async () => {
                 // Fetch complete user data from database
                 const User = require('./src/models/User.model');
                 const userData = await User.findById(decoded.userId).select('name firstName lastName displayName email').lean();
-                
+
                 // Construct name with proper fallbacks
                 let constructedName;
                 if (userData?.name && userData.name !== 'Clinician' && userData.name !== 'User Unknown') {
@@ -566,7 +572,7 @@ const startServer = async () => {
                 } else {
                     constructedName = `User ${decoded.userId.substring(0, 5)}`;
                 }
-                
+
                 // Attach complete user info to socket
                 socket.user = {
                     userId: decoded.userId.toString(), // Ensure string format
