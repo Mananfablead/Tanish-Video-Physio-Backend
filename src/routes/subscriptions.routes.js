@@ -1,5 +1,5 @@
 const express = require('express');
-const { getSubscriptionPlans, createSubscriptionPlan, getAllSubscriptionPlans, getSubscriptionPlan, updateSubscriptionPlan, deleteSubscriptionPlan, archiveSubscriptionPlan, getUserSubscriptions, getAllSubscriptions, getExpiredSubscriptions, getExpiredServices, checkSubscriptionEligibility, getSubscriptionServices, createFreeSessionWithSubscription } = require('../controllers/subscriptions.controller');
+const { getSubscriptionPlans, createSubscriptionPlan, getAllSubscriptionPlans, getSubscriptionPlan, updateSubscriptionPlan, deleteSubscriptionPlan, archiveSubscriptionPlan, getUserSubscriptions, getAllSubscriptions, getExpiredSubscriptions, getExpiredServices, checkSubscriptionEligibility, getSubscriptionServices, createFreeSessionWithSubscription, checkFreeConsultationEligibility } = require('../controllers/subscriptions.controller');
 const { authenticateToken, authorizeRoles } = require('../middlewares/auth.middleware');
 
 const router = express.Router();
@@ -27,5 +27,8 @@ router.get('/admin/expired-services', authenticateToken, authorizeRoles('admin')
 router.get('/eligibility', authenticateToken, checkSubscriptionEligibility);
 router.get('/services', authenticateToken, getSubscriptionServices);
 router.post('/free-session', authenticateToken, createFreeSessionWithSubscription);
+
+// Route to check free consultation eligibility
+router.get('/free-consultation-eligibility', authenticateToken, checkFreeConsultationEligibility);
 
 module.exports = router;

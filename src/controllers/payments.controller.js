@@ -1966,7 +1966,7 @@ const verifySubscriptionPayment = async (req, res, next) => {
 
                                 // Update the booking status to indicate session has been created
                                 await Booking.findByIdAndUpdate(pendingBooking._id, {
-                                    status: 'session_created'
+                                    status: 'pending'
                                 });
                             } catch (sessionError) {
                                 console.error(`❌ Failed to create automatic session for subscription booking ${pendingBooking._id}:`, sessionError);
@@ -2429,7 +2429,7 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
 
                                     // Update the booking status
                                     await Booking.findByIdAndUpdate(pendingBooking._id, {
-                                        status: 'session_created'
+                                        status: 'pending'
                                     });
                                 }
                             }

@@ -131,6 +131,10 @@ const userSchema = new mongoose.Schema(
         type: Boolean,
         default: false
       }
+    },
+    freeConsultationsUsed: {
+      type: Number,
+      default: 0
     }
   },
   {

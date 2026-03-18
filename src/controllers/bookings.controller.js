@@ -204,7 +204,49 @@ const createBooking = async (req, res, next) => {
         let bookingTypeFinal = bookingType || 'regular';
 
         if (bookingType === 'free-consultation') {
-            // For free consultations, no service validation needed
+            // For free consultations, check if user has already used their free session(s)
+            const User = require('../models/User.model');
+            const user = await User.findById(req.user.userId);
+            
+            if (!user) {
+                return res.status(404).json(ApiResponse.error('User not found'));
+            }
+            
+            // Calculate how many free consultations the user is eligible for
+            let maxFreeConsultations = 1; // Default: 1 free consultation for all users
+            
+            // Check if user has an active subscription
+            if (subscription && !subscription.isExpired) {
+                let plan = null;
+                if (subscription.planId) {
+                    const isValidObjectId = require('mongoose').Types.ObjectId.isValid(subscription.planId);
+                    if (isValidObjectId) {
+                        const SubscriptionPlan = require('../models/SubscriptionPlan.model');
+                        plan = await SubscriptionPlan.findById(subscription.planId);
+                    } else {
+                        const SubscriptionPlan = require('../models/SubscriptionPlan.model');
+                        plan = await SubscriptionPlan.findOne({ planId: subscription.planId });
+                    }
+                }
+                
+                if (plan) {
+                    // Check plan duration to determine free sessions
+                    if (plan.duration === 'monthly') {
+                        maxFreeConsultations = 2; // Monthly plan gets 2 free sessions
+                    } else if (plan.duration === 'one-time') {
+                        maxFreeConsultations = 1; // One-time plan gets 1 free session
+                    }
+                }
+            }
+            
+            // Check if user has already used their free consultations
+            const freeConsultationsUsed = user.freeConsultationsUsed || 0;
+            
+            if (freeConsultationsUsed >= maxFreeConsultations) {
+                return res.status(400).json(ApiResponse.error(
+                    `You have already used your ${maxFreeConsultations} free consultation${maxFreeConsultations > 1 ? 's' : ''}. Please book a regular session.`
+                ));
+            }
         } else if (subscription && !subscription.isExpired) {
             // Check if subscription has remaining sessions
             // Fetch the plan data manually since planId might be a string field
@@ -385,6 +427,14 @@ const createBooking = async (req, res, next) => {
         });
 
         await booking.save();
+
+        // Increment free consultations used counter for free consultation bookings
+        if (bookingTypeFinal === 'free-consultation') {
+            const User = require('../models/User.model');
+            await User.findByIdAndUpdate(req.user.userId, {
+                $inc: { freeConsultationsUsed: 1 }
+            });
+        }
 
         // Send booking confirmation notifications for free consultations
         if (bookingTypeFinal === 'free-consultation') {
@@ -1643,18 +1693,6 @@ const createGuestBooking = async (req, res, next) => {
         let serviceName = "Free Consultation";
         let amount = 0;
 
-        if (bookingType === 'free-consultation') {
-            // For free consultations, no service validation needed
-        } else {
-            // Validate service exists for regular bookings
-            service = await Service.findById(serviceId);
-            if (!service || service.status !== 'active') {
-                return res.status(404).json(ApiResponse.error('Service not found or not active'));
-            }
-            serviceName = service.name;
-            amount = service.price;
-        }
-
         // Check if user already exists
         let user = await User.findOne({ email: clientEmail });
 
@@ -1690,6 +1728,68 @@ const createGuestBooking = async (req, res, next) => {
             });
 
             await user.save();
+        }
+
+        // NOW check free consultation eligibility (after user is found/created)
+        if (bookingType === 'free-consultation') {
+            // Calculate how many free consultations the user is eligible for
+            let maxFreeConsultations = 1; // Default: 1 free consultation for all users
+            
+            console.log('[Free Consultation Check] User:', user._id, 'Email:', user.email);
+            
+            // Check if user has an active subscription
+            const subscription = await Subscription.findOne({
+                userId: user._id,
+                status: 'active'
+            }).populate('planId');
+            
+            console.log('[Free Consultation Check] Subscription:', subscription ? { id: subscription._id, status: subscription.status } : 'No active subscription');
+            
+            if (subscription && !subscription.isExpired) {
+                let plan = null;
+                if (subscription.planId) {
+                    const isValidObjectId = require('mongoose').Types.ObjectId.isValid(subscription.planId);
+                    if (isValidObjectId) {
+                        const SubscriptionPlan = require('../models/SubscriptionPlan.model');
+                        plan = await SubscriptionPlan.findById(subscription.planId);
+                    } else {
+                        const SubscriptionPlan = require('../models/SubscriptionPlan.model');
+                        plan = await SubscriptionPlan.findOne({ planId: subscription.planId });
+                    }
+                }
+                
+                console.log('[Free Consultation Check] Plan:', plan ? { name: plan.name, duration: plan.duration } : 'No plan found');
+                
+                if (plan) {
+                    // Check plan duration to determine free sessions
+                    if (plan.duration === 'monthly') {
+                        maxFreeConsultations = 2; // Monthly plan gets 2 free sessions
+                        console.log('[Free Consultation Check] Monthly plan detected - 2 free sessions allowed');
+                    } else if (plan.duration === 'one-time') {
+                        maxFreeConsultations = 1; // One-time plan gets 1 free session
+                        console.log('[Free Consultation Check] One-time plan detected - 1 free session allowed');
+                    }
+                }
+            }
+            
+            // Check if user has already used their free consultations
+            const freeConsultationsUsed = user.freeConsultationsUsed || 0;
+            
+            console.log('[Free Consultation Check]', { maxFreeConsultations, freeConsultationsUsed, isEligible: freeConsultationsUsed < maxFreeConsultations });
+            
+            if (freeConsultationsUsed >= maxFreeConsultations) {
+                return res.status(400).json(ApiResponse.error(
+                    `You have already used your ${maxFreeConsultations} free consultation${maxFreeConsultations > 1 ? 's' : ''}. Please book a regular session.`
+                ));
+            }
+        } else {
+            // Validate service exists for regular bookings
+            service = await Service.findById(serviceId);
+            if (!service || service.status !== 'active') {
+                return res.status(404).json(ApiResponse.error('Service not found or not active'));
+            }
+            serviceName = service.name;
+            amount = service.price;
         }
 
         // Automatically assign an available therapist (admin user)
@@ -1741,6 +1841,13 @@ const createGuestBooking = async (req, res, next) => {
         });
 
         await booking.save();
+
+        // Increment free consultations used counter for free consultation bookings
+        if (bookingType === 'free-consultation') {
+            await User.findByIdAndUpdate(user._id, {
+                $inc: { freeConsultationsUsed: 1 }
+            });
+        }
 
         // Send booking confirmation notifications for free consultations
         if (bookingType === 'free-consultation') {

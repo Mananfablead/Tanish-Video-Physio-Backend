@@ -238,6 +238,8 @@ const updateSubscriptionPlan = async (req, res, next) => {
             if (status !== undefined) updateData.status = status;
             if (sortOrder !== undefined) updateData.sortOrder = sortOrder;
             if (totalService !== undefined) updateData.totalService = totalService;
+            if (name !==undefined) updateData.name=name;
+            if (sessions !==undefined) updateData.sessions=sessions
             
             // Calculate validityDays based on duration if provided
             if (validityDays !== undefined) {
@@ -254,31 +256,31 @@ const updateSubscriptionPlan = async (req, res, next) => {
             }
             
             // Disallow updates to critical fields that affect existing subscribers
-            if (price !== undefined) {
-                return res.status(400).json(
-                    ApiResponse.error('Cannot update price for a plan that has been purchased by users. Create a new plan instead.')
-                );
-            }
-            if (name !== undefined) {
-                return res.status(400).json(
-                    ApiResponse.error('Cannot update name for a plan that has been purchased by users. Create a new plan instead.')
-                );
-            }
-            if (duration !== undefined) {
-                return res.status(400).json(
-                    ApiResponse.error('Cannot update duration for a plan that has been purchased by users. Create a new plan instead.')
-                );
-            }
-            if (sessions !== undefined) {
-                return res.status(400).json(
-                    ApiResponse.error('Cannot update session count for a plan that has been purchased by users. Create a new plan instead.')
-                );
-            }
-            if (totalService !== undefined) {
-                return res.status(400).json(
-                    ApiResponse.error('Cannot update total service count for a plan that has been purchased by users. Create a new plan instead.')
-                );
-            }
+            // if (price !== undefined) {
+            //     return res.status(400).json(
+            //         ApiResponse.error('Cannot update price for a plan that has been purchased by users. Create a new plan instead.')
+            //     );
+            // }
+            // if (name !== undefined) {
+            //     return res.status(400).json(
+            //         ApiResponse.error('Cannot update name for a plan that has been purchased by users. Create a new plan instead.')
+            //     );
+            // }
+            // if (duration !== undefined) {
+            //     return res.status(400).json(
+            //         ApiResponse.error('Cannot update duration for a plan that has been purchased by users. Create a new plan instead.')
+            //     );
+            // }
+            // if (sessions !== undefined) {
+            //     return res.status(400).json(
+            //         ApiResponse.error('Cannot update session count for a plan that has been purchased by users. Create a new plan instead.')
+            //     );
+            // }
+            // if (totalService !== undefined) {
+            //     return res.status(400).json(
+            //         ApiResponse.error('Cannot update total service count for a plan that has been purchased by users. Create a new plan instead.')
+            //     );
+            // }
             
             // Update the plan with only allowed fields
             const plan = await SubscriptionPlan.findByIdAndUpdate(
@@ -822,22 +824,37 @@ const checkSubscriptionEligibility = async (req, res, next) => {
         
         // Count used sessions for this subscription
         // ONLY count actual Session documents, not Booking documents
-        const usedSessions = await Session.countDocuments({
-            $or: [
-                { subscriptionId: subscription._id },
-                { subscriptionId: subscription._id.toString() }
-            ],
+        // IMPORTANT: Exclude sessions from free consultation bookings
+        const Booking = require('../models/Booking.model');
+        
+        // Get all sessions for this subscription
+        const allSessions = await Session.find({
+            subscriptionId: subscription._id,
             status: { $ne: "cancelled" }
-        });
+        }).populate('bookingId');
+        
+        // Filter out sessions that belong to free consultation bookings
+        let usedSessions = 0;
+        for (const session of allSessions) {
+            if (session.bookingId && session.bookingId.bookingType === 'free-consultation') {
+                // Skip free consultation sessions
+                continue;
+            }
+            // Count regular and subscription-based sessions
+            usedSessions++;
+        }
+        
+        console.log(`[Subscription Eligibility] Total sessions: ${allSessions.length}, Free consultation sessions excluded, Counted: ${usedSessions}`);
         
         // Count used services for this subscription (based on bookings that have been created)
-        // For subscription-based bookings, we count all bookings associated with the subscription
+        // EXCLUDE free consultation bookings
         const usedServices = await Booking.countDocuments({
             $or: [
                 { subscriptionId: subscription._id },
                 { subscriptionId: subscription._id.toString() }
             ],
-            status: { $ne: "cancelled" }
+            status: { $ne: "cancelled" },
+            bookingType: { $ne: 'free-consultation' } // Exclude free consultations
         });
         
         // Get total sessions from plan (handle different formats)
@@ -981,6 +998,67 @@ const checkSubscriptionEligibility = async (req, res, next) => {
         
     } catch (error) {
         console.error("Error checking subscription eligibility:", error);
+        next(error);
+    }
+};
+
+// Check free consultation eligibility for a user
+const checkFreeConsultationEligibility = async (req, res, next) => {
+    try {
+        const userId = req.user.userId;
+        const User = require('../models/User.model');
+        
+        const user = await User.findById(userId);
+        
+        if (!user) {
+            return res.status(404).json(ApiResponse.error('User not found'));
+        }
+        
+        // Default: every user gets 1 free consultation
+        let maxFreeConsultations = 1;
+        
+        // Check if user has an active subscription
+        const subscription = await Subscription.findOne({
+            userId,
+            status: 'active'
+        }).populate('planId');
+        
+        if (subscription && !subscription.isExpired) {
+            let plan = null;
+            if (subscription.planId) {
+                const isValidObjectId = require('mongoose').Types.ObjectId.isValid(subscription.planId);
+                if (isValidObjectId) {
+                    plan = await SubscriptionPlan.findById(subscription.planId);
+                } else {
+                    plan = await SubscriptionPlan.findOne({ planId: subscription.planId });
+                }
+            }
+            
+            if (plan) {
+                // Check plan duration to determine free sessions
+                if (plan.duration === 'monthly') {
+                    maxFreeConsultations = 2; // Monthly plan gets 2 free sessions
+                } else if (plan.duration === 'one-time') {
+                    maxFreeConsultations = 1; // One-time plan gets 1 free session
+                }
+            }
+        }
+        
+        const freeConsultationsUsed = user.freeConsultationsUsed || 0;
+        const remainingFreeConsultations = Math.max(0, maxFreeConsultations - freeConsultationsUsed);
+        const isEligible = remainingFreeConsultations > 0;
+        
+        res.status(200).json(ApiResponse.success({
+            eligible: isEligible,
+            maxFreeConsultations,
+            freeConsultationsUsed,
+            remainingFreeConsultations,
+            message: isEligible 
+                ? `You have ${remainingFreeConsultations} free consultation${remainingFreeConsultations > 1 ? 's' : ''} remaining.`
+                : `You have used all your free consultations.`
+        }));
+    } catch (error) {
+        console.error("Error checking free consultation eligibility:", error);
         next(error);
     }
 };
@@ -1162,5 +1240,6 @@ module.exports = {
     getExpiredServices,
     checkSubscriptionEligibility,
     getSubscriptionServices,
-    createFreeSessionWithSubscription
+    createFreeSessionWithSubscription,
+    checkFreeConsultationEligibility
 };
