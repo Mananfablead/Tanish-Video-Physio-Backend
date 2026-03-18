@@ -226,7 +226,10 @@ const createOrder = async (req, res, next) => {
         }
 
         // Get original service price for coupon calculation
-        const originalServicePrice = booking.serviceId ? booking.serviceId.price : amount;
+        const originalServicePrice = booking.serviceId ?
+            (booking.serviceId.priceINR ||
+                (typeof booking.serviceId.price === 'string' ? parseInt(booking.serviceId.price.replace(/[₹$,]/g, '')) : booking.serviceId.price) ||
+                amount) : amount;
 
         let validatedAmount = amount;
 
@@ -556,7 +559,10 @@ const verifyPayment = async (req, res, next) => {
                                 serviceName: service?.name || 'Service',
                                 date: booking?.date || booking?.scheduledDate || 'N/A',  // Fallback to scheduledDate
                                 time: booking?.time || booking?.scheduledTime || 'N/A',  // Fallback to scheduledTime
-                                amount: booking?.amount || service?.price || '0'  // Add amount from booking or service
+                                amount: booking?.amount ||
+                                    (service?.priceINR ||
+                                        (typeof service?.price === 'string' ? parseInt(service.price.replace(/[₹$,]/g, '')) : service?.price) ||
+                                        '0')  // Add amount from booking or service
                             }
                         );
 
@@ -652,7 +658,10 @@ const createGuestOrder = async (req, res, next) => {
         }
 
         // Get original service price for coupon calculation
-        const originalServicePrice = booking.serviceId ? booking.serviceId.price : amount;
+        const originalServicePrice = booking.serviceId ?
+            (booking.serviceId.priceINR ||
+                (typeof booking.serviceId.price === 'string' ? parseInt(booking.serviceId.price.replace(/[₹$,]/g, '')) : booking.serviceId.price) ||
+                amount) : amount;
 
         let validatedAmount = amount;
 
@@ -1001,7 +1010,11 @@ const verifyGuestPayment = async (req, res, next) => {
                         serviceName: service?.name || 'Service',
                         date: booking?.scheduledDate || 'N/A',
                         time: booking?.scheduledTime || 'N/A',
-                        amount: payment?.amount || booking?.amount || service?.price || '0'
+                        amount: payment?.amount ||
+                            booking?.amount ||
+                            (service?.priceINR ||
+                                (typeof service?.price === 'string' ? parseInt(service.price.replace(/[₹$,]/g, '')) : service?.price) ||
+                                '0')
                     }
                 );
             } catch (notificationError) {

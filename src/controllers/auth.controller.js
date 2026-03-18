@@ -359,7 +359,9 @@ const getProfile = async (req, res, next) => {
                     name: service.name,
                     description: service.description,
                     category: service.category,
-                    price: service.price,
+                    // Use priceINR for India, fallback to parsing old price format
+                    price: service.priceINR ||
+                        (typeof service.price === 'string' ? parseInt(service.price.replace(/[₹$,]/g, '')) : service.price) || 0,
                     duration: service.duration,
                     validity: service.validity,
                     bookingId: booking._id,

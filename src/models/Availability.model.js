@@ -24,7 +24,7 @@ const availabilitySchema = new mongoose.Schema({
         },
         status: {
             type: String,
-            enum: ['available', 'unavailable', 'booked'],
+            enum: ['available', 'unavailable', 'booked', 'tentative'],
             default: 'available'
         },
         duration: {
@@ -50,8 +50,6 @@ const availabilitySchema = new mongoose.Schema({
         min: 0,
         description: 'Minimum minutes in advance required for booking (e.g., 30 = must book 30 min before)'
     }
-}, {
-    timestamps: true
-});
+}, { timestamps: true });
 
 module.exports = mongoose.model('Availability', availabilitySchema);

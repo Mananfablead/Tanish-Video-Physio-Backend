@@ -202,7 +202,9 @@ const createUser = async (req, res, next) => {
                     userId: null, // Will be set after user is created
                     planId: plan.planId,
                     planName: plan.name,
-                    amount: plan.price,
+                    // Use price_inr if available, fallback to parsing old price format
+                    amount: plan.price_inr ||
+                        (typeof plan.price === 'string' ? parseInt(plan.price.replace(/[₹$,]/g, '')) : plan.price) || 0,
                     currency: 'INR',
                     orderId: orderId,
                     paymentId: null, // No payment for admin-assigned subscriptions
@@ -214,7 +216,9 @@ const createUser = async (req, res, next) => {
                     guestName: name,
                     guestEmail: email,
                     guestPhone: phone,
-                    finalAmount: plan.price,
+                    // Use price_inr if available, fallback to parsing old price format
+                    finalAmount: plan.price_inr ||
+                        (typeof plan.price === 'string' ? parseInt(plan.price.replace(/[₹$,]/g, '')) : plan.price) || 0,
                     discountAmount: 0,
                     scheduleType: 'now'
                 });

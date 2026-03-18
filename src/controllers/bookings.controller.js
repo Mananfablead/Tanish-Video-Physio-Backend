@@ -277,7 +277,8 @@ const createBooking = async (req, res, next) => {
                     return res.status(404).json(ApiResponse.error('Service not found or not active'));
                 }
                 serviceName = service.name;
-                amount = service.price;
+                // Use priceINR for India, fallback to old price field and parse it
+                amount = service.priceINR || (typeof service.price === 'string' ? parseInt(service.price.replace(/[₹$,]/g, '')) : service.price) || 0;
             } else {
                 console.log(`Regular booking with subscription check:`, {
                     subscriptionId: subscription._id,
@@ -325,7 +326,8 @@ const createBooking = async (req, res, next) => {
                         return res.status(404).json(ApiResponse.error('Service not found or not active'));
                     }
                     serviceName = service.name;
-                    amount = service.price;
+                    // Use priceINR for India, fallback to old price field and parse it
+                    amount = service.priceINR || (typeof service.price === 'string' ? parseInt(service.price.replace(/[₹$,]/g, '')) : service.price) || 0;
                 } else if (usedSessions >= totalSessions) {
                     // Session limit reached, proceed with regular booking flow
                     if (!serviceId) {
@@ -339,7 +341,8 @@ const createBooking = async (req, res, next) => {
                         return res.status(404).json(ApiResponse.error('Service not found or not active'));
                     }
                     serviceName = service.name;
-                    amount = service.price;
+                    // Use priceINR for India, fallback to old price field and parse it
+                    amount = service.priceINR || (typeof service.price === 'string' ? parseInt(service.price.replace(/[₹$,]/g, '')) : service.price) || 0;
                 } else {
                     // User has remaining sessions in subscription, make booking free
                     if (serviceId) {
@@ -368,7 +371,8 @@ const createBooking = async (req, res, next) => {
                 return res.status(404).json(ApiResponse.error('Service not found or not active'));
             }
             serviceName = service.name;
-            amount = service.price;
+            // Use priceINR for India, fallback to old price field and parse it
+            amount = service.priceINR || (typeof service.price === 'string' ? parseInt(service.price.replace(/[₹$,]/g, '')) : service.price) || 0;
         }
 
         // Automatically assign an available therapist (admin user)
@@ -570,6 +574,8 @@ Looking forward to helping you!
 async function checkTimeSlotAvailability(therapistId, date, time, timeSlot, bookingType) {
     const mongoose = require('mongoose');
 
+    console.log('[checkTimeSlotAvailability] Checking availability:', { therapistId, date, time, timeSlot, bookingType });
+
     // Validate inputs
     if (!mongoose.Types.ObjectId.isValid(therapistId)) {
         return { available: false, message: 'Invalid therapist ID' };
@@ -592,9 +598,25 @@ async function checkTimeSlotAvailability(therapistId, date, time, timeSlot, book
         date
     });
 
+    console.log('[checkTimeSlotAvailability] Availability record:', availability ? {
+        date: availability.date,
+        timeSlotsCount: availability.timeSlots.length,
+        timeSlots: availability.timeSlots
+    } : 'No availability found');
+
     if (availability) {
+        console.log('[checkTimeSlotAvailability] Found availability with', availability.timeSlots.length, 'slots');
+
         // Check if the requested time slot exists in availability
         if (timeSlot) {
+            // Validate timeSlot format
+            if (!timeSlot.start || !timeSlot.end) {
+                return { available: false, message: 'Invalid time slot format. Both start and end times are required.' };
+            }
+
+            console.log('[checkTimeSlotAvailability] Looking for slot:', timeSlot);
+            console.log('[checkTimeSlotAvailability] Available slots:', availability.timeSlots.map(s => `${s.start}-${s.end} (${s.status}, ${s.bookingType})`));
+
             // For booking type validation, we need to check if the slot duration matches the booking type
             const requestedSlot = availability.timeSlots.find(slot =>
                 slot.start === timeSlot.start &&
@@ -603,6 +625,28 @@ async function checkTimeSlotAvailability(therapistId, date, time, timeSlot, book
             );
 
             if (!requestedSlot) {
+                // Provide more detailed error message
+                const existingSlot = availability.timeSlots.find(slot =>
+                    slot.start === timeSlot.start && slot.end === timeSlot.end
+                );
+
+                if (!existingSlot) {
+                    return {
+                        available: false,
+                        message: `No time slot found for ${timeSlot.start}-${timeSlot.end}. Please select a different time or check availability settings.`
+                    };
+                } else if (existingSlot.status === 'booked') {
+                    return {
+                        available: false,
+                        message: `This time slot (${timeSlot.start}-${timeSlot.end}) is already booked. Please select another slot.`
+                    };
+                } else if (existingSlot.status === 'unavailable' || existingSlot.status === 'tentative') {
+                    return {
+                        available: false,
+                        message: `This time slot (${timeSlot.start}-${timeSlot.end}) is not available (${existingSlot.status}). Please select another slot.`
+                    };
+                }
+
                 return { available: false, message: 'Requested time slot is not available' };
             }
 
@@ -619,12 +663,24 @@ async function checkTimeSlotAvailability(therapistId, date, time, timeSlot, book
             );
 
             if (!requestedSlot) {
+                const existingSlot = availability.timeSlots.find(slot => slot.start === time);
+                if (!existingSlot) {
+                    return {
+                        available: false,
+                        message: `No time slot found for ${time}. Please select a different time or check availability settings.`
+                    };
+                } else if (existingSlot.status === 'booked') {
+                    return {
+                        available: false,
+                        message: `This time slot (${time}) is already booked. Please select another slot.`
+                    };
+                }
                 return { available: false, message: 'Requested time slot is not available' };
             }
         }
     } else {
         // If no availability record exists for the date, assume slot is not available
-        return { available: false, message: 'No availability found for the selected date' };
+        return { available: false, message: `No availability found for the selected date (${date}). Please choose a different date.` };
     }
 
     // Check if there's already a PAID booking for this therapist at the same time
@@ -1789,8 +1845,11 @@ const createGuestBooking = async (req, res, next) => {
                 return res.status(404).json(ApiResponse.error('Service not found or not active'));
             }
             serviceName = service.name;
-            amount = service.price;
+            // Use priceINR for India, fallback to old price field and parse it
+            amount = service.priceINR || (typeof service.price === 'string' ? parseInt(service.price.replace(/[₹$,]/g, '')) : service.price) || 0;
         }
+
+        console.log('[createGuestBooking] Before slot validation:', { scheduledDate, scheduledTime, timeSlot, bookingType });
 
         // Automatically assign an available therapist (admin user)
         const therapist = await User.findOne({
@@ -1802,10 +1861,14 @@ const createGuestBooking = async (req, res, next) => {
             return res.status(404).json(ApiResponse.error('No active therapists available'));
         }
 
+        console.log('[createGuestBooking] Therapist found:', therapist._id);
+
         // Always validate the scheduled date and time if provided, regardless of schedule type
         if (scheduledDate && scheduledTime) {
             // Check if the requested time slot is available
             const slotAvailability = await checkTimeSlotAvailability(therapist._id, scheduledDate, scheduledTime, timeSlot, bookingType);
+
+            console.log('[createGuestBooking] Slot availability result:', slotAvailability);
 
             if (!slotAvailability.available) {
                 return res.status(409).json(ApiResponse.error(slotAvailability.message));
