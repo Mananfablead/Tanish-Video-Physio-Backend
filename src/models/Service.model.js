@@ -23,9 +23,14 @@ const serviceSchema = new mongoose.Schema({
         type: String,
         maxlength: [2000, 'About section cannot exceed 2000 characters']
     },
-    price: {
+    priceINR: {
         type: Number,
-        required: [true, 'Price is required'],
+        required: [true, 'Price in INR is required'],
+        min: 0
+    },
+    priceUSD: {
+        type: Number,
+        required: [true, 'Price in USD is required'],
         min: 0
     },
     duration: {

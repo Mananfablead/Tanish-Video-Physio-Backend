@@ -299,14 +299,15 @@ const getServiceByIdAdmin = async (req, res, next) => {
 // Create a new service (admin only)
 const createService = async (req, res, next) => {
     try {
-        const { name, description, about, price, duration, category, status, features, prerequisites, benefits, contraindications, sessions, validity, featured } = req.body;
+        const { name, description, about, priceINR, priceUSD, duration, category, status, features, prerequisites, benefits, contraindications, sessions, validity, featured } = req.body;
 
             // Prepare service object
             const serviceData = {
                 name,
                 description,
                 about,
-                price,
+                priceINR,
+                priceUSD,
                 duration,
                 category,
                 status,
@@ -360,7 +361,7 @@ const createService = async (req, res, next) => {
 // Update service by ID (admin only)
 const updateService = async (req, res, next) => {
     try {
-        const { name, description, about, price, duration, category, status, features, prerequisites, benefits, contraindications, sessions, validity, featured } = req.body;
+        const { name, description, about, priceINR, priceUSD, duration, category, status, features, prerequisites, benefits, contraindications, sessions, validity, featured } = req.body;
 
             // Prepare update object
             const updateData = {};
@@ -368,7 +369,8 @@ const updateService = async (req, res, next) => {
             if (name) updateData.name = name;
             if (description) updateData.description = description;
             if (about !== undefined) updateData.about = about;
-            if (price) updateData.price = price;
+            if (priceINR !== undefined) updateData.priceINR = priceINR;
+            if (priceUSD !== undefined) updateData.priceUSD = priceUSD;
             if (duration) updateData.duration = duration;
             if (category) updateData.category = category;
             if (status) updateData.status = status;
