@@ -226,12 +226,31 @@ const createOrder = async (req, res, next) => {
         }
 
         // Get original service price for coupon calculation
-        const originalServicePrice = booking.serviceId ?
-            (booking.serviceId.priceINR ||
-                (typeof booking.serviceId.price === 'string' ? parseInt(booking.serviceId.price.replace(/[₹$,]/g, '')) : booking.serviceId.price) ||
-                amount) : amount;
+        // Priority: booking.originalAmount > booking.serviceId.priceINR > booking.amount > amount from request
+        const originalServicePrice = booking.originalAmount ||
+            (booking.serviceId ?
+                (booking.serviceId.priceINR ||
+                    (typeof booking.serviceId.price === 'string' ? parseInt(booking.serviceId.price.replace(/[₹$,]/g, '')) : booking.serviceId.price) ||
+                    booking.amount) :
+                booking.amount) || amount;
 
+        // Use the amount from request if no coupon, otherwise calculate based on coupon
         let validatedAmount = amount;
+
+        // If booking already has finalAmount saved, use that as reference (only when no coupon is applied)
+        if (booking.finalAmount && !couponCode) {
+            console.log('✅ Using booking.finalAmount:', booking.finalAmount, 'instead of request amount:', amount);
+            validatedAmount = booking.finalAmount;
+        }
+
+        console.log('💰 Payment order calculation:', {
+            originalServicePrice,
+            requestAmount: amount,
+            bookingFinalAmount: booking.finalAmount,
+            bookingAmount: booking.amount,
+            validatedAmount,
+            hasCoupon: !!couponCode
+        });
 
         // If coupon code is provided, re-validate it before creating payment order
         if (couponCode) {
@@ -658,12 +677,31 @@ const createGuestOrder = async (req, res, next) => {
         }
 
         // Get original service price for coupon calculation
-        const originalServicePrice = booking.serviceId ?
-            (booking.serviceId.priceINR ||
-                (typeof booking.serviceId.price === 'string' ? parseInt(booking.serviceId.price.replace(/[₹$,]/g, '')) : booking.serviceId.price) ||
-                amount) : amount;
+        // Priority: booking.originalAmount > booking.serviceId.priceINR > booking.amount > amount from request
+        const originalServicePrice = booking.originalAmount ||
+            (booking.serviceId ?
+                (booking.serviceId.priceINR ||
+                    (typeof booking.serviceId.price === 'string' ? parseInt(booking.serviceId.price.replace(/[₹$,]/g, '')) : booking.serviceId.price) ||
+                    booking.amount) :
+                booking.amount) || amount;
 
+        // Use the amount from request if no coupon, otherwise calculate based on coupon
         let validatedAmount = amount;
+
+        // If booking already has finalAmount saved, use that as reference (only when no coupon is applied)
+        if (booking.finalAmount && !couponCode) {
+            console.log('✅ [Guest] Using booking.finalAmount:', booking.finalAmount, 'instead of request amount:', amount);
+            validatedAmount = booking.finalAmount;
+        }
+
+        console.log('💰 [Guest] Payment order calculation:', {
+            originalServicePrice,
+            requestAmount: amount,
+            bookingFinalAmount: booking.finalAmount,
+            bookingAmount: booking.amount,
+            validatedAmount,
+            hasCoupon: !!couponCode
+        });
 
         // If coupon code is provided, re-validate it before creating payment order
         if (couponCode) {
