@@ -214,125 +214,59 @@ const getSubscriptionPlan = async (req, res, next) => {
 // Update a subscription plan (admin only)
 const updateSubscriptionPlan = async (req, res, next) => {
     try {
-        const { name, price, description, features, duration, sessions, totalService, status, sortOrder, validityDays, session_type, price_inr, price_usd } = req.body;
-        
-        // Check if the plan has any active or past subscriptions
+        const {
+            name, price, description, features, duration,
+            sessions, totalService, status, sortOrder,
+            validityDays, session_type, price_inr, price_usd
+        } = req.body;
+
         const existingPlan = await SubscriptionPlan.findById(req.params.id);
         if (!existingPlan) {
             return res.status(404).json(ApiResponse.error('Subscription plan not found'));
         }
-        
-        // Count if any user has ever subscribed to this plan
-        const subscriptionCount = await Subscription.countDocuments({
-            planId: existingPlan.planId  // Use planId string to match both ObjectId and string references
-        });
-        
-        // If plan has been purchased by users, restrict certain updates
-        if (subscriptionCount > 0) {
-            // Allow only safe updates for plans that have been purchased
-            let updateData = {};
-            
-            // Allow these fields to be updated
-            if (description !== undefined) updateData.description = description;
-            if (features !== undefined) updateData.features = features;
-            if (status !== undefined) updateData.status = status;
-            if (sortOrder !== undefined) updateData.sortOrder = sortOrder;
-            if (totalService !== undefined) updateData.totalService = totalService;
-            if (name !==undefined) updateData.name=name;
-            if (sessions !==undefined) updateData.sessions=sessions
-            
-            // Calculate validityDays based on duration if provided
-            if (validityDays !== undefined) {
-                updateData.validityDays = validityDays;
-            } else if (duration) {
-                // Recalculate validityDays based on new duration
-                switch(duration) {
-                    case 'monthly': updateData.validityDays = 30; break;
-                    case 'quarterly': updateData.validityDays = 90; break;
-                    case 'half-yearly': updateData.validityDays = 180; break;
-                    case 'yearly': updateData.validityDays = 365; break;
-                    default: updateData.validityDays = 30;
-                }
-            }
-            
-            // Disallow updates to critical fields that affect existing subscribers
-            // if (price !== undefined) {
-            //     return res.status(400).json(
-            //         ApiResponse.error('Cannot update price for a plan that has been purchased by users. Create a new plan instead.')
-            //     );
-            // }
-            // if (name !== undefined) {
-            //     return res.status(400).json(
-            //         ApiResponse.error('Cannot update name for a plan that has been purchased by users. Create a new plan instead.')
-            //     );
-            // }
-            // if (duration !== undefined) {
-            //     return res.status(400).json(
-            //         ApiResponse.error('Cannot update duration for a plan that has been purchased by users. Create a new plan instead.')
-            //     );
-            // }
-            // if (sessions !== undefined) {
-            //     return res.status(400).json(
-            //         ApiResponse.error('Cannot update session count for a plan that has been purchased by users. Create a new plan instead.')
-            //     );
-            // }
-            // if (totalService !== undefined) {
-            //     return res.status(400).json(
-            //         ApiResponse.error('Cannot update total service count for a plan that has been purchased by users. Create a new plan instead.')
-            //     );
-            // }
-            
-            // Update the plan with only allowed fields
-            const plan = await SubscriptionPlan.findByIdAndUpdate(
-                req.params.id,
-                updateData,
-                { new: true, runValidators: true }
-            );
 
-            if (!plan) {
-                return res.status(404).json(ApiResponse.error('Subscription plan not found'));
-            }
+        let updateData = {
+            name,
+            price,
+            description,
+            features,
+            duration,
+            sessions,
+            totalService,
+            status,
+            sortOrder,
+            session_type,
+            price_inr,
+            price_usd
+        };
 
-            return res.status(200).json(ApiResponse.success({ plan }, 'Subscription plan updated successfully with limited fields'));            
-        } else {
-            // If no users have purchased this plan, allow all updates
-            let updateData = { name, price, description, features, duration, sessions, totalService, status, sortOrder };
-            
-            if (session_type !== undefined) {
-                updateData.session_type = session_type;
+        // validityDays logic
+        if (validityDays !== undefined) {
+            updateData.validityDays = validityDays;
+        } else if (duration) {
+            switch (duration) {
+                case 'monthly': updateData.validityDays = 30; break;
+                case 'quarterly': updateData.validityDays = 90; break;
+                case 'half-yearly': updateData.validityDays = 180; break;
+                case 'yearly': updateData.validityDays = 365; break;
+                default: updateData.validityDays = 30;
             }
-            if (price_inr !== undefined) {
-                updateData.price_inr = price_inr;
-            }
-            if (price_usd !== undefined) {
-                updateData.price_usd = price_usd;
-            }
-            
-            if (validityDays !== undefined) {
-                updateData.validityDays = validityDays;
-            } else if (duration) {
-                // Recalculate validityDays based on new duration
-                switch(duration) {
-                    case 'monthly': updateData.validityDays = 30; break;
-                    case 'quarterly': updateData.validityDays = 90; break;
-                    case 'half-yearly': updateData.validityDays = 180; break;
-                    case 'yearly': updateData.validityDays = 365; break;
-                    default: updateData.validityDays = 30;
-                }
-            }
-
-            const plan = await SubscriptionPlan.findByIdAndUpdate(
-                req.params.id,
-                updateData,
-                { new: true, runValidators: true }
-            );
-
-            if (!plan) {
-                return res.status(404).json(ApiResponse.error('Subscription plan not found'));
-            }
-
-            res.status(200).json(ApiResponse.success({ plan }, 'Subscription plan updated successfully'));
         }
+
+        const plan = await SubscriptionPlan.findByIdAndUpdate(
+            req.params.id,
+            updateData,
+            { new: true, runValidators: true }
+        );
+
+        if (!plan) {
+            return res.status(404).json(ApiResponse.error('Subscription plan not found'));
+        }
+
+        return res.status(200).json(
+            ApiResponse.success({ plan }, 'Subscription plan updated successfully')
+        );
+
     } catch (error) {
         next(error);
     }
