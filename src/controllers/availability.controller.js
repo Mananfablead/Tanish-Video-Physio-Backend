@@ -114,6 +114,16 @@ const getAvailability = async (req, res, next) => {
         // Convert admin's local time to client's local time for display
         const availabilityWithClientTime = availability.map(avail => {
             const convertedTimeSlots = avail.timeSlots.map(slot => {
+                // If client timezone matches admin timezone or is not set, return original times
+                if (!clientTimezone || clientTimezone === 'UTC' || clientTimezone === avail.adminTimezone) {
+                    return {
+                        ...slot.toObject(),
+                        start: slot.start,      // Original admin time
+                        end: slot.end,          // Original admin time
+                        adminTimezone: avail.adminTimezone,
+                    };
+                }
+
                 const clientTime = convertAdminTimeToClientTime(
                     avail.date,
                     slot.start,
@@ -181,6 +191,16 @@ const getAvailabilityByTherapist = async (req, res, next) => {
         // Convert admin's local time to client's local time for display
         const availabilityWithClientTime = availability.map(avail => {
             const convertedTimeSlots = avail.timeSlots.map(slot => {
+                // If client timezone matches admin timezone or is not set, return original times
+                if (!clientTimezone || clientTimezone === 'UTC' || clientTimezone === avail.adminTimezone) {
+                    return {
+                        ...slot.toObject(),
+                        start: slot.start,      // Original admin time
+                        end: slot.end,          // Original admin time
+                        adminTimezone: avail.adminTimezone,
+                    };
+                }
+
                 const clientTime = convertAdminTimeToClientTime(
                     avail.date,
                     slot.start,
@@ -217,6 +237,7 @@ const getAvailabilityByTherapist = async (req, res, next) => {
                 adminTimezone: avail.adminTimezone
             };
         });
+
 
         res.status(200).json(ApiResponse.success({
             availability: availabilityWithClientTime,
