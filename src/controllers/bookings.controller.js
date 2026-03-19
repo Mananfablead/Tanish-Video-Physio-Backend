@@ -20,7 +20,7 @@ const getAllBookings = async (req, res, next) => {
             paymentStatus: 'paid' // Only show bookings where payment has been completed
         })
             .sort({ createdAt: -1 }) // Sort by createdAt descending
-            .populate('serviceId', 'name price duration validity images')
+            .populate('serviceId', 'name price priceINR priceUSD duration validity images')
             .populate('therapistId', 'name email role profilePicture');
 
         // Add duration information for subscription-covered bookings
@@ -64,7 +64,7 @@ const getBookingById = async (req, res, next) => {
         }
 
         const booking = await Booking.findOne(query)
-            .populate('serviceId', 'name price duration validity images')
+            .populate('serviceId', 'name price priceINR priceUSD duration validity images')
             .populate('therapistId', 'name email role profilePicture')
             .populate({
                 path: 'userId',
@@ -142,7 +142,7 @@ const getBookingDetails = async (req, res, next) => {
 
         // Find the booking by ID
         const booking = await Booking.findById(bookingId)
-            .populate('serviceId', 'name price duration description validity images')
+            .populate('serviceId', 'name price priceINR priceUSD duration description validity images')
             .populate('therapistId', 'name email role profilePicture')
             .populate({
                 path: 'userId',
@@ -594,7 +594,7 @@ Looking forward to helping you!
         }
 
         // Populate the response
-        await booking.populate('serviceId', 'name price duration validity images');
+        await booking.populate('serviceId', 'name price priceINR priceUSD duration validity images');
         await booking.populate('therapistId', 'name email role profilePicture');
 
         // Send real-time notification to admin panel
@@ -1014,7 +1014,7 @@ const updateBookingWithSchedule = async (req, res, next) => {
             query,
             updateData,
             { new: true, runValidators: true }
-        ).populate('serviceId', 'name price duration validity images')
+        ).populate('serviceId', 'name price priceINR priceUSD duration validity images')
             .populate('therapistId', 'name email role profilePicture');
 
         // For free consultation bookings, ensure service expiry is calculated
@@ -1267,7 +1267,7 @@ const updateBooking = async (req, res, next) => {
             updateData,
             { new: true, runValidators: true }
         )
-            .populate('serviceId', 'name price duration validity images')
+            .populate('serviceId', 'name price priceINR priceUSD duration validity images')
             .populate('therapistId', 'name email role profilePicture');
 
         // For free consultation bookings, ensure service expiry is calculated
@@ -1470,7 +1470,7 @@ const updateBookingStatus = async (req, res, next) => {
             updateData,
             { new: true, runValidators: true }
         )
-            .populate('serviceId', 'name price duration validity images')
+            .populate('serviceId', 'name price priceINR priceUSD duration validity images')
             .populate('therapistId', 'name email role profilePicture');
 
         if (!booking) {
@@ -1816,7 +1816,7 @@ const deleteBooking = async (req, res, next) => {
             updateData,
             { new: true }
         )
-            .populate('serviceId', 'name price duration validity images')
+            .populate('serviceId', 'name price priceINR priceUSD duration validity images')
             .populate('therapistId', 'name email role profilePicture');
 
         if (!booking) {
@@ -1872,7 +1872,7 @@ const updateGuestBookingStatus = async (req, res, next) => {
             }
 
             // Populate the booking before sending response
-            await updatedBooking.populate('serviceId', 'name price duration images');
+            await updatedBooking.populate('serviceId', 'name price priceINR priceUSD duration images');
             await updatedBooking.populate('therapistId', 'name email role profilePicture');
 
             res.status(200).json(ApiResponse.success({ booking: updatedBooking }, `Booking status updated to ${status} successfully`));
@@ -1950,7 +1950,7 @@ const getAllBookingsForAdmin = async (req, res, next) => {
         const skip = (page - 1) * limit;
 
         const bookings = await Booking.find(query)
-            .populate('serviceId', 'name price duration validity images')
+            .populate('serviceId', 'name price priceINR priceUSD duration validity images')
             .populate('therapistId', 'name email role profilePicture')
             .populate({
                 path: 'userId',
@@ -2009,7 +2009,7 @@ const getBookingsByStatus = async (req, res, next) => {
 
         const bookings = await Booking.find(query)
             .sort({ createdAt: -1 })
-            .populate('serviceId', 'name price duration validity images')
+            .populate('serviceId', 'name price priceINR priceUSD duration validity images')
             .populate('therapistId', 'name email role profilePicture')
             .populate('userId', 'name email phone');
 
@@ -2294,7 +2294,7 @@ Looking forward to helping you!
         }
 
         // Populate the response
-        await booking.populate('serviceId', 'name price duration validity images');
+        await booking.populate('serviceId', 'name price priceINR priceUSD duration validity images');
         await booking.populate('therapistId', 'name email role profilePicture');
 
         // Send notifications to guest user
@@ -2693,7 +2693,7 @@ const createBookingWithSubscription = async (req, res, next) => {
         console.log(`User has ${remainingSessions === 'unlimited' ? 'unlimited' : remainingSessions} sessions remaining.`);
 
         // Populate the response
-        await booking.populate('serviceId', 'name price duration validity images');
+        await booking.populate('serviceId', 'name price priceINR priceUSD duration validity images');
         await booking.populate('therapistId', 'name email role profilePicture');
         
         let groupSessionId = null;
