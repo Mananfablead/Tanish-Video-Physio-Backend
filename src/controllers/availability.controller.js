@@ -19,28 +19,58 @@ const convertAdminTimeToClientTime = (date, time, adminTimezone, clientTimezone)
 
         console.log(`\n[Timezone Conversion] Converting ${time} (${adminTimezone}) to ${clientTimezone}`);
 
-        // Step 1: Create date object with admin's local time
+        // Step 1: Parse the time components
         const [hours, minutes] = time.split(':').map(Number);
-        const adminDateTime = new Date(`${date}T${time}:00`);
-        console.log(`[Step 1] Admin datetime: ${adminDateTime.toISOString()} (local: ${adminDateTime})`);
 
-        // Step 2: Get UTC time from admin's timezone
-        const utcString = adminDateTime.toLocaleString('en-US', { timeZone: adminTimezone });
-        const utcDate = new Date(utcString);
-        console.log(`[Step 2] UTC equivalent: ${utcDate.toISOString()}`);
+        // Step 2: Create a date string and parse it as being in admin's timezone
+        // We need to find what UTC time corresponds to this local time in admin's timezone
+        const dateTimeString = `${date}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
 
-        // Step 3: Convert UTC to client's timezone
-        const clientString = utcDate.toLocaleString('en-US', { timeZone: clientTimezone });
-        const clientDate = new Date(clientString);
-        console.log(`[Step 3] Client datetime: ${clientDate.toISOString()} (local: ${clientDate})`);
+        // Create a date object assuming it's UTC first
+        const tempDate = new Date(dateTimeString + 'Z');
 
-        // Step 4: Format as HH:MM
-        const clientHours = String(clientDate.getHours()).padStart(2, '0');
-        const clientMinutes = String(clientDate.getMinutes()).padStart(2, '0');
-        const result = `${clientHours}:${clientMinutes}`;
+        // Now adjust for the admin's timezone offset
+        const adminLocaleString = tempDate.toLocaleString('en-US', { timeZone: adminTimezone });
+        const adminDate = new Date(adminLocaleString);
+
+        // Calculate the offset between UTC and admin timezone
+        const utcHours = tempDate.getUTCHours();
+        const utcMinutes = tempDate.getUTCMinutes();
+        const adminHours = adminDate.getHours();
+        const adminMinutes = adminDate.getMinutes();
+
+        // The difference tells us the timezone offset
+        let offsetMinutes = (adminHours - utcHours) * 60 + (adminMinutes - utcMinutes);
+
+        // Step 3: Apply the offset to get actual UTC time
+        const utcDate = new Date(tempDate.getTime() - (offsetMinutes * 60 * 1000));
+        console.log(`[Step 1-2] Admin local: ${dateTimeString} -> UTC: ${utcDate.toISOString()}`);
+
+        // Step 4: Convert UTC to client's timezone
+        const clientOptions = {
+            timeZone: clientTimezone,
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        };
+
+        const clientFormatter = new Intl.DateTimeFormat('en-US', clientOptions);
+        const clientParts = clientFormatter.formatToParts(utcDate);
+
+        const partMap = {};
+        clientParts.forEach(part => {
+            if (part.type !== 'literal') {
+                partMap[part.type] = part.value;
+            }
+        });
+
+        const result = `${String(partMap.hour).padStart(2, '0')}:${String(partMap.minute).padStart(2, '0')}`;
 
         console.log(`[Result] ${time} ${adminTimezone} = ${result} ${clientTimezone}`);
-        console.log(`[Verification] Time difference: ${(clientDate.getTime() - adminDateTime.getTime()) / (1000 * 60 * 60)} hours\n`);
+        console.log(`[Verification] UTC time: ${utcDate.toISOString()}\n`);
 
         return result;
 
