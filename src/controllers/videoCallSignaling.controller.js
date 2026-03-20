@@ -1528,62 +1528,126 @@ const generateGoogleMeetLink = async (req, res) => {
             const manualLink = req.body.googleMeetLink;
             const manualCode = req.body.googleMeetCode || null;
 
-            // update session with manual link and optional code
-            await Session.findByIdAndUpdate(
-                sessionId,
-                {
-                    googleMeetLink: manualLink,
-                    googleMeetCode: manualCode,
-                    // dont touch expiresAt/eventId when manually entered
-                },
-                { new: true, runValidators: true }
-            );
-
-            // notify user same as generation
-            if (session.userId) {
-                try {
-                    const io = getIO();
-                    const Notification = require('../models/Notification.model');
-                    const userNotificationRoom = `user_notifications_${session.userId._id}`;
-
-                    // Save to database first
-                    const clientNotification = new Notification({
-                        title: 'Alternative Meeting Ready',
-                        message: 'Your therapist has provided a meeting link for your session. Please check your session details.',
-                        type: 'google_meet_ready',
-                        recipientType: 'client',
-                        userId: session.userId._id,
-                        sessionId: sessionId,
+            // Check if this is a group session
+            const isGroupSession = session.groupSessionId || session.sessionType === 'group';
+            
+            if (isGroupSession && session.groupSessionId) {
+                // Update ALL sessions in this group with the manual link
+                const updateResult = await Session.updateMany(
+                    { groupSessionId: session.groupSessionId },
+                    {
                         googleMeetLink: manualLink,
                         googleMeetCode: manualCode,
-                        priority: 'medium',
-                        channels: { inApp: true }
-                    });
+                    }
+                );
+                
+                logger.info(`Manual Google Meet link updated for ${updateResult.modifiedCount} group sessions`);
+                
+                // Notify all users in the group
+                const groupSessions = await Session.find({ groupSessionId: session.groupSessionId })
+                    .populate('userId');
+                    
+                for (const groupSession of groupSessions) {
+                    if (groupSession.userId) {
+                        try {
+                            const io = getIO();
+                            const Notification = require('../models/Notification.model');
+                            const userNotificationRoom = `user_notifications_${groupSession.userId._id}`;
 
-                    await clientNotification.save();
+                            const clientNotification = new Notification({
+                                title: 'Alternative Meeting Ready',
+                                message: 'Your therapist has provided a meeting link for your group session. Please check your session details.',
+                                type: 'google_meet_ready',
+                                recipientType: 'client',
+                                userId: groupSession.userId._id,
+                                sessionId: groupSession._id,
+                                googleMeetLink: manualLink,
+                                googleMeetCode: manualCode,
+                                priority: 'medium',
+                                channels: { inApp: true }
+                            });
 
-                    // Emit with database ID
-                    io.to(userNotificationRoom).emit('client-notification', {
-                        id: clientNotification._id,
-                        type: 'google_meet_ready',
-                        title: 'Alternative Meeting Ready',
-                        message: 'Your therapist has provided a meeting link for your session. Please check your session details.',
-                        sessionId: sessionId,
+                            await clientNotification.save();
+
+                            io.to(userNotificationRoom).emit('client-notification', {
+                                id: clientNotification._id,
+                                type: 'google_meet_ready',
+                                title: 'Alternative Meeting Ready',
+                                message: 'Your therapist has provided a meeting link for your group session. Please check your session details.',
+                                sessionId: groupSession._id,
+                                googleMeetLink: manualLink,
+                                googleMeetCode: manualCode,
+                                timestamp: clientNotification.createdAt,
+                                priority: 'medium'
+                            });
+                        } catch (socketError) {
+                            const Notification = require('../models/Notification.model');
+                            const notification = new Notification({
+                                title: 'Alternative Meeting Available',
+                                message: `Your therapist has arranged a meeting link as an alternative to the video call. You can join using the link provided.`,
+                                type: 'connection_failure',
+                                userId: groupSession.userId._id,
+                                sessionId: groupSession._id
+                            });
+                            await notification.save();
+                        }
+                    }
+                }
+            } else {
+                // Regular 1-on-1 session - update only this session
+                await Session.findByIdAndUpdate(
+                    sessionId,
+                    {
                         googleMeetLink: manualLink,
                         googleMeetCode: manualCode,
-                        timestamp: clientNotification.createdAt,
-                        priority: 'medium'
-                    });
-                } catch (socketError) {
-                    const Notification = require('../models/Notification.model');
-                    const notification = new Notification({
-                        title: 'Alternative Meeting Available',
-                        message: `Your therapist has arranged a meeting link as an alternative to the video call. You can join using the link provided.`,
-                        type: 'connection_failure',
-                        userId: session.userId._id,
-                        sessionId: sessionId
-                    });
-                    await notification.save();
+                    },
+                    { new: true, runValidators: true }
+                );
+
+                // notify user
+                if (session.userId) {
+                    try {
+                        const io = getIO();
+                        const Notification = require('../models/Notification.model');
+                        const userNotificationRoom = `user_notifications_${session.userId._id}`;
+
+                        const clientNotification = new Notification({
+                            title: 'Alternative Meeting Ready',
+                            message: 'Your therapist has provided a meeting link for your session. Please check your session details.',
+                            type: 'google_meet_ready',
+                            recipientType: 'client',
+                            userId: session.userId._id,
+                            sessionId: sessionId,
+                            googleMeetLink: manualLink,
+                            googleMeetCode: manualCode,
+                            priority: 'medium',
+                            channels: { inApp: true }
+                        });
+
+                        await clientNotification.save();
+
+                        io.to(userNotificationRoom).emit('client-notification', {
+                            id: clientNotification._id,
+                            type: 'google_meet_ready',
+                            title: 'Alternative Meeting Ready',
+                            message: 'Your therapist has provided a meeting link for your session. Please check your session details.',
+                            sessionId: sessionId,
+                            googleMeetLink: manualLink,
+                            googleMeetCode: manualCode,
+                            timestamp: clientNotification.createdAt,
+                            priority: 'medium'
+                        });
+                    } catch (socketError) {
+                        const Notification = require('../models/Notification.model');
+                        const notification = new Notification({
+                            title: 'Alternative Meeting Available',
+                            message: `Your therapist has arranged a meeting link as an alternative to the video call. You can join using the link provided.`,
+                            type: 'connection_failure',
+                            userId: session.userId._id,
+                            sessionId: sessionId
+                        });
+                        await notification.save();
+                    }
                 }
             }
 
@@ -1623,70 +1687,138 @@ const generateGoogleMeetLink = async (req, res) => {
                 summary: `Physiotherapy Session - ${session.therapistId?.name || 'Therapist'}`
             });
 
-            // Update session with Google Meet details
-            await Session.findByIdAndUpdate(
-                sessionId,
-                {
-                    googleMeetLink: googleMeetData.googleMeetLink,
-                    googleMeetCode: googleMeetData.googleMeetCode,
-                    googleMeetExpiresAt: googleMeetData.googleMeetExpiresAt,
-                    googleMeetEventId: googleMeetData.googleMeetEventId
-                },
-                { new: true, runValidators: true }
-            );
-
-            // Send real-time notification to client about the Google Meet link
-            if (session.userId) {
-                // Try to notify via socket if available
-                try {
-                    // Get the global io instance using socket manager
-                    const io = getIO();
-                    const Notification = require('../models/Notification.model');
-                    const userNotificationRoom = `user_notifications_${session.userId._id}`;
-
-                    // Save to database first
-                    const clientNotification = new Notification({
-                        title: 'Alternative Meeting Ready',
-                        message: 'Your therapist has prepared a Google Meet link as an alternative. Please check your session details.',
-                        type: 'google_meet_ready',
-                        recipientType: 'client',
-                        userId: session.userId._id,
-                        sessionId: sessionId,
+            // Check if this is a group session
+            const isGroupSession = session.groupSessionId || session.sessionType === 'group';
+            
+            if (isGroupSession && session.groupSessionId) {
+                // Update ALL sessions in this group with the generated link
+                const updateResult = await Session.updateMany(
+                    { groupSessionId: session.groupSessionId },
+                    {
                         googleMeetLink: googleMeetData.googleMeetLink,
                         googleMeetCode: googleMeetData.googleMeetCode,
-                        priority: 'medium',
-                        channels: { inApp: true }
-                    });
+                        googleMeetExpiresAt: googleMeetData.googleMeetExpiresAt,
+                        googleMeetEventId: googleMeetData.googleMeetEventId
+                    }
+                );
+                
+                logger.info(`Auto-generated Google Meet link updated for ${updateResult.modifiedCount} group sessions`);
+                
+                // Notify all users in the group
+                const groupSessions = await Session.find({ groupSessionId: session.groupSessionId })
+                    .populate('userId');
+                    
+                for (const groupSession of groupSessions) {
+                    if (groupSession.userId) {
+                        try {
+                            const io = getIO();
+                            const Notification = require('../models/Notification.model');
+                            const userNotificationRoom = `user_notifications_${groupSession.userId._id}`;
 
-                    await clientNotification.save();
+                            const clientNotification = new Notification({
+                                title: 'Alternative Meeting Ready',
+                                message: 'Your therapist has prepared a Google Meet link as an alternative for your group session. Please check your session details.',
+                                type: 'google_meet_ready',
+                                recipientType: 'client',
+                                userId: groupSession.userId._id,
+                                sessionId: groupSession._id,
+                                googleMeetLink: googleMeetData.googleMeetLink,
+                                googleMeetCode: googleMeetData.googleMeetCode,
+                                priority: 'medium',
+                                channels: { inApp: true }
+                            });
 
-                    // Emit with database ID
-                    io.to(userNotificationRoom).emit('client-notification', {
-                        id: clientNotification._id,
-                        type: 'google_meet_ready',
-                        title: 'Alternative Meeting Ready',
-                        message: 'Your therapist has prepared a Google Meet link as an alternative. Please check your session details.',
-                        sessionId: sessionId,
+                            await clientNotification.save();
+
+                            io.to(userNotificationRoom).emit('client-notification', {
+                                id: clientNotification._id,
+                                type: 'google_meet_ready',
+                                title: 'Alternative Meeting Ready',
+                                message: 'Your therapist has prepared a Google Meet link as an alternative for your group session. Please check your session details.',
+                                sessionId: groupSession._id,
+                                googleMeetLink: googleMeetData.googleMeetLink,
+                                googleMeetCode: googleMeetData.googleMeetCode,
+                                timestamp: clientNotification.createdAt,
+                                priority: 'medium'
+                            });
+
+                            logger.info(`Auto-generated Google Meet notification sent to user ${groupSession.userId._id}`);
+                        } catch (socketError) {
+                            logger.warn('Socket notification failed for group member, falling back to database notification:', socketError);
+                            
+                            const Notification = require('../models/Notification.model');
+                            const notification = new Notification({
+                                title: 'Alternative Meeting Available',
+                                message: `Your therapist has arranged a Google Meet session as an alternative to the video call. You can join using the Google Meet link provided.`,
+                                type: 'connection_failure',
+                                userId: groupSession.userId._id,
+                                sessionId: groupSession._id
+                            });
+                            await notification.save();
+                        }
+                    }
+                }
+            } else {
+                // Regular 1-on-1 session - update only this session
+                await Session.findByIdAndUpdate(
+                    sessionId,
+                    {
                         googleMeetLink: googleMeetData.googleMeetLink,
                         googleMeetCode: googleMeetData.googleMeetCode,
-                        timestamp: clientNotification.createdAt,
-                        priority: 'medium'
-                    });
+                        googleMeetExpiresAt: googleMeetData.googleMeetExpiresAt,
+                        googleMeetEventId: googleMeetData.googleMeetEventId
+                    },
+                    { new: true, runValidators: true }
+                );
 
-                    logger.info(`Google Meet notification sent via socket to user ${session.userId._id}`);
-                } catch (socketError) {
-                    logger.warn('Socket notification failed, falling back to database notification:', socketError);
+                // Send real-time notification to client about the Google Meet link
+                if (session.userId) {
+                    try {
+                        const io = getIO();
+                        const Notification = require('../models/Notification.model');
+                        const userNotificationRoom = `user_notifications_${session.userId._id}`;
 
-                    // Fallback to database notification
-                    const Notification = require('../models/Notification.model');
-                    const notification = new Notification({
-                        title: 'Alternative Meeting Available',
-                        message: `Your therapist has arranged a Google Meet session as an alternative to the video call. You can join using the Google Meet link provided.`,
-                        type: 'connection_failure',
-                        userId: session.userId._id,
-                        sessionId: sessionId
-                    });
-                    await notification.save();
+                        const clientNotification = new Notification({
+                            title: 'Alternative Meeting Ready',
+                            message: 'Your therapist has prepared a Google Meet link as an alternative. Please check your session details.',
+                            type: 'google_meet_ready',
+                            recipientType: 'client',
+                            userId: session.userId._id,
+                            sessionId: sessionId,
+                            googleMeetLink: googleMeetData.googleMeetLink,
+                            googleMeetCode: googleMeetData.googleMeetCode,
+                            priority: 'medium',
+                            channels: { inApp: true }
+                        });
+
+                        await clientNotification.save();
+
+                        io.to(userNotificationRoom).emit('client-notification', {
+                            id: clientNotification._id,
+                            type: 'google_meet_ready',
+                            title: 'Alternative Meeting Ready',
+                            message: 'Your therapist has prepared a Google Meet link as an alternative. Please check your session details.',
+                            sessionId: sessionId,
+                            googleMeetLink: googleMeetData.googleMeetLink,
+                            googleMeetCode: googleMeetData.googleMeetCode,
+                            timestamp: clientNotification.createdAt,
+                            priority: 'medium'
+                        });
+
+                        logger.info(`Google Meet notification sent via socket to user ${session.userId._id}`);
+                    } catch (socketError) {
+                        logger.warn('Socket notification failed, falling back to database notification:', socketError);
+
+                        const Notification = require('../models/Notification.model');
+                        const notification = new Notification({
+                            title: 'Alternative Meeting Available',
+                            message: `Your therapist has arranged a Google Meet session as an alternative to the video call. You can join using the Google Meet link provided.`,
+                            type: 'connection_failure',
+                            userId: session.userId._id,
+                            sessionId: sessionId
+                        });
+                        await notification.save();
+                    }
                 }
             }
 
@@ -1744,85 +1876,150 @@ const updateGoogleMeetLink = async (req, res) => {
             });
         }
 
-        // Update session with new Google Meet details
-        const updateData = {
-            googleMeetLink,
-            googleMeetCode: googleMeetCode || null,
-            googleMeetExpiresAt: googleMeetExpiresAt ? new Date(googleMeetExpiresAt) : null
-        };
-
-        const updatedSession = await Session.findByIdAndUpdate(
-            sessionId,
-            updateData,
-            { new: true, runValidators: true }
-        ).populate('userId').populate('therapistId');
-
-        logger.info(`Google Meet link updated for session ${sessionId}: ${googleMeetLink}`);
-
-        // Send real-time notification to client about the updated Google Meet link
-        if (updatedSession.userId) {
-            try {
-                // Get the global io instance
-                const io = getIO();
-                const Notification = require('../models/Notification.model');
-                const userNotificationRoom = `user_notifications_${updatedSession.userId._id}`;
-
-                // Save to database first
-                const clientNotification = new Notification({
-                    title: 'Google Meet Link Updated',
-                    message: 'Your therapist has updated the Google Meet link for your session. Please check your session details.',
-                    type: 'google_meet_ready',
-                    recipientType: 'client',
-                    userId: updatedSession.userId._id,
-                    sessionId: sessionId,
-                    googleMeetLink: googleMeetLink,
+        // Check if this is a group session
+        const isGroupSession = session.groupSessionId || session.sessionType === 'group';
+        
+        if (isGroupSession && session.groupSessionId) {
+            // Update ALL sessions in this group
+            const updateResult = await Session.updateMany(
+                { groupSessionId: session.groupSessionId },
+                {
+                    googleMeetLink,
                     googleMeetCode: googleMeetCode || null,
-                    priority: 'high',
-                    channels: { inApp: true }
-                });
+                    googleMeetExpiresAt: googleMeetExpiresAt ? new Date(googleMeetExpiresAt) : null
+                }
+            );
+            
+            logger.info(`Google Meet link updated for ${updateResult.modifiedCount} group sessions: ${googleMeetLink}`);
+            
+            // Notify all users in the group
+            const groupSessions = await Session.find({ groupSessionId: session.groupSessionId })
+                .populate('userId');
+                
+            for (const groupSession of groupSessions) {
+                if (groupSession.userId) {
+                    try {
+                        const io = getIO();
+                        const Notification = require('../models/Notification.model');
+                        const userNotificationRoom = `user_notifications_${groupSession.userId._id}`;
 
-                await clientNotification.save();
+                        const clientNotification = new Notification({
+                            title: 'Google Meet Link Updated',
+                            message: 'Your therapist has updated the Google Meet link for your group session. Please check your session details.',
+                            type: 'google_meet_ready',
+                            recipientType: 'client',
+                            userId: groupSession.userId._id,
+                            sessionId: groupSession._id,
+                            googleMeetLink: googleMeetLink,
+                            googleMeetCode: googleMeetCode || null,
+                            priority: 'high',
+                            channels: { inApp: true }
+                        });
 
-                // Emit with database ID
-                io.to(userNotificationRoom).emit('client-notification', {
-                    id: clientNotification._id,
-                    type: 'google_meet_updated',
-                    title: 'Google Meet Link Updated',
-                    message: 'Your therapist has updated the Google Meet link for your session. Please check your session details.',
-                    sessionId: sessionId,
-                    googleMeetLink: googleMeetLink,
-                    googleMeetCode: googleMeetCode || null,
-                    timestamp: clientNotification.createdAt,
-                    priority: 'high'
-                });
+                        await clientNotification.save();
 
-                logger.info(`Google Meet update notification saved and sent via socket to user ${updatedSession.userId._id}`);
-            } catch (socketError) {
-                logger.warn('Socket notification failed for update, falling back to database notification:', socketError);
+                        io.to(userNotificationRoom).emit('client-notification', {
+                            id: clientNotification._id,
+                            type: 'google_meet_updated',
+                            title: 'Google Meet Link Updated',
+                            message: 'Your therapist has updated the Google Meet link for your group session. Please check your session details.',
+                            sessionId: groupSession._id,
+                            googleMeetLink: googleMeetLink,
+                            googleMeetCode: googleMeetCode || null,
+                            timestamp: clientNotification.createdAt,
+                            priority: 'high'
+                        });
 
-                // Fallback to database notification
-                const Notification = require('../models/Notification.model');
-                const notification = new Notification({
-                    title: 'Google Meet Link Updated',
-                    message: `Your therapist has updated the Google Meet link for your upcoming session. Please check your session details.`,
-                    type: 'google_meet_updated',
-                    userId: updatedSession.userId._id,
-                    sessionId: sessionId
-                });
-                await notification.save();
+                        logger.info(`Google Meet update notification sent to user ${groupSession.userId._id}`);
+                    } catch (socketError) {
+                        logger.warn('Socket notification failed for group member, falling back to database notification:', socketError);
+                        
+                        const Notification = require('../models/Notification.model');
+                        const notification = new Notification({
+                            title: 'Google Meet Link Updated',
+                            message: `Your therapist has updated the Google Meet link for your upcoming group session. Please check your session details.`,
+                            type: 'google_meet_updated',
+                            userId: groupSession.userId._id,
+                            sessionId: groupSession._id
+                        });
+                        await notification.save();
+                    }
+                }
             }
+        } else {
+            // Regular 1-on-1 session - update only this session
+            const updatedSession = await Session.findByIdAndUpdate(
+                sessionId,
+                {
+                    googleMeetLink,
+                    googleMeetCode: googleMeetCode || null,
+                    googleMeetExpiresAt: googleMeetExpiresAt ? new Date(googleMeetExpiresAt) : null
+                },
+                { new: true, runValidators: true }
+            ).populate('userId').populate('therapistId');
+
+            logger.info(`Google Meet link updated for session ${sessionId}: ${googleMeetLink}`);
+
+            // Send real-time notification to client about the updated Google Meet link
+            if (updatedSession.userId) {
+                try {
+                    const io = getIO();
+                    const Notification = require('../models/Notification.model');
+                    const userNotificationRoom = `user_notifications_${updatedSession.userId._id}`;
+
+                    const clientNotification = new Notification({
+                        title: 'Google Meet Link Updated',
+                        message: 'Your therapist has updated the Google Meet link for your session. Please check your session details.',
+                        type: 'google_meet_ready',
+                        recipientType: 'client',
+                        userId: updatedSession.userId._id,
+                        sessionId: sessionId,
+                        googleMeetLink: googleMeetLink,
+                        googleMeetCode: googleMeetCode || null,
+                        priority: 'high',
+                        channels: { inApp: true }
+                    });
+
+                    await clientNotification.save();
+
+                    io.to(userNotificationRoom).emit('client-notification', {
+                        id: clientNotification._id,
+                        type: 'google_meet_updated',
+                        title: 'Google Meet Link Updated',
+                        message: 'Your therapist has updated the Google Meet link for your session. Please check your session details.',
+                        sessionId: sessionId,
+                        googleMeetLink: googleMeetLink,
+                        googleMeetCode: googleMeetCode || null,
+                        timestamp: clientNotification.createdAt,
+                        priority: 'high'
+                    });
+
+                    logger.info(`Google Meet update notification saved and sent via socket to user ${updatedSession.userId._id}`);
+                } catch (socketError) {
+                    logger.warn('Socket notification failed for update, falling back to database notification:', socketError);
+
+                    const Notification = require('../models/Notification.model');
+                    const notification = new Notification({
+                        title: 'Google Meet Link Updated',
+                        message: `Your therapist has updated the Google Meet link for your upcoming session. Please check your session details.`,
+                        type: 'google_meet_updated',
+                        userId: updatedSession.userId._id,
+                        sessionId: sessionId
+                    });
+                    await notification.save();
+                }
+            }
+            
+            return res.json({
+                success: true,
+                message: 'Google Meet link updated successfully',
+                data: {
+                    googleMeetLink: updatedSession.googleMeetLink,
+                    googleMeetCode: updatedSession.googleMeetCode,
+                    googleMeetExpiresAt: updatedSession.googleMeetExpiresAt
+                }
+            });
         }
-
-        return res.json({
-            success: true,
-            message: 'Google Meet link updated successfully',
-            data: {
-                googleMeetLink: updatedSession.googleMeetLink,
-                googleMeetCode: updatedSession.googleMeetCode,
-                googleMeetExpiresAt: updatedSession.googleMeetExpiresAt
-            }
-        });
-
     } catch (error) {
         logger.error('Error updating Google Meet link:', error);
         return res.status(500).json({
