@@ -1347,6 +1347,26 @@ const createAdminSession = async (req, res, next) => {
           );
       }
 
+      // 🔥 VALIDATE SESSION TYPE MATCHES SUBSCRIPTION PLAN
+      if (subscription.planId && subscription.planId.session_type) {
+        const planSessionType = subscription.planId.session_type;
+        const requestedSessionType = type;
+        
+        // Convert session type format for comparison
+        const normalizedPlanType = planSessionType === 'group' ? 'group' : '1-on-1';
+        const normalizedRequestedType = requestedSessionType === 'group' ? 'group' : '1-on-1';
+        
+        if (normalizedPlanType !== normalizedRequestedType) {
+          return res
+            .status(400)
+            .json(
+              ApiResponse.error(
+                `Cannot create ${requestedSessionType} session: User's subscription plan is for ${planSessionType} sessions only`
+              )
+            );
+        }
+      }
+
       // 🔥 CHECK SESSION LIMITS using helper function
       const limitCheck = await checkSubscriptionLimits(subscriptionId, userId);
       if (!limitCheck.allowed) {
@@ -1416,6 +1436,7 @@ const createAdminSession = async (req, res, next) => {
       startTime, // Add the required startTime field
       endTime, // Add the calculated endTime based on duration
       type: type || "1-on-1",
+      sessionType: type === "group" ? "group" : "one-to-one", // Set sessionType based on type
       status: status || "scheduled",
       duration, // Add the duration field
       notes,
@@ -1432,6 +1453,83 @@ const createAdminSession = async (req, res, next) => {
       sessionData.subscriptionId = subscriptionId;
     }
 
+    // Handle group session creation
+    let groupSessionIdValue = null;
+    if (type === 'group' || sessionData.sessionType === 'group') {
+      try {
+        const GroupSession = require('../models/GroupSession.model');
+        
+        // Check if there's already a group session for this exact time slot
+        // Match by therapist, date, and start time to ensure same group session
+        let existingGroupSession = await GroupSession.findOne({
+          therapistId,
+          startTime: startTime,
+          // Also match by date as a fallback
+          $expr: {
+            $and: [
+              { $eq: [{ $dateToString: { format: "%Y-%m-%d", date: "$startTime" } }, date] }
+            ]
+          }
+        });
+        
+        console.log(`Looking for existing GroupSession for therapist: ${therapistId}, date: ${date}, startTime: ${startTime}`);
+        console.log(`Found existing GroupSession:`, existingGroupSession ? existingGroupSession._id : 'none');
+        
+        if (!existingGroupSession) {
+          // Create a new GroupSession for this group slot
+          const groupSession = new GroupSession({
+            title: `Group Session - ${date}`,
+            description: notes || 'Group therapy session',
+            therapistId,
+            startTime,
+            endTime: endTime || new Date(startTime.getTime() + 45 * 60000), // Default 45 min
+            maxParticipants: 5, // Or get from availability slot
+            status: 'scheduled'
+          });
+          
+          await groupSession.save();
+          groupSessionIdValue = groupSession._id;
+          console.log(`✅ Created NEW GroupSession: ${groupSessionIdValue}`);
+        } else {
+          groupSessionIdValue = existingGroupSession._id;
+          console.log(`♻️ REUSED existing GroupSession: ${groupSessionIdValue}`);
+        }
+        
+        // Add participant to the group session (only if not already added)
+        if (groupSessionIdValue) {
+          // Check if user is already a participant to avoid duplicates
+          const existingParticipant = await GroupSession.findOne({
+            _id: groupSessionIdValue,
+            'participants.userId': userId
+          });
+          
+          if (!existingParticipant) {
+            await GroupSession.findByIdAndUpdate(groupSessionIdValue, {
+              $push: {
+                participants: {
+                  userId,
+                  bookingId: bookingId || null,
+                  joinedAt: Date.now(),
+                  status: 'accepted'
+                }
+              }
+            });
+            console.log(`➕ Added participant ${userId} to GroupSession ${groupSessionIdValue}`);
+          } else {
+            console.log(`⚠️ User ${userId} already in GroupSession ${groupSessionIdValue}`);
+          }
+        }
+      } catch (groupSessionError) {
+        console.error("Error creating GroupSession:", groupSessionError);
+        // Continue with session creation even if group session fails
+      }
+    }
+
+    // Add groupSessionId to session data if it's a group session
+    if (groupSessionIdValue) {
+      sessionData.groupSessionId = groupSessionIdValue;
+    }
+
     const session = new Session(sessionData);
 
     await session.save();
@@ -1439,22 +1537,34 @@ const createAdminSession = async (req, res, next) => {
     // Update availability status to 'booked' if therapistId exists
     if (therapistId) {
       try {
-        await Availability.updateOne(
-          { therapistId: sessionData.therapistId, date: sessionData.date },
-          {
-            $set: {
-              "timeSlots.$[elem].status": "booked",
-            },
-          },
-          {
-            arrayFilters: [
-              {
-                "elem.start": sessionData.time,
-                "elem.status": "available",
-              },
-            ],
+        const availability = await Availability.findOne({ 
+          therapistId: sessionData.therapistId, 
+          date: sessionData.date 
+        });
+        
+        if (availability) {
+          const slot = availability.timeSlots.find(s => s.start === sessionData.time);
+          
+          if (slot) {
+            // Handle group sessions differently from one-to-one
+            if (slot.sessionType === 'group' || sessionData.sessionType === 'group') {
+              // For group sessions, increment booked participants
+              slot.bookedParticipants = (slot.bookedParticipants || 0) + 1;
+              
+              // Only mark as booked if max participants reached
+              if (slot.maxParticipants && slot.bookedParticipants >= slot.maxParticipants) {
+                slot.status = 'booked';
+              } else {
+                slot.status = 'available'; // Keep available until full
+              }
+            } else {
+              // For one-to-one sessions, mark as booked immediately
+              slot.status = 'booked';
+            }
+            
+            await availability.save();
           }
-        );
+        }
       } catch (availabilityError) {
         console.error("Error updating availability status:", availabilityError);
         // Continue with response even if availability update fails
@@ -1478,6 +1588,9 @@ const createAdminSession = async (req, res, next) => {
 
     await session.populate("therapistId", "name email role");
     await session.populate("userId", "name email");
+    
+    // For group sessions, just include the groupSessionId reference (not populated)
+    // The frontend can fetch GroupSession details separately if needed
 
     /* ================= SEND ADMIN NOTIFICATION ================= */
     // Send new session request notification to admin (even when created by admin, send confirmation)

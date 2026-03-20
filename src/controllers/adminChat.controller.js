@@ -108,7 +108,20 @@ const getAdminChatMessages = async (req, res, next) => {
         // Query messages with pagination and sorting
         const messages = await ChatMessage.find(filter)
             .populate('senderId', 'name email role')
-            .populate('sessionId', 'date time type')
+            .populate({
+                path: 'sessionId',
+                select: 'date time type userId therapistId status',
+                populate: [
+                    {
+                        path: 'userId',
+                        select: 'name email'
+                    },
+                    {
+                        path: 'therapistId',
+                        select: 'name email'
+                    }
+                ]
+            })
             .populate('replyTo', 'message')
             .sort(sort)
             .skip(skip)

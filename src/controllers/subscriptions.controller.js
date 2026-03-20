@@ -502,7 +502,6 @@ const getAllSubscriptions = async (req, res, next) => {
     try {
         const subscriptions = await Subscription.find()
             .populate('userId', 'name email')
-            .populate('planId')
             .sort({ createdAt: -1 });
         
         // Enrich each subscription with session information and expiration status
@@ -515,20 +514,36 @@ const getAllSubscriptions = async (req, res, next) => {
             subscriptionObj.isExpired = isExpired;
             subscriptionObj.status = isExpired ? 'expired' : subscription.status;
 
-            // Handle both ObjectId and string planId
+            // Get plan details - planId is a String, so we need to query manually
             let plan = null;
             if (subscription.planId) {
-                console.log(`Looking up plan for subscription ${subscription._id}, planId: ${subscription.planId}`);
                 // Try to find by ObjectId first
-                const isValidObjectId = require('mongoose').Types.ObjectId.isValid(subscription.planId);
-                console.log(`Is valid ObjectId: ${isValidObjectId}`);
+                const mongoose = require('mongoose');
+                const isValidObjectId = mongoose.Types.ObjectId.isValid(subscription.planId);
+                
                 if (isValidObjectId) {
                     plan = await SubscriptionPlan.findById(subscription.planId);
                 } else {
-                    // Try to find by planId string
+                    // Find by planId string (the plan's planId field, not _id)
                     plan = await SubscriptionPlan.findOne({ planId: subscription.planId });
                 }
-                console.log(`Found plan:`, plan ? { name: plan.name, sessions: plan.sessions } : 'null');
+            }
+            
+            // Add plan details to the response
+            if (plan) {
+                subscriptionObj.planDetails = {
+                    name: plan.name,
+                    session_type: plan.session_type,
+                    duration: plan.duration,
+                    sessions: plan.sessions,
+                    price: plan.price,
+                    description: plan.description,
+                    features: plan.features,
+                    totalService: plan.totalService,
+                    price_inr: plan.price_inr,
+                    price_usd: plan.price_usd,
+                    status: plan.status
+                };
             }
 
             if (plan && plan.sessions > 0) {
