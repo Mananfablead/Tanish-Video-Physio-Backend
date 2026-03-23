@@ -1929,6 +1929,7 @@ const setupVideoCallHandlers = (io, socket) => {
         try {
             const { groupSessionId } = data;
             const userId = socket.user.userId;
+            const userRole = socket.user.role;
 
             const groupSession = await GroupSession.findById(groupSessionId);
 
@@ -1937,9 +1938,12 @@ const setupVideoCallHandlers = (io, socket) => {
                 return;
             }
 
-            // Only therapist can end group call
-            if (groupSession.therapistId.toString() !== userId) {
-                socket.emit('error', { message: 'Only therapist can end group call' });
+            // Only therapist or admin can end group call
+            const isTherapist = groupSession.therapistId.toString() === userId;
+            const isAdmin = userRole === 'admin';
+            
+            if (!isTherapist && !isAdmin) {
+                socket.emit('error', { message: 'Only therapist or admin can end group call' });
                 return;
             }
 
@@ -1950,7 +1954,7 @@ const setupVideoCallHandlers = (io, socket) => {
                 timestamp: new Date()
             });
 
-            logger.info(`Group call ended for session ${groupSessionId} by user ${userId}`);
+            logger.info(`Group call ended for session ${groupSessionId} by user ${userId} (${userRole})`);
         } catch (error) {
             logger.error('Error ending group call:', error);
             socket.emit('error', { message: 'Failed to end group call' });
