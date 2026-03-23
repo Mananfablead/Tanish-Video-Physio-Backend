@@ -542,7 +542,25 @@ const verifyPayment = async (req, res, next) => {
                         );
 
                         if (slotIndex !== -1) {
-                            availability.timeSlots[slotIndex].status = 'booked';
+                            const slot = availability.timeSlots[slotIndex];
+
+                            // For group sessions, increment bookedParticipants
+                            if (slot.sessionType === 'group') {
+                                slot.bookedParticipants = (slot.bookedParticipants || 0) + 1;
+
+                                // Mark as booked only if full
+                                if (slot.maxParticipants && slot.bookedParticipants >= slot.maxParticipants) {
+                                    slot.status = 'booked';
+                                } else {
+                                    slot.status = 'available'; // Keep available until full
+                                }
+
+                                console.log(`✅ Updated group slot: ${slot.bookedParticipants}/${slot.maxParticipants} participants booked`);
+                            } else {
+                                // For 1-on-1 sessions, just mark as booked
+                                slot.status = 'booked';
+                            }
+
                             await availability.save();
                             console.log(`Successfully booked slot ${booking.timeSlot.start}-${booking.timeSlot.end} for therapist ${booking.therapistId} on ${booking.scheduledDate}`);
                         } else {
@@ -1013,7 +1031,25 @@ const verifyGuestPayment = async (req, res, next) => {
                         );
   
                         if (slotIndex !== -1) {
-                            availability.timeSlots[slotIndex].status = 'booked';
+                            const slot = availability.timeSlots[slotIndex];
+
+                            // For group sessions, increment bookedParticipants
+                            if (slot.sessionType === 'group') {
+                                slot.bookedParticipants = (slot.bookedParticipants || 0) + 1;
+
+                                // Mark as booked only if full
+                                if (slot.maxParticipants && slot.bookedParticipants >= slot.maxParticipants) {
+                                    slot.status = 'booked';
+                                } else {
+                                    slot.status = 'available'; // Keep available until full
+                                }
+
+                                console.log(`✅ Updated group slot: ${slot.bookedParticipants}/${slot.maxParticipants} participants booked`);
+                            } else {
+                                // For 1-on-1 sessions, just mark as booked
+                                slot.status = 'booked';
+                            }
+
                             await availability.save();
                             console.log(`Successfully booked slot ${booking.timeSlot.start}-${booking.timeSlot.end} for therapist ${booking.therapistId} on ${booking.scheduledDate}`);
                         } else {
@@ -1402,9 +1438,9 @@ const handleWebhook = async (req, res) => {
 // Create a subscription payment order for Razorpay
 const createSubscriptionOrder = async (req, res, next) => {
     try {
-        const { planId, amount, currency = 'INR', couponCode, scheduleType, scheduledDate, scheduledTime, timeSlot, therapistId } = req.body;
+        const { planId, amount, currency = 'INR', couponCode, scheduleType, scheduledDate, scheduledTime, timeSlot, therapistId, sessionType } = req.body;
 
-        console.log('🔍 Subscription order request:', { planId, amount, currency, couponCode, scheduleType, scheduledDate, scheduledTime, timeSlot, therapistId });
+        console.log('🔍 Subscription order request:', { planId, amount, currency, couponCode, scheduleType, scheduledDate, scheduledTime, timeSlot, therapistId, sessionType });
 
         // Validate plan exists in the database
         const plan = await SubscriptionPlan.findOne({ planId, status: 'active' });
@@ -1916,7 +1952,11 @@ const verifySubscriptionPayment = async (req, res, next) => {
                         date: bookingDate,
                         time: bookingTime,
                         scheduleType: subscription.scheduleType || 'now', // Set schedule type based on subscription
-                        status: 'confirmed', // Initially confirmed
+                        scheduledDate: subscription.scheduledDate || null,
+                        scheduledTime: subscription.scheduledTime || null,
+                        timeSlot: subscription.timeSlot || null,
+                        sessionType: subscription.sessionType || null, // Store session type for group sessions
+                        status: 'pending', // Pending admin approval (changed from 'confirmed')
                         notes: `Booking created automatically from subscription purchase (Order ID: ${orderId})`,
                         paymentStatus: 'paid',
                         amount: subscription.amount,
@@ -2002,14 +2042,32 @@ const verifySubscriptionPayment = async (req, res, next) => {
                         });
 
                         if (availability) {
-                            // Find and update the specific time slot from 'tentative' to 'booked'
+                            // Find and update the specific time slot
                             const slotIndex = availability.timeSlots.findIndex(slot =>
                                 slot.start === subscription.timeSlot.start &&
                                 slot.end === subscription.timeSlot.end
                             );
 
                             if (slotIndex !== -1) {
-                                availability.timeSlots[slotIndex].status = 'booked';
+                                const slot = availability.timeSlots[slotIndex];
+
+                                // For group sessions, increment bookedParticipants
+                                if (slot.sessionType === 'group') {
+                                    slot.bookedParticipants = (slot.bookedParticipants || 0) + 1;
+
+                                    // Mark as booked only if full
+                                    if (slot.maxParticipants && slot.bookedParticipants >= slot.maxParticipants) {
+                                        slot.status = 'booked';
+                                    } else {
+                                        slot.status = 'available'; // Keep available until full
+                                    }
+
+                                    console.log(`✅ Updated group slot: ${slot.bookedParticipants}/${slot.maxParticipants} participants booked`);
+                                } else {
+                                    // For 1-on-1 sessions, just mark as booked
+                                    slot.status = 'booked';
+                                }
+
                                 await availability.save();
                                 console.log(`Successfully booked slot ${subscription.timeSlot.start}-${subscription.timeSlot.end} for therapist ${subscription.therapistId} on ${subscription.scheduledDate}`);
                             } else {
@@ -2189,6 +2247,78 @@ const verifySubscriptionPayment = async (req, res, next) => {
                                 endTime.setMinutes(endTime.getMinutes() + (plan.duration ? parseInt(plan.duration.match(/(\d+)/)?.[1] || '60') : 60));
                             }
 
+                            // Determine session type based on plan
+                            const sessionType = plan.session_type || 'individual';
+                            const isGroupSession = sessionType === 'group';
+
+                            console.log('DEBUG: Creating initial session for subscription:', {
+                                planName: plan.name,
+                                sessionType: sessionType,
+                                isGroupSession: isGroupSession,
+                                scheduledDate: subscription.scheduledDate,
+                                timeSlot: subscription.timeSlot
+                            });
+
+                            // For group sessions, create or find a GroupSession first
+                            let groupSessionId = null;
+                            if (isGroupSession && subscription.scheduledDate && subscription.timeSlot) {
+                                try {
+                                    const GroupSession = require('../models/GroupSession.model');
+
+                                    const groupStartTime = new Date(`${subscription.scheduledDate}T${subscription.timeSlot.start}:00`);
+                                    const groupEndTime = new Date(`${subscription.scheduledDate}T${subscription.timeSlot.end}:00`);
+
+                                    // Find existing GroupSession for this time slot
+                                    let existingGroupSession = await GroupSession.findOne({
+                                        therapistId: subscription.therapistId,
+                                        startTime: groupStartTime,
+                                        endTime: groupEndTime,
+                                        status: 'scheduled'
+                                    });
+
+                                    if (!existingGroupSession) {
+                                        // Create new GroupSession
+                                        existingGroupSession = new GroupSession({
+                                            title: `Group Session - ${plan.name} - ${subscription.timeSlot.start}`,
+                                            description: 'Group physiotherapy session',
+                                            therapistId: subscription.therapistId,
+                                            startTime: groupStartTime,
+                                            endTime: groupEndTime,
+                                            maxParticipants: plan.maxParticipantsPerSession || 5,
+                                            participants: [],
+                                            status: 'scheduled',
+                                            isActiveCall: false
+                                        });
+
+                                        await existingGroupSession.save();
+                                        console.log('✅ Created GroupSession for subscription:', existingGroupSession._id);
+                                    }
+
+                                    // Add user to participants
+                                    const userAlreadyInGroup = existingGroupSession.participants.some(
+                                        p => p.userId.toString() === subscription.userId.toString()
+                                    );
+
+                                    if (!userAlreadyInGroup) {
+                                        existingGroupSession.participants.push({
+                                            userId: subscription.userId,
+                                            joinedAt: new Date(),
+                                            status: 'accepted',
+                                            bookingId: null // Will be linked if there's a booking
+                                        });
+
+                                        await existingGroupSession.save();
+                                        console.log('✅ Added user to GroupSession:', existingGroupSession._id);
+                                    }
+
+                                    groupSessionId = existingGroupSession._id;
+
+                                } catch (groupError) {
+                                    console.error('❌ Error creating GroupSession:', groupError);
+                                    // Don't fail the session creation if GroupSession fails
+                                }
+                            }
+
                             const session = new Session({
                                 therapistId: subscription.therapistId, // Use therapist from subscription if available
                                 userId: subscription.userId,
@@ -2196,12 +2326,19 @@ const verifySubscriptionPayment = async (req, res, next) => {
                                 time: sessionTime, // Use timeSlot start or scheduled time or default
                                 startTime: startTime,
                                 endTime: endTime,
-                                type: '1-on-1',
+                                type: isGroupSession ? 'group' : '1-on-1',
+                                sessionType: sessionType,
+                                maxParticipants: isGroupSession ? (plan.maxParticipantsPerSession || 5) : 1,
                                 status: 'pending', // Changed from 'scheduled' to 'pending' as requested
                                 notes: `Initial session created automatically from subscription plan ${plan.name}`,
                                 subscriptionId: subscription._id,
                                 duration: Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60)) // Calculate duration in minutes
                             });
+
+                            // For group sessions, create or find a GroupSession
+                            if (isGroupSession && groupSessionId) {
+                                session.groupSessionId = groupSessionId;
+                            }
 
                             // Set end time based on duration
                             if (session.duration > 0) {
@@ -2652,6 +2789,16 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
                                 endTime.setMinutes(endTime.getMinutes() + (plan.duration ? parseInt(plan.duration.match(/(\d+)/)?.[1] || '60') : 60));
                             }
 
+                            // Determine session type based on plan
+                            const sessionType = plan.session_type || 'individual';
+                            const isGroupSession = sessionType === 'group';
+
+                            console.log('DEBUG (Guest): Creating initial session for subscription:', {
+                                planName: plan.name,
+                                sessionType: sessionType,
+                                isGroupSession: isGroupSession
+                            });
+
                             const session = new Session({
                                 therapistId: subscription.therapistId,
                                 userId: userIdToCheck,
@@ -2659,7 +2806,9 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
                                 time: sessionTime,
                                 startTime: startTime,
                                 endTime: endTime,
-                                type: '1-on-1',
+                                type: isGroupSession ? 'group' : '1-on-1',
+                                sessionType: sessionType,
+                                maxParticipants: isGroupSession ? (plan.maxParticipantsPerSession || 5) : 1,
                                 status: 'pending',
                                 notes: `Initial session created from subscription #${subscription._id}`,
                                 subscriptionId: subscription._id,
