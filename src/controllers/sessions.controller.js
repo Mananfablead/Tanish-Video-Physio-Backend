@@ -10,6 +10,8 @@ const { generateJoinLink } = require("../utils/videoCall.utils");
 const NotificationService = require("../services/notificationService");
 const logger = require('../utils/logger');
 const { getIO } = require('../utils/socketManager'); // Import socket manager
+const { getUTCFromLocal } = require('../utils/timezone.utils'); // Import timezone utility
+const config = require('../config/env');
 
 // Helper function to check subscription session limits
 const checkSubscriptionLimits = async (subscriptionId, userId = null) => {
@@ -619,7 +621,8 @@ const createSession = async (req, res, next) => {
     }
 
     /* ================= TIME ================= */
-    const startTime = new Date(`${date}T${time}:00`);
+    // Convert local time to UTC for consistent timezone handling
+    const startTime = getUTCFromLocal(date, time, config.GOOGLE_CALENDAR_TIMEZONE || 'Asia/Kolkata');
     const endTime =
       duration && duration > 0
         ? new Date(startTime.getTime() + duration * 60000)
@@ -797,7 +800,8 @@ const updateSession = async (req, res, next) => {
     // If time is provided, update time fields
     if (time !== undefined) {
       updateFields.time = time;
-      const startTime = new Date(`${sessionWithUpdatedStatus.date}T${time}:00`);
+      // Convert local time to UTC for consistent timezone handling
+      const startTime = getUTCFromLocal(sessionWithUpdatedStatus.date, time, config.GOOGLE_CALENDAR_TIMEZONE || 'Asia/Kolkata');
       updateFields.startTime = startTime;
     }
 
@@ -973,7 +977,8 @@ const rescheduleUserSession = async (req, res, next) => {
     }
 
     // Auto-generate new startTime from date and time
-    const startTime = new Date(`${date}T${time}:00`);
+    // Convert local time to UTC for consistent timezone handling
+    const startTime = getUTCFromLocal(date, time, config.GOOGLE_CALENDAR_TIMEZONE || 'Asia/Kolkata');
 
     /* ================= RESCHEDULE SLOT VALIDATION ================= */
     // Fetch the availability to get the slot information
@@ -1377,7 +1382,8 @@ const createAdminSession = async (req, res, next) => {
     }
 
     // Auto-generate startTime from date and time
-    const startTime = new Date(`${date}T${time}:00`);
+    // Convert local time to UTC for consistent timezone handling
+    const startTime = getUTCFromLocal(date, time, config.GOOGLE_CALENDAR_TIMEZONE || 'Asia/Kolkata');
 
     /* ================= ADMIN SLOT VALIDATION ================= */
     // Fetch the availability to get the slot information
@@ -1670,13 +1676,16 @@ const updateAdminSession = async (req, res, next) => {
 
     // If date and time are provided, update startTime as well
     if (date && time) {
-      updateFields.startTime = new Date(`${date}T${time}:00`);
+      // Convert local time to UTC for consistent timezone handling
+      updateFields.startTime = getUTCFromLocal(date, time, config.GOOGLE_CALENDAR_TIMEZONE || 'Asia/Kolkata');
     } else if (time && !date) {
       // If only time is provided, use the existing date
-      updateFields.startTime = new Date(`${sessionWithUpdatedStatus.date}T${time}:00`);
+      // Convert local time to UTC for consistent timezone handling
+      updateFields.startTime = getUTCFromLocal(sessionWithUpdatedStatus.date, time, config.GOOGLE_CALENDAR_TIMEZONE || 'Asia/Kolkata');
     } else if (date && !time) {
       // If only date is provided, use the existing time
-      updateFields.startTime = new Date(`${date}T${sessionWithUpdatedStatus.time}:00`);
+      // Convert local time to UTC for consistent timezone handling
+      updateFields.startTime = getUTCFromLocal(date, sessionWithUpdatedStatus.time, config.GOOGLE_CALENDAR_TIMEZONE || 'Asia/Kolkata');
     }
 
     // Update session
