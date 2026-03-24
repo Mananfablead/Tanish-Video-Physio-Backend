@@ -3,7 +3,7 @@ const config = require('../config/env');
 
 // Create logger instance
 const logger = winston.createLogger({
-    level: config.NODE_ENV === 'production' ? 'info' : 'debug',
+    level: config.NODE_ENV === 'production' ? 'warn' : 'debug', // Reduced logging in production
     format: winston.format.combine(
         winston.format.timestamp(),
         winston.format.errors({ stack: true }),
@@ -12,8 +12,9 @@ const logger = winston.createLogger({
     ),
     defaultMeta: { service: 'tanish-physio-backend' },
     transports: [
-        // Write all logs with level 'info' and below to console
+        // Write errors to console in production, all logs in development
         new winston.transports.Console({
+            level: config.NODE_ENV === 'production' ? 'error' : 'debug',
             format: winston.format.combine(
                 winston.format.colorize(),
                 winston.format.simple()
@@ -24,9 +25,10 @@ const logger = winston.createLogger({
             filename: 'logs/error.log',
             level: 'error'
         }),
-        // Write all logs info (and below) to combined.log
+        // Write warnings and above to combined.log in production, all logs in development
         new winston.transports.File({
-            filename: 'logs/combined.log'
+            filename: 'logs/combined.log',
+            level: config.NODE_ENV === 'production' ? 'warn' : 'info'
         })
     ]
 });

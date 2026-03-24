@@ -226,17 +226,17 @@ const createBooking = async (req, res, next) => {
             });
 
             if (availability) {
-                const slot = availability.timeSlots.find(s => 
+                const slot = availability.timeSlots.find(s =>
                     s.start === timeSlot.start && s.end === timeSlot.end
                 );
 
                 if (slot) {
                     // Get user's subscription info to validate plan type
                     const user = await User.findById(req.user.userId);
-                    
+
                     if (user && user.subscriptionInfo && user.subscriptionInfo.planId) {
                         const SubscriptionPlan = require('../models/SubscriptionPlan.model');
-                        const userPlan = await SubscriptionPlan.findOne({ 
+                        const userPlan = await SubscriptionPlan.findOne({
                             $or: [
                                 { _id: user.subscriptionInfo.planId },
                                 { planId: user.subscriptionInfo.planId }
@@ -247,10 +247,10 @@ const createBooking = async (req, res, next) => {
                             // Validate session type matches plan type
                             const planSessionType = userPlan.session_type || 'individual';
                             const slotSessionType = slot.sessionType || 'one-to-one';
-                            
+
                             // Map 'one-to-one' to 'individual' for comparison
                             const normalizedSlotType = slotSessionType === 'one-to-one' ? 'individual' : slotSessionType;
-                            
+
                             if (planSessionType !== normalizedSlotType) {
                                 return res.status(403).json(ApiResponse.error(
                                     `Your ${userPlan.name} plan only allows ${userPlan.session_type} sessions. This slot is for ${slot.sessionType} sessions.`
@@ -294,14 +294,14 @@ const createBooking = async (req, res, next) => {
             // For free consultations, check if user has already used their free session(s)
             const User = require('../models/User.model');
             const user = await User.findById(req.user.userId);
-            
+
             if (!user) {
                 return res.status(404).json(ApiResponse.error('User not found'));
             }
-            
+
             // Calculate how many free consultations the user is eligible for
             let maxFreeConsultations = 1; // Default: 1 free consultation for all users
-            
+
             // Check if user has an active subscription
             if (subscription && !subscription.isExpired) {
                 let plan = null;
@@ -315,7 +315,7 @@ const createBooking = async (req, res, next) => {
                         plan = await SubscriptionPlan.findOne({ planId: subscription.planId });
                     }
                 }
-                
+
                 if (plan) {
                     // Check plan duration to determine free sessions
                     if (plan.duration === 'monthly') {
@@ -325,10 +325,10 @@ const createBooking = async (req, res, next) => {
                     }
                 }
             }
-            
+
             // Check if user has already used their free consultations
             const freeConsultationsUsed = user.freeConsultationsUsed || 0;
-            
+
             if (freeConsultationsUsed >= maxFreeConsultations) {
                 return res.status(400).json(ApiResponse.error(
                     `You have already used your ${maxFreeConsultations} free consultation${maxFreeConsultations > 1 ? 's' : ''}. Please book a regular session.`
@@ -747,7 +747,7 @@ async function checkTimeSlotAvailability(therapistId, date, time, timeSlot, book
                 const user = await User.findById(userId);
                 if (user && user.subscriptionInfo && user.subscriptionInfo.planId) {
                     const SubscriptionPlan = require('../models/SubscriptionPlan.model');
-                    const userPlan = await SubscriptionPlan.findOne({ 
+                    const userPlan = await SubscriptionPlan.findOne({
                         $or: [
                             { _id: user.subscriptionInfo.planId },
                             { planId: user.subscriptionInfo.planId }
@@ -758,11 +758,11 @@ async function checkTimeSlotAvailability(therapistId, date, time, timeSlot, book
                         const planSessionType = userPlan.session_type || 'individual';
                         const slotSessionType = requestedSlot.sessionType || 'one-to-one';
                         const normalizedSlotType = slotSessionType === 'one-to-one' ? 'individual' : slotSessionType;
-                        
+
                         if (planSessionType !== normalizedSlotType) {
-                            return { 
-                                available: false, 
-                                message: `Your ${userPlan.name} plan only allows ${userPlan.session_type} sessions. This slot is for ${requestedSlot.sessionType} sessions.` 
+                            return {
+                                available: false,
+                                message: `Your ${userPlan.name} plan only allows ${userPlan.session_type} sessions. This slot is for ${requestedSlot.sessionType} sessions.`
                             };
                         }
                     }
@@ -1159,7 +1159,7 @@ const updateBooking = async (req, res, next) => {
                     // Get the slot's session type
                     let slotSessionType = 'one-to-one';
                     let slotMaxParticipants = 1;
-                    
+
                     if (currentBooking.timeSlot && currentBooking.date) {
                         const availability = await Availability.findOne({
                             therapistId: currentBooking.therapistId,
@@ -1167,7 +1167,7 @@ const updateBooking = async (req, res, next) => {
                         });
 
                         if (availability) {
-                            const slot = availability.timeSlots.find(s => 
+                            const slot = availability.timeSlots.find(s =>
                                 s.start === currentBooking.timeSlot.start && s.end === currentBooking.timeSlot.end
                             );
 
@@ -1583,7 +1583,7 @@ const updateBookingStatus = async (req, res, next) => {
                 // Get the slot's session type
                 let slotSessionType = 'one-to-one';
                 let slotMaxParticipants = 1;
-                
+
                 if (booking.timeSlot && booking.scheduledDate) {
                     const availability = await Availability.findOne({
                         therapistId: booking.therapistId,
@@ -1591,7 +1591,7 @@ const updateBookingStatus = async (req, res, next) => {
                     });
 
                     if (availability) {
-                        const slot = availability.timeSlots.find(s => 
+                        const slot = availability.timeSlots.find(s =>
                             s.start === booking.timeSlot.start && s.end === booking.timeSlot.end
                         );
 
@@ -1612,7 +1612,7 @@ const updateBookingStatus = async (req, res, next) => {
                         const sessionEndTime = booking.timeSlot?.end || booking.scheduledTime || booking.time || '10:00';
                         const groupSessionStartTime = new Date(`${booking.scheduledDate}T${booking.timeSlot.start}:00`);
                         const groupSessionEndTime = new Date(`${booking.scheduledDate}T${booking.timeSlot.end}:00`);
-                        
+
                         // Find existing GroupSession for this time slot
                         const existingGroupSession = await GroupSession.findOne({
                             therapistId: booking.therapistId,
@@ -1620,7 +1620,7 @@ const updateBookingStatus = async (req, res, next) => {
                             endTime: groupSessionEndTime,
                             status: 'scheduled'
                         });
-                        
+
                         if (existingGroupSession) {
                             groupSessionId = existingGroupSession._id;
                             console.log(`✅ Found existing GroupSession ${groupSessionId} for group booking ${booking._id}`);
@@ -1677,7 +1677,7 @@ const updateBookingStatus = async (req, res, next) => {
                 // Get the slot's session type
                 let slotSessionType = 'one-to-one';
                 let slotMaxParticipants = 1;
-                
+
                 if (booking.timeSlot && booking.scheduledDate) {
                     const availability = await Availability.findOne({
                         therapistId: booking.therapistId,
@@ -1685,7 +1685,7 @@ const updateBookingStatus = async (req, res, next) => {
                     });
 
                     if (availability) {
-                        const slot = availability.timeSlots.find(s => 
+                        const slot = availability.timeSlots.find(s =>
                             s.start === booking.timeSlot.start && s.end === booking.timeSlot.end
                         );
 
@@ -1930,7 +1930,7 @@ const getAllBookingsForAdmin = async (req, res, next) => {
 
         // Allow additional filtering
         if (status) query.status = status;
-        
+
         // Override paymentStatus if explicitly provided (to view cancelled/pending if needed)
         if (req.query.paymentStatus && req.query.paymentStatus !== 'all') {
             query.paymentStatus = req.query.paymentStatus;
@@ -2111,17 +2111,17 @@ const createGuestBooking = async (req, res, next) => {
         if (bookingType === 'free-consultation') {
             // Calculate how many free consultations the user is eligible for
             let maxFreeConsultations = 1; // Default: 1 free consultation for all users
-            
+
             console.log('[Free Consultation Check] User:', user._id, 'Email:', user.email);
-            
+
             // Check if user has an active subscription
             const subscription = await Subscription.findOne({
                 userId: user._id,
                 status: 'active'
             }).populate('planId');
-            
+
             console.log('[Free Consultation Check] Subscription:', subscription ? { id: subscription._id, status: subscription.status } : 'No active subscription');
-            
+
             if (subscription && !subscription.isExpired) {
                 let plan = null;
                 if (subscription.planId) {
@@ -2134,9 +2134,9 @@ const createGuestBooking = async (req, res, next) => {
                         plan = await SubscriptionPlan.findOne({ planId: subscription.planId });
                     }
                 }
-                
+
                 console.log('[Free Consultation Check] Plan:', plan ? { name: plan.name, duration: plan.duration } : 'No plan found');
-                
+
                 if (plan) {
                     // Check plan duration to determine free sessions
                     if (plan.duration === 'monthly') {
@@ -2148,12 +2148,12 @@ const createGuestBooking = async (req, res, next) => {
                     }
                 }
             }
-            
+
             // Check if user has already used their free consultations
             const freeConsultationsUsed = user.freeConsultationsUsed || 0;
-            
+
             console.log('[Free Consultation Check]', { maxFreeConsultations, freeConsultationsUsed, isEligible: freeConsultationsUsed < maxFreeConsultations });
-            
+
             if (freeConsultationsUsed >= maxFreeConsultations) {
                 return res.status(400).json(ApiResponse.error(
                     `You have already used your ${maxFreeConsultations} free consultation${maxFreeConsultations > 1 ? 's' : ''}. Please book a regular session.`
@@ -2505,8 +2505,8 @@ const createBookingWithSubscription = async (req, res, next) => {
             userId: req.user.userId,
             status: 'active'
         })
-        .sort({ createdAt: -1 }) // Get the most recent one
-        .populate('planId');
+            .sort({ createdAt: -1 }) // Get the most recent one
+            .populate('planId');
 
         if (!subscription) {
             return res.status(400).json(ApiResponse.error('No active subscription found'));
@@ -2650,18 +2650,18 @@ const createBookingWithSubscription = async (req, res, next) => {
             });
 
             if (availability) {
-                const slot = availability.timeSlots.find(s => 
+                const slot = availability.timeSlots.find(s =>
                     s.start === timeSlot.start && s.end === timeSlot.end
                 );
 
                 if (slot) {
                     slotSessionType = slot.sessionType || 'one-to-one';
                     slotMaxParticipants = slot.maxParticipants || 1;
-                    
+
                     // Validate plan type matches slot type
                     const planSessionType = plan.session_type || 'individual';
                     const normalizedSlotType = slotSessionType === 'one-to-one' ? 'individual' : slotSessionType;
-                    
+
                     if (planSessionType !== normalizedSlotType) {
                         return res.status(403).json(ApiResponse.error(
                             `Your ${plan.name} plan only allows ${plan.session_type} sessions. This slot is for ${slotSessionType} sessions.`
@@ -2882,48 +2882,48 @@ const createBookingWithSubscription = async (req, res, next) => {
 
                 // Save to database first
                 const adminNotification = new Notification({
-                title: 'New Subscription Session Request',
-                message: `${user?.name || 'Client'} booked a session with subscription for ${date} at ${time}`,
-                type: 'session',
-                recipientType: 'admin',
-                adminId: req.user.userId, // ✅ Set admin ID
-                sessionId: session._id,
-                bookingId: booking._id,
-                subscriptionId: subscription._id,
-                priority: 'medium',
-                channels: { inApp: true },
-                metadata: {
+                    title: 'New Subscription Session Request',
+                    message: `${user?.name || 'Client'} booked a session with subscription for ${date} at ${time}`,
+                    type: 'session',
+                    recipientType: 'admin',
+                    adminId: req.user.userId, // ✅ Set admin ID
+                    sessionId: session._id,
+                    bookingId: booking._id,
+                    subscriptionId: subscription._id,
+                    priority: 'medium',
+                    channels: { inApp: true },
+                    metadata: {
+                        clientName: user?.name || 'Client',
+                        serviceName: service?.name || 'Subscription Session',
+                        date: date,
+                        time: time
+                    }
+                });
+
+                await adminNotification.save();
+
+                // Emit with database ID
+                io.to('admin_notifications').emit('admin-notification', {
+                    id: adminNotification._id,
+                    type: 'session',
+                    title: 'New Subscription Session Request',
+                    message: `${user?.name || 'Client'} booked a session with subscription for ${date} at ${time}`,
+                    sessionId: session._id,
+                    bookingId: booking._id,
+                    subscriptionId: subscription._id,
                     clientName: user?.name || 'Client',
                     serviceName: service?.name || 'Subscription Session',
                     date: date,
-                    time: time
-                }
-            });
-
-            await adminNotification.save();
-
-            // Emit with database ID
-            io.to('admin_notifications').emit('admin-notification', {
-                id: adminNotification._id,
-                type: 'session',
-                title: 'New Subscription Session Request',
-                message: `${user?.name || 'Client'} booked a session with subscription for ${date} at ${time}`,
-                sessionId: session._id,
-                bookingId: booking._id,
-                subscriptionId: subscription._id,
-                clientName: user?.name || 'Client',
-                serviceName: service?.name || 'Subscription Session',
-                date: date,
-                time: time,
-                timestamp: adminNotification.createdAt
-            });
+                    time: time,
+                    timestamp: adminNotification.createdAt
+                });
 
                 logger.info(`Real-time notification saved and sent to admin for subscription session`);
-        } catch (notificationError) {
+            } catch (notificationError) {
                 console.error(`❌ Error sending admin session notification:`, notificationError);
-            logger.error('Error sending real-time subscription session notification to admin:', notificationError);
-            // Continue with response even if notification fails
-        }
+                logger.error('Error sending real-time subscription session notification to admin:', notificationError);
+                // Continue with response even if notification fails
+            }
         } // End of if (scheduleType !== 'later') for notifications
 
         // Also update the booking to link it properly with subscription
@@ -2934,7 +2934,7 @@ const createBookingWithSubscription = async (req, res, next) => {
         // Get updated counts for the response
         const updatedUsedSessions = usedSessions + 1;
         const updatedRemainingSessions = remainingSessions - 1;
-        
+
         // Count used services for this subscription (all bookings associated with subscription)
         const updatedUsedServices = await Booking.countDocuments({
             $or: [
@@ -2944,7 +2944,7 @@ const createBookingWithSubscription = async (req, res, next) => {
             status: { $ne: "cancelled" }
         });
         const updatedRemainingServices = plan.totalService ? plan.totalService - updatedUsedServices : 0;
-        
+
         // Prepare response data
         const responseData = {
             booking,
@@ -2984,8 +2984,8 @@ const checkSubscriptionBookingEligibility = async (req, res, next) => {
             userId: req.user.userId,
             status: 'active'
         })
-        .sort({ createdAt: -1 }) // Get the most recent one
-        .populate('planId');
+            .sort({ createdAt: -1 }) // Get the most recent one
+            .populate('planId');
 
         if (!subscription) {
             return res.status(200).json(ApiResponse.success({

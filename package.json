@@ -8,7 +8,9 @@
     "dev": "nodemon server.js",
     "test": "jest",
     "trigger-reminders": "node scripts/triggerReminders.js",
-    "cleanup-stale-payments": "node scripts/stalePaymentCleanup.js"
+    "cleanup-stale-payments": "node scripts/stalePaymentCleanup.js",
+    "health-check": "node scripts/health-check.js",
+    "monitor": "node scripts/monitor.js"
   },
   "keywords": [
     "physio",

@@ -49,9 +49,9 @@ class ReminderService {
         */
     }
 
-    // Schedule session reminders (every minute)
+    // Schedule session reminders (every 15 minutes instead of every minute)
     scheduleSessionReminders() {
-        const job = cron.schedule('* * * * *', async () => {
+        const job = cron.schedule('*/15 * * * *', async () => {
             console.log('Running session reminder job...');
             await this.processSessionReminders();
         });
@@ -68,8 +68,6 @@ class ReminderService {
     // Process session reminders
     async processSessionReminders() {
         try {
-            console.log('Running session reminder job...');
-
             // Find upcoming sessions that need reminders
             const now = new Date();
             const in24Hours = new Date(now.getTime() + 24 * 60 * 60 * 1000);
@@ -99,33 +97,36 @@ class ReminderService {
                 .populate('therapistId', 'name email phone')
                 .populate('bookingId');
 
-            console.log(`Found ${sessionsFor24HourReminder.length} sessions for 24-hour reminders`);
-            console.log(`Found ${sessionsFor1HourReminder.length} sessions for 1-hour reminders`);
-
             // Send 24-hour reminders
-            for (const session of sessionsFor24HourReminder) {
-                try {
-                    await this.sendSessionReminder(session, '24hour');
-                    await this.updateSessionReminderSent(session, '24hour');
-                    console.log(`✅ 24-hour reminder sent for session ${session._id}`);
-                } catch (error) {
-                    console.error(`❌ Error sending 24-hour reminder for session ${session._id}:`, error);
+            if (sessionsFor24HourReminder.length > 0) {
+                console.log(`Sending ${sessionsFor24HourReminder.length} 24-hour reminders`);
+                for (const session of sessionsFor24HourReminder) {
+                    try {
+                        await this.sendSessionReminder(session, '24hour');
+                        await this.updateSessionReminderSent(session, '24hour');
+                    } catch (error) {
+                        logger.error(`Error sending 24-hour reminder for session ${session._id}:`, error);
+                    }
                 }
             }
 
             // Send 1-hour reminders
-            for (const session of sessionsFor1HourReminder) {
-                try {
-                    await this.sendSessionReminder(session, '1hour');
-                    await this.updateSessionReminderSent(session, '1hour');
-                    console.log(`✅ 1-hour reminder sent for session ${session._id}`);
-                } catch (error) {
-                    console.error(`❌ Error sending 1-hour reminder for session ${session._id}:`, error);
+            if (sessionsFor1HourReminder.length > 0) {
+                console.log(`Sending ${sessionsFor1HourReminder.length} 1-hour reminders`);
+                for (const session of sessionsFor1HourReminder) {
+                    try {
+                        await this.sendSessionReminder(session, '1hour');
+                        await this.updateSessionReminderSent(session, '1hour');
+                    } catch (error) {
+                        logger.error(`Error sending 1-hour reminder for session ${session._id}:`, error);
+                    }
                 }
             }
 
+            logger.info(`Session reminder job completed. Sent ${sessionsFor24HourReminder.length} 24h reminders and ${sessionsFor1HourReminder.length} 1h reminders.`);
+
         } catch (error) {
-            console.error('Error in session reminder processing:', error);
+            logger.error('Error in session reminder processing:', error);
         }
     }
 
