@@ -34,5 +34,18 @@ module.exports = {
             // Health check
             status_check_interval: 5000
         }
+        // Stale Payment Cleanup - DISABLED
+        // {
+        //     name: 'stale-payment-cleanup',
+        //     script: './scripts/stalePaymentCleanup.js',
+        //     instances: 1,
+        //     exec_mode: 'fork',
+        //     max_memory_restart: '200M',
+        //     env_production: {
+        //         NODE_ENV: 'production',
+        //         BACKEND_URL: process.env.BACKEND_URL || 'http://localhost:5000',
+        //         ADMIN_TOKEN: process.env.ADMIN_TOKEN || 'your-admin-token-here'
+        //     }
+        // }
     ]
 };

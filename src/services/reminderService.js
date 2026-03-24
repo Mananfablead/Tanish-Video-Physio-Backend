@@ -51,9 +51,12 @@ class ReminderService {
 
     // Schedule session reminders (every 15 minutes instead of every minute)
     scheduleSessionReminders() {
+        console.log('📅 Scheduling session reminders: Every 15 minutes');
         const job = cron.schedule('*/15 * * * *', async () => {
-            console.log('Running session reminder job...');
+            const startTime = Date.now();
+            console.log(`\n⏰ [${new Date().toISOString()}] Running session reminder job...`);
             await this.processSessionReminders();
+            console.log(`✅ Session reminder job completed in ${Date.now() - startTime}ms`);
         });
 
         this.cronJobs.set('sessionReminders', job);
@@ -67,6 +70,7 @@ class ReminderService {
 
     // Process session reminders
     async processSessionReminders() {
+        const startTime = Date.now();
         try {
             // Find upcoming sessions that need reminders
             const now = new Date();
@@ -123,7 +127,10 @@ class ReminderService {
                 }
             }
 
-            logger.info(`Session reminder job completed. Sent ${sessionsFor24HourReminder.length} 24h reminders and ${sessionsFor1HourReminder.length} 1h reminders.`);
+            logger.info(`\n📊 Session Reminder Summary:`);
+            logger.info(`   ✅ 24-hour reminders sent: ${sessionsFor24HourReminder.length}`);
+            logger.info(`   ✅ 1-hour reminders sent: ${sessionsFor1HourReminder.length}`);
+            logger.info(`   ⏱️ Total time: ${Date.now() - startTime}ms\n`);
 
         } catch (error) {
             logger.error('Error in session reminder processing:', error);
