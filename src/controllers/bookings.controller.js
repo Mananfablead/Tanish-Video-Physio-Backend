@@ -609,6 +609,15 @@ Looking forward to helping you!
             const io = getIO();
             const Notification = require('../models/Notification.model');
 
+            console.log(`📢 [Booking Notification] Preparing admin notification for booking ${booking._id}:`, {
+                bookingType: bookingTypeFinal,
+                paymentStatus: booking.paymentStatus,
+                serviceName: serviceName,
+                clientName: booking.clientName,
+                date: date,
+                time: time
+            });
+
             // Save to database first
             const adminNotification = new Notification({
                 title: 'New Booking Request',
@@ -624,14 +633,16 @@ Looking forward to helping you!
                     serviceName: serviceName,
                     date: date,
                     time: time,
-                    status: booking.status
+                    status: booking.status,
+                    bookingType: bookingTypeFinal
                 }
             });
 
             await adminNotification.save();
+            console.log(`✅ [Booking Notification] Saved to database: ${adminNotification._id}`);
 
             // Emit with database ID
-            io.to('admin_notifications').emit('admin-notification', {
+            const notificationPayload = {
                 id: adminNotification._id,
                 type: 'booking',
                 title: 'New Booking Request',
@@ -643,11 +654,16 @@ Looking forward to helping you!
                 time: time,
                 status: booking.status,
                 timestamp: adminNotification.createdAt
-            });
+            };
+
+            console.log(`📡 [Booking Notification] Emitting to admin_notifications room:`, notificationPayload);
+            io.to('admin_notifications').emit('admin-notification', notificationPayload);
 
             logger.info(`Real-time notification saved and sent to admin for new booking ${booking._id}`);
+            console.log(`✅ [Booking Notification] Successfully sent to admin for booking ${booking._id} (${bookingTypeFinal})`);
         } catch (socketError) {
             logger.error('Error sending real-time booking notification to admin:', socketError);
+            console.error(`❌ [Booking Notification] Failed to send notification for booking ${booking._id}:`, socketError);
             // Don't fail the booking if socket notification fails
         }
 
@@ -1561,6 +1577,44 @@ const updateBookingStatus = async (req, res, next) => {
                 // Don't fail the operation if socket notification fails
             }
         }
+        
+        // Handle bookedParticipants decrement for cancelled group sessions
+        if (status === 'cancelled' && booking.timeSlot && booking.scheduledDate) {
+            try {
+                const availability = await Availability.findOne({
+                    therapistId: booking.therapistId,
+                    date: booking.scheduledDate
+                });
+                
+                if (availability) {
+                    const slotIndex = availability.timeSlots.findIndex(s => 
+                        s.start === booking.timeSlot.start && s.end === booking.timeSlot.end
+                    );
+                    
+                    if (slotIndex !== -1) {
+                        const slot = availability.timeSlots[slotIndex];
+                        
+                        // Only decrement for group slots
+                        if (slot.sessionType === 'group') {
+                            if (typeof slot.bookedParticipants === 'number' && slot.bookedParticipants > 0) {
+                                slot.bookedParticipants -= 1;
+                                
+                                // Update slot status based on capacity
+                                if (slot.bookedParticipants < slot.maxParticipants) {
+                                    slot.status = 'available';
+                                }
+                                
+                                await availability.save();
+                                console.log(`✅ Decremented bookedParticipants for cancelled group slot: ${slot.bookedParticipants}/${slot.maxParticipants} participants booked`);
+                            }
+                        }
+                    }
+                }
+            } catch (availError) {
+                console.error('❌ Error decrementing bookedParticipants for cancelled booking:', availError);
+                // Continue without failing the cancellation
+            }
+        }
 
         /* =========================================================
            ✅ 1️⃣ AUTO CREATE SESSION (Subscription Covered)
@@ -1604,29 +1658,61 @@ const updateBookingStatus = async (req, res, next) => {
 
                 const startTime = new Date(`${sessionDate}T${sessionTime}`);
 
-                // For group sessions, find the GroupSession to link to
+                // For group sessions, find or create the GroupSession to link to
                 let groupSessionId = null;
                 if (slotSessionType === 'group' && booking.timeSlot && booking.scheduledDate) {
                     try {
                         const GroupSession = require('../models/GroupSession.model');
-                        const sessionEndTime = booking.timeSlot?.end || booking.scheduledTime || booking.time || '10:00';
                         const groupSessionStartTime = new Date(`${booking.scheduledDate}T${booking.timeSlot.start}:00`);
                         const groupSessionEndTime = new Date(`${booking.scheduledDate}T${booking.timeSlot.end}:00`);
 
                         // Find existing GroupSession for this time slot
-                        const existingGroupSession = await GroupSession.findOne({
+                        let existingGroupSession = await GroupSession.findOne({
                             therapistId: booking.therapistId,
                             startTime: groupSessionStartTime,
                             endTime: groupSessionEndTime,
                             status: 'scheduled'
                         });
-
-                        if (existingGroupSession) {
-                            groupSessionId = existingGroupSession._id;
-                            console.log(`✅ Found existing GroupSession ${groupSessionId} for group booking ${booking._id}`);
+                        
+                        if (!existingGroupSession) {
+                            // Create new GroupSession for this time slot
+                            existingGroupSession = new GroupSession({
+                                title: `Group Session - ${booking.therapistName || 'Therapist'} - ${booking.timeSlot.start}`,
+                                description: 'Group physiotherapy session',
+                                therapistId: booking.therapistId,
+                                startTime: groupSessionStartTime,
+                                endTime: groupSessionEndTime,
+                                maxParticipants: slotMaxParticipants,
+                                participants: [],
+                                status: 'scheduled',
+                                isActiveCall: false
+                            });
+                            
+                            await existingGroupSession.save();
+                            console.log(`✅ Created new GroupSession ${existingGroupSession._id} for time slot ${booking.timeSlot.start}-${booking.timeSlot.end}`);
                         }
+                        
+                        // Add user to GroupSession participants if not already added
+                        const userAlreadyInGroup = existingGroupSession.participants.some(
+                            p => p.userId && p.userId.toString() === booking.userId.toString()
+                        );
+                        
+                        if (!userAlreadyInGroup) {
+                            existingGroupSession.participants.push({
+                                userId: booking.userId,
+                                joinedAt: new Date(),
+                                status: 'accepted',
+                                bookingId: booking._id
+                            });
+                            
+                            await existingGroupSession.save();
+                            console.log(`✅ Added user ${booking.userId} to GroupSession ${existingGroupSession._id}`);
+                        }
+                        
+                        groupSessionId = existingGroupSession._id;
+                        console.log(`✅ Found existing GroupSession ${groupSessionId} for group booking ${booking._id}`);
                     } catch (groupError) {
-                        console.error('❌ Error finding GroupSession:', groupError);
+                        console.error('❌ Error creating/finding GroupSession:', groupError);
                         // Continue without failing the session creation
                     }
                 }
@@ -1652,7 +1738,53 @@ const updateBookingStatus = async (req, res, next) => {
                 session.endTime = endTime;
 
                 await session.save();
+                
+                // Update booking with groupSessionId if this is a group session
+                if (groupSessionId) {
+                    booking.groupSessionId = groupSessionId;
+                    await booking.save();
+                    console.log(`✅ Updated booking ${booking._id} with groupSessionId ${groupSessionId}`);
+                }
                 console.log(`✅ Session created for subscription booking ${booking._id} with sessionType: ${slotSessionType}`);
+                
+                // Update availability slot's bookedParticipants for group sessions
+                if (slotSessionType === 'group' && booking.timeSlot && booking.scheduledDate) {
+                    try {
+                        const availability = await Availability.findOne({
+                            therapistId: booking.therapistId,
+                            date: booking.scheduledDate
+                        });
+                        
+                        if (availability) {
+                            const slotIndex = availability.timeSlots.findIndex(s => 
+                                s.start === booking.timeSlot.start && s.end === booking.timeSlot.end
+                            );
+                            
+                            if (slotIndex !== -1) {
+                                const slot = availability.timeSlots[slotIndex];
+                                
+                                // Increment bookedParticipants for group slots
+                                if (typeof slot.bookedParticipants !== 'number') {
+                                    slot.bookedParticipants = 0;
+                                }
+                                slot.bookedParticipants += 1;
+                                
+                                // Update slot status based on capacity
+                                if (slot.maxParticipants && slot.bookedParticipants >= slot.maxParticipants) {
+                                    slot.status = 'booked';
+                                } else {
+                                    slot.status = 'available'; // Keep available until full
+                                }
+                                
+                                await availability.save();
+                                console.log(`✅ Updated availability slot: ${slot.bookedParticipants}/${slot.maxParticipants} participants booked`);
+                            }
+                        }
+                    } catch (availError) {
+                        console.error('❌ Error updating availability slot bookedParticipants:', availError);
+                        // Continue without failing the booking confirmation
+                    }
+                }
             }
         }
 
@@ -1698,6 +1830,65 @@ const updateBookingStatus = async (req, res, next) => {
 
                 const startTime = new Date(`${sessionDate}T${sessionTime}`);
 
+                // For group sessions, find or create the GroupSession to link to
+                let groupSessionId = null;
+                if (slotSessionType === 'group' && booking.timeSlot && booking.scheduledDate) {
+                    try {
+                        const GroupSession = require('../models/GroupSession.model');
+                        const groupSessionStartTime = new Date(`${booking.scheduledDate}T${booking.timeSlot.start}:00`);
+                        const groupSessionEndTime = new Date(`${booking.scheduledDate}T${booking.timeSlot.end}:00`);
+                        
+                        // Find existing GroupSession for this time slot
+                        let existingGroupSession = await GroupSession.findOne({
+                            therapistId: booking.therapistId,
+                            startTime: groupSessionStartTime,
+                            endTime: groupSessionEndTime,
+                            status: 'scheduled'
+                        });
+                        
+                        if (!existingGroupSession) {
+                            // Create new GroupSession for this time slot
+                            existingGroupSession = new GroupSession({
+                                title: `Group Session - ${booking.therapistName || 'Therapist'} - ${booking.timeSlot.start}`,
+                                description: 'Group physiotherapy session',
+                                therapistId: booking.therapistId,
+                                startTime: groupSessionStartTime,
+                                endTime: groupSessionEndTime,
+                                maxParticipants: slotMaxParticipants,
+                                participants: [],
+                                status: 'scheduled',
+                                isActiveCall: false
+                            });
+                            
+                            await existingGroupSession.save();
+                            console.log(`✅ Created new GroupSession ${existingGroupSession._id} for time slot ${booking.timeSlot.start}-${booking.timeSlot.end}`);
+                        }
+                        
+                        // Add user to GroupSession participants if not already added
+                        const userAlreadyInGroup = existingGroupSession.participants.some(
+                            p => p.userId && p.userId.toString() === booking.userId.toString()
+                        );
+                        
+                        if (!userAlreadyInGroup) {
+                            existingGroupSession.participants.push({
+                                userId: booking.userId,
+                                joinedAt: new Date(),
+                                status: 'accepted',
+                                bookingId: booking._id
+                            });
+                            
+                            await existingGroupSession.save();
+                            console.log(`✅ Added user ${booking.userId} to GroupSession ${existingGroupSession._id}`);
+                        }
+                        
+                        groupSessionId = existingGroupSession._id;
+                        console.log(`✅ Found existing GroupSession ${groupSessionId} for group booking ${booking._id}`);
+                    } catch (groupError) {
+                        console.error('❌ Error creating/finding GroupSession:', groupError);
+                        // Continue without failing the session creation
+                    }
+                }
+
                 const session = new Session({
                     bookingId: booking._id,
                     therapistId: booking.therapistId,
@@ -1710,7 +1901,8 @@ const updateBookingStatus = async (req, res, next) => {
                     maxParticipants: slotMaxParticipants,
                     status: 'pending',
                     duration: 45,
-                    notes: `Auto-created from confirmed booking #${booking._id}`
+                    notes: `Auto-created from confirmed booking #${booking._id}`,
+                    ...(groupSessionId && { groupSessionId }) // Link to GroupSession if exists
                 });
 
                 const endTime = new Date(startTime);
@@ -1718,7 +1910,54 @@ const updateBookingStatus = async (req, res, next) => {
                 session.endTime = endTime;
 
                 await session.save();
+                
+                // Update booking with groupSessionId if this is a group session
+                if (groupSessionId) {
+                    booking.groupSessionId = groupSessionId;
+                    await booking.save();
+                    console.log(`✅ Updated booking ${booking._id} with groupSessionId ${groupSessionId}`);
+                }
+                
                 console.log(`✅ Session created for booking ${booking._id} with sessionType: ${slotSessionType}`);
+                
+                // Update availability slot's bookedParticipants for group sessions
+                if (slotSessionType === 'group' && booking.timeSlot && booking.scheduledDate) {
+                    try {
+                        const availability = await Availability.findOne({
+                            therapistId: booking.therapistId,
+                            date: booking.scheduledDate
+                        });
+                        
+                        if (availability) {
+                            const slotIndex = availability.timeSlots.findIndex(s => 
+                                s.start === booking.timeSlot.start && s.end === booking.timeSlot.end
+                            );
+                            
+                            if (slotIndex !== -1) {
+                                const slot = availability.timeSlots[slotIndex];
+                                
+                                // Increment bookedParticipants for group slots
+                                if (typeof slot.bookedParticipants !== 'number') {
+                                    slot.bookedParticipants = 0;
+                                }
+                                slot.bookedParticipants += 1;
+                                
+                                // Update slot status based on capacity
+                                if (slot.maxParticipants && slot.bookedParticipants >= slot.maxParticipants) {
+                                    slot.status = 'booked';
+                                } else {
+                                    slot.status = 'available'; // Keep available until full
+                                }
+                                
+                                await availability.save();
+                                console.log(`✅ Updated availability slot: ${slot.bookedParticipants}/${slot.maxParticipants} participants booked`);
+                            }
+                        }
+                    } catch (availError) {
+                        console.error('❌ Error updating availability slot bookedParticipants:', availError);
+                        // Continue without failing the booking confirmation
+                    }
+                }
             }
         }
 
@@ -2776,7 +3015,7 @@ const createBookingWithSubscription = async (req, res, next) => {
             }
 
             // Create session with correct session type based on the slot
-            const session = new Session({
+            session = new Session({
                 subscriptionId: subscription._id,
                 bookingId: booking._id,
                 ...(groupSessionId && { groupSessionId }), // Link to GroupSession if exists
