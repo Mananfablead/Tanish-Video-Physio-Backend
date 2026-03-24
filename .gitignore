@@ -22,6 +22,8 @@ logs
 combined.log
 access.log
 error.log
+logs/
+*.log
 
 # Runtime data
 pids/
