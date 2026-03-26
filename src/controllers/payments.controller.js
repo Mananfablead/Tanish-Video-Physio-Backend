@@ -3217,5 +3217,6 @@ module.exports = {
     getPaymentById,
     getRazorpayConfig,
     // Utility function to expire stale payments
-    expireStalePayments
+    expireStalePayments,
+    checkStalePayments
 };

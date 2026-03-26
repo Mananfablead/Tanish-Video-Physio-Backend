@@ -46,6 +46,23 @@ module.exports = {
                 BACKEND_URL: process.env.BACKEND_URL || 'http://localhost:5000',
                 ADMIN_TOKEN: process.env.ADMIN_TOKEN || 'your-admin-token-here'
             }
+        },
+        // Session Reminders - ENABLED
+        {
+            name: 'session-reminders',
+            script: './scripts/triggerReminders.js',
+            instances: 1,
+            exec_mode: 'fork',
+            max_memory_restart: '200M',
+            max_restarts: 5,
+            min_uptime: '10s',
+            error_file: './logs/reminder-error.log',
+            out_file: './logs/reminder-out.log',
+            log_date_format: 'YYYY-MM-DD HH:mm:ss',
+            env_production: {
+                NODE_ENV: 'production',
+                BACKEND_URL: process.env.BACKEND_URL || 'http://localhost:5000'
+            }
         }
     ]
 };
