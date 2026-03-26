@@ -34,15 +34,15 @@ const initializeServices = async () => {
         } catch (contactEmailError) {
         }
         
-        // Initialize reminder service - DISABLED
-        logger.warn('⚠ Reminder service initialization is disabled');
-        // try {
-        //     ReminderService.initialize();
-        //     logger.info('✓ Reminder service initialized successfully');
-        //     logger.info('📅 Session reminders: Every 15 minutes (24h & 1h before session)');
-        // } catch (reminderError) {
-        //     logger.error('❌ Reminder service initialization error:', reminderError.message);
-        // }
+        // Initialize reminder service - ENABLED
+        try {
+            ReminderService.initialize();
+            logger.info('✓ Reminder service initialized successfully');
+            logger.info('📅 Session reminders: Every 15 minutes (24h & 1h before session)');
+            logger.info('📊 Daily summary: Every day at 9:00 AM IST');
+        } catch (reminderError) {
+            logger.error('❌ Reminder service initialization error:', reminderError.message);
+        }
     } catch (error) {
         logger.error('Error initializing services:', error);
     }

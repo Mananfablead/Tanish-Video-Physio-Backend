@@ -23,10 +23,7 @@ class ReminderService {
 
         console.log('Initializing reminder service...');
 
-        // Payment reminder job - runs every hour
-        this.schedulePaymentReminders();
-
-        // Session reminder job - runs every 30 minutes
+        // Schedule session reminders (every 15 minutes instead of every minute)
         this.scheduleSessionReminders();
 
         // Daily summary job - runs at 9 AM
@@ -36,36 +33,81 @@ class ReminderService {
         console.log('Reminder service initialized successfully');
     }
 
-    // Schedule payment reminders (every hour) - DISABLED
-    schedulePaymentReminders() {
-        // PAYMENT REMINDERS DISABLED
-        /*
-        const job = cron.schedule('0 * * * *', async () => {
-            console.log('Running payment reminder job...');
-            await this.processPaymentReminders();
-        });
 
-        this.cronJobs.set('paymentReminders', job);
-        */
-    }
 
-    // Schedule session reminders (every 15 minutes instead of every minute)
+    // Schedule session reminders (runs every 30 minutes, only processes if sessions exist)
     scheduleSessionReminders() {
-        console.log('📅 Scheduling session reminders: Every 15 minutes');
-        const job = cron.schedule('*/15 * * * *', async () => {
+        console.log('📅 Scheduling session reminders: Every 30 minutes (optimized - only runs when sessions found)');
+        const job = cron.schedule('*/30 * * * *', async () => {
             const startTime = Date.now();
             console.log(`\n⏰ [${new Date().toISOString()}] Running session reminder job...`);
-            await this.processSessionReminders();
-            console.log(`✅ Session reminder job completed in ${Date.now() - startTime}ms`);
+
+            // First check if there are any upcoming sessions
+            const hasUpcomingSessions = await this.checkUpcomingSessions();
+
+            if (hasUpcomingSessions) {
+                await this.processSessionReminders();
+                console.log(`✅ Session reminder job completed in ${Date.now() - startTime}ms`);
+            } else {
+                console.log('ℹ️ No upcoming sessions - skipping reminder processing to reduce server load');
+            }
         });
 
         this.cronJobs.set('sessionReminders', job);
     }
 
-    // Daily summary disabled as requested
+    // Schedule daily summary at 9 AM IST
     scheduleDailySummary() {
-        console.log('Daily summary scheduling disabled');
-        // No job scheduled
+        console.log('📊 Scheduling daily summary: Every day at 9:00 AM IST');
+        const job = cron.schedule('0 9 * * *', async () => {
+            const startTime = Date.now();
+            console.log(`\n⏰ [${new Date().toISOString()}] Running daily summary job...`);
+            await this.processDailySummary();
+            console.log(`✅ Daily summary job completed in ${Date.now() - startTime}ms`);
+        });
+
+        this.cronJobs.set('dailySummary', job);
+    }
+
+    // Check if there are any upcoming sessions that need reminders
+    async checkUpcomingSessions() {
+        try {
+            const now = new Date();
+            const in24Hours = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+            const in1Hour = new Date(now.getTime() + 60 * 60 * 1000);
+
+            // Check for sessions in next 24 hours (for 24h reminders)
+            const sessions24h = await Session.countDocuments({
+                startTime: {
+                    $gte: in24Hours,
+                    $lt: new Date(in24Hours.getTime() + 60 * 60 * 1000)
+                },
+                status: { $in: ['scheduled', 'pending'] },
+                last24HourReminderSent: { $exists: false }
+            });
+
+            // Check for sessions in next 1 hour (for 1h reminders)
+            const sessions1h = await Session.countDocuments({
+                startTime: {
+                    $gte: in1Hour,
+                    $lt: new Date(in1Hour.getTime() + 60 * 60 * 1000)
+                },
+                status: { $in: ['scheduled', 'pending'] },
+                last1HourReminderSent: { $exists: false }
+            });
+
+            const total = sessions24h + sessions1h;
+
+            if (total > 0) {
+                console.log(`🔍 Found ${total} upcoming sessions needing reminders (24h: ${sessions24h}, 1h: ${sessions1h})`);
+                return true;
+            }
+
+            return false;
+        } catch (error) {
+            logger.error('Error checking upcoming sessions:', error);
+            return false; // If error occurs, don't process to avoid unnecessary load
+        }
     }
 
     // Process session reminders
@@ -137,52 +179,73 @@ class ReminderService {
         }
     }
 
-    // Daily summary processing disabled as requested
+    // Process daily summary
     async processDailySummary() {
-        console.log('Daily summary processing disabled');
-        // No processing performed
+        const startTime = Date.now();
+        try {
+            const now = new Date();
+            const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+            // Get yesterday's statistics
+            const totalBookings = await Booking.countDocuments({
+                createdAt: {
+                    $gte: yesterday,
+                    $lte: now
+                }
+            });
+
+            const completedSessions = await Session.countDocuments({
+                startTime: {
+                    $gte: yesterday,
+                    $lte: now
+                },
+                status: 'completed'
+            });
+
+            const pendingPayments = await Payment.countDocuments({
+                createdAt: {
+                    $gte: yesterday,
+                    $lte: now
+                },
+                status: 'pending'
+            });
+
+            const completedPayments = await Payment.countDocuments({
+                createdAt: {
+                    $gte: yesterday,
+                    $lte: now
+                },
+                status: 'completed'
+            });
+
+            const stats = {
+                date: now.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }),
+                totalBookings,
+                completedSessions,
+                pendingPayments,
+                completedPayments,
+                totalRevenue: completedPayments // This would need aggregation for actual amount
+            };
+
+            console.log('\n📊 Daily Summary Statistics:');
+            console.log(`   📅 Date: ${stats.date}`);
+            console.log(`   📝 Total Bookings: ${stats.totalBookings}`);
+            console.log(`   ✅ Completed Sessions: ${stats.completedSessions}`);
+            console.log(`   💳 Pending Payments: ${stats.pendingPayments}`);
+            console.log(`   ✔️ Completed Payments: ${stats.completedPayments}`);
+            console.log(`   💰 Total Revenue: ${stats.totalRevenue}\n`);
+
+            // Send daily summary email (if needed)
+            // await this.sendDailySummary(stats);
+
+            logger.info(`\n📊 Daily Summary completed in ${Date.now() - startTime}ms\n`);
+
+        } catch (error) {
+            logger.error('Error in daily summary processing:', error);
+        }
     }
 
-    // Helper methods for reminder logic
-    async shouldSendPaymentReminder(booking) {
-        // Check if 24 hours have passed since last reminder
-        const lastReminder = booking.lastPaymentReminderSent;
-        if (!lastReminder) return true; // First reminder
 
-        const hoursSinceLast = (Date.now() - new Date(lastReminder).getTime()) / (1000 * 60 * 60);
-        return hoursSinceLast >= 24;
-    }
-
-    async shouldSendSessionReminder(booking) {
-        // Check if reminder already sent today
-        const lastReminder = booking.lastSessionReminderSent;
-        if (!lastReminder) return true;
-
-        const today = new Date().toDateString();
-        const lastReminderDate = new Date(lastReminder).toDateString();
-
-        return today !== lastReminderDate;
-    }
-
-    async sendPaymentReminder(booking) {
-        // PAYMENT REMINDER DISABLED
-        /*
-        const recipient = {
-            email: booking.userId?.email,
-            phone: booking.userId?.phone
-        };
-
-        const data = {
-            clientName: booking.clientName,
-            serviceName: booking.serviceName,
-            amount: booking.amount,
-            bookingId: booking._id,
-            paymentLink: `${process.env.FRONTEND_URL}/payment/${booking._id}`
-        };
-
-        await NotificationService.sendNotification(recipient, 'payment_reminder', data);
-        */
-    }
 
     async sendSessionReminder(session, reminderType) {
         // Send to user/patient
@@ -267,29 +330,14 @@ class ReminderService {
         // No emails sent
     }
 
-    async updateLastReminderSent(booking, reminderType) {
-        const updateField = reminderType === 'payment'
-            ? 'lastPaymentReminderSent'
-            : 'lastSessionReminderSent';
-
-        await Booking.findByIdAndUpdate(booking._id, {
-            [updateField]: new Date()
-        });
-    }
-
     // Manual trigger methods (for testing/admin)
-    async triggerPaymentReminders() {
-        await this.processPaymentReminders();
-    }
-
     async triggerSessionReminders() {
         await this.processSessionReminders();
     }
 
-    // Daily summary trigger disabled as requested
+    // Daily summary trigger enabled
     async triggerDailySummary() {
-        console.log('Daily summary trigger disabled');
-        // No action performed
+        await this.processDailySummary();
     }
 
     // Status and monitoring

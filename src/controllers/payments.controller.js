@@ -3070,6 +3070,32 @@ const getRazorpayConfig = async (req, res, next) => {
     }
 };
 
+// Check count of stale payments (for optimized cron job)
+const checkStalePayments = async (req, res, next) => {
+    try {
+        // Set expiry time to 1 minute (60000 ms)
+        const expiryTime = new Date(Date.now() - 1 * 60 * 1000); // 1 minute ago
+
+        // Count stale payments without processing them
+        const staleCount = await Payment.countDocuments({
+            status: 'created',
+            createdAt: { $lt: expiryTime }
+        });
+
+        console.log(`🔍 Stale payment check: ${staleCount} stale payment(s) found`);
+
+        res.status(200).json(
+            ApiResponse.success({
+                count: staleCount,
+                expiryTime: expiryTime
+            }, `Found ${staleCount} stale payment(s)`)
+        );
+    } catch (error) {
+        console.error('❌ Error in checkStalePayments:', error);
+        next(error);
+    }
+};
+
 // Utility function to expire stale payments (payments that were created but not completed)
 const expireStalePayments = async (req, res, next) => {
     try {

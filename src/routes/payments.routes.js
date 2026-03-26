@@ -1,5 +1,5 @@
 const express = require('express');
-const { createOrder, createGuestOrder, verifyPayment, verifyGuestPayment, handleWebhook, createSubscriptionOrder, createGuestSubscriptionOrder, verifySubscriptionPayment, verifyGuestSubscriptionPayment, getUserPayments, getAllPayments, getPaymentById, getRazorpayConfig, expireStalePayments } = require('../controllers/payments.controller');
+const { createOrder, createGuestOrder, verifyPayment, verifyGuestPayment, handleWebhook, createSubscriptionOrder, createGuestSubscriptionOrder, verifySubscriptionPayment, verifyGuestSubscriptionPayment, getUserPayments, getAllPayments, getPaymentById, getRazorpayConfig, expireStalePayments, checkStalePayments } = require('../controllers/payments.controller');
 const { authenticateToken, authorizeRoles } = require('../middlewares/auth.middleware');
 
 const router = express.Router();
@@ -34,6 +34,9 @@ router.get('/admin/all', authenticateToken, authorizeRoles('admin'), getAllPayme
 
 // Admin route to get payment by ID
 router.get('/admin/:paymentId', authenticateToken, authorizeRoles('admin'), getPaymentById);
+
+// Admin route to check stale payments count (for optimized cron)
+router.get('/admin/check-stale', authenticateToken, authorizeRoles('admin'), checkStalePayments);
 
 // Admin route to expire stale payments (payments older than 15 minutes with status 'created')
 router.post('/admin/expire-stale', authenticateToken, authorizeRoles('admin'), expireStalePayments);

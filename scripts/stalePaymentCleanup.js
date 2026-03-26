@@ -16,15 +16,41 @@ if (!ADMIN_TOKEN) {
 
 console.log('🚀 Starting Stale Payment Cleanup Cron Job...');
 console.log(`📡 Backend URL: ${BACKEND_URL}`);
-console.log(`⏰ Schedule: Every 1 minute`);
+console.log(`⏰ Schedule: Every 5 minutes (optimized - only runs when stale payments found)`);
 console.log('---');
 
-// Cron job to run every 1 minute
-cron.schedule('* * * * *', async () => {
+// Cron job to run every 5 minutes (optimized)
+cron.schedule('*/5 * * * *', async () => {
   const now = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
-  console.log(`\n⏰ [${now}] Running stale payment cleanup...`);
   
   try {
+    // First, check if there are any stale payments
+    const checkResponse = await fetch(`${BACKEND_URL}/api/payments/admin/check-stale`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${ADMIN_TOKEN}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    let hasStalePayments = false;
+
+    if (checkResponse.ok) {
+      const checkResult = await checkResponse.json();
+      hasStalePayments = checkResult.data?.count > 0;
+
+      if (hasStalePayments) {
+        console.log(`\n🔍 [${now}] Found ${checkResult.data.count} stale payment(s) - running cleanup...`);
+      } else {
+        console.log(`\nℹ️ [${now}] No stale payments found - skipping cleanup to reduce server load`);
+        return; // Skip if no stale payments
+      }
+    } else {
+      console.warn(`⚠️ [${now}] Could not check stale payments count, proceeding with cleanup anyway...`);
+      hasStalePayments = true; // Proceed anyway if check fails
+    }
+
+    // Run the actual cleanup
     const response = await fetch(`${BACKEND_URL}/api/payments/admin/expire-stale`, {
       method: 'POST',
       headers: {
