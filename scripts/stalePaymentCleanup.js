@@ -16,11 +16,11 @@ if (!ADMIN_TOKEN) {
 
 console.log('🚀 Starting Stale Payment Cleanup Cron Job...');
 console.log(`📡 Backend URL: ${BACKEND_URL}`);
-console.log(`⏰ Schedule: Every 5 minutes (optimized - only runs when stale payments found)`);
+console.log('⏰ Schedule: Every minute (optimized - only runs when stale payments found)');
 console.log('---');
 
-// Cron job to run every 5 minutes (optimized)
-cron.schedule('*/5 * * * *', async () => {
+// Cron job to run every minute (optimized)
+cron.schedule('* * * * *', async () => {
   const now = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
   
   try {
