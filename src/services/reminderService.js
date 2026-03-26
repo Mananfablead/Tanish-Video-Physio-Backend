@@ -7,6 +7,7 @@ const Payment = require('../models/Payment.model');
 const Session = require('../models/Session.model');
 const NotificationService = require('./notificationService');
 const BookingStatusHandler = require('./bookingStatusHandler');
+const logger = require('../utils/logger');
 
 class ReminderService {
     constructor() {
