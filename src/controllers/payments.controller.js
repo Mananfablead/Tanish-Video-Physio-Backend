@@ -1652,6 +1652,33 @@ const createSubscriptionOrder = async (req, res, next) => {
             return res.status(400).json(ApiResponse.error('Invalid or inactive plan ID'));
         }
 
+        // Session type validation - ensure plan session type matches selected time slot
+        if (timeSlot && plan.session_type) {
+            // timeSlot can be an object (from frontend) or an ID string (from DB lookup)
+            const slotSessionType = typeof timeSlot === 'object' 
+                ? timeSlot.sessionType 
+                : null;
+
+            if (slotSessionType) {
+                if (plan.session_type === 'individual' && slotSessionType !== 'one-to-one') {
+                    return res.status(400).json(ApiResponse.error(
+                        'Your Individual plan only allows booking 1-on-1 sessions. Please select a 1-on-1 time slot.'
+                    ));
+                }
+
+                if (plan.session_type === 'group' && slotSessionType !== 'group') {
+                    return res.status(400).json(ApiResponse.error(
+                        'Your Group plan only allows booking group sessions. Please select a group time slot.'
+                    ));
+                }
+
+                console.log('✅ Slot session type validation passed:', {
+                    planSessionType: plan.session_type,
+                    slotSessionType
+                });
+            }
+        }
+
         // Use the provided amount if it's less than or equal to plan price (discount applied)
         // Otherwise use the actual plan price
         const providedAmount = Number(amount);
@@ -1850,6 +1877,33 @@ const createGuestSubscriptionOrder = async (req, res, next) => {
         const plan = await SubscriptionPlan.findOne({ planId, status: 'active' });
         if (!plan) {
             return res.status(400).json(ApiResponse.error('Invalid or inactive plan ID'));
+        }
+
+        // Session type validation - ensure plan session type matches selected time slot
+        if (timeSlot && plan.session_type) {
+            // timeSlot can be an object (from frontend) or an ID string (from DB lookup)
+            const slotSessionType = typeof timeSlot === 'object' 
+                ? timeSlot.sessionType 
+                : null;
+
+            if (slotSessionType) {
+                if (plan.session_type === 'individual' && slotSessionType !== 'one-to-one') {
+                    return res.status(400).json(ApiResponse.error(
+                        'Your Individual plan only allows booking 1-on-1 sessions. Please select a 1-on-1 time slot.'
+                    ));
+                }
+
+                if (plan.session_type === 'group' && slotSessionType !== 'group') {
+                    return res.status(400).json(ApiResponse.error(
+                        'Your Group plan only allows booking group sessions. Please select a group time slot.'
+                    ));
+                }
+
+                console.log('✅ Slot session type validation passed:', {
+                    planSessionType: plan.session_type,
+                    slotSessionType
+                });
+            }
         }
 
         // Check if user already exists
@@ -2323,6 +2377,42 @@ status: 'pending', // Pending admin approval (changed from 'confirmed')
 
                     // Send new booking notification to admin for subscription purchase
                     const NotificationService = require('../services/notificationService');
+                    const Notification = require('../models/Notification.model');
+                    const { getIO } = require('../utils/socketManager');
+                    const io = getIO();
+
+                    // Save admin notification to database first
+                    const adminNotification = new Notification({
+                        title: 'New Subscription Purchased',
+                        message: `${user.name} purchased ${subscription.planName} subscription`,
+                        type: 'payment',
+                        recipientType: 'admin',
+                        subscriptionId: subscription._id,
+                        priority: 'high',
+                        channels: { inApp: true },
+                        metadata: {
+                            clientName: user.name,
+                            planName: subscription.planName,
+                            amount: subscription.amount,
+                            email: user.email
+                        }
+                    });
+
+                    await adminNotification.save();
+                    console.log(`✅ [Subscription Payment] Admin notification saved: ${adminNotification._id}`);
+
+                    // Emit real-time Socket.IO notification
+                    io.to('admin_notifications').emit('admin-notification', {
+                        id: adminNotification._id,
+                        type: 'payment',
+                        title: 'New Subscription Purchased',
+                        message: `${user.name} purchased ${subscription.planName} subscription`,
+                        subscriptionId: subscription._id,
+                        timestamp: adminNotification.createdAt
+                    });
+                    console.log('✅ [Subscription Payment] Real-time notification emitted');
+
+                    // Send email and WhatsApp to admin
                     await NotificationService.sendNotification(
                         { email: 'placeholder', phone: 'placeholder' }, // Will be replaced by notification service
                         'new_booking',
@@ -3034,6 +3124,43 @@ status: 'pending', // Changed to pending admin approval
 
                         // Send new booking notification to admin for guest subscription purchase
                         const NotificationService = require('../services/notificationService');
+                        const Notification = require('../models/Notification.model');
+                        const { getIO } = require('../utils/socketManager');
+                        const io = getIO();
+
+                        // Save admin notification to database first
+                        const adminNotification = new Notification({
+                            title: 'New Subscription Purchased',
+                            message: `${user.name} purchased ${subscription.planName} subscription`,
+                            type: 'payment',
+                            recipientType: 'admin',
+                            subscriptionId: subscription._id,
+                            priority: 'high',
+                            channels: { inApp: true },
+                            metadata: {
+                                clientName: user.name,
+                                planName: subscription.planName,
+                                amount: subscription.amount,
+                                email: user.email,
+                                isGuest: true
+                            }
+                        });
+
+                        await adminNotification.save();
+                        console.log(`✅ [Guest Subscription Payment] Admin notification saved: ${adminNotification._id}`);
+
+                        // Emit real-time Socket.IO notification
+                        io.to('admin_notifications').emit('admin-notification', {
+                            id: adminNotification._id,
+                            type: 'payment',
+                            title: 'New Subscription Purchased',
+                            message: `${user.name} purchased ${subscription.planName} subscription`,
+                            subscriptionId: subscription._id,
+                            timestamp: adminNotification.createdAt
+                        });
+                        console.log('✅ [Guest Subscription Payment] Real-time notification emitted');
+
+                        // Send email and WhatsApp to admin
                         await NotificationService.sendNotification(
                             { email: 'placeholder', phone: 'placeholder' }, // Will be replaced by notification service
                             'new_booking',
