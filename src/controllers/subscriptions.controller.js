@@ -381,10 +381,14 @@ const getUserSubscriptions = async (req, res, next) => {
                 // Count all sessions for this subscription (more accurate approach)
 
                 // Count all non-cancelled sessions for this specific subscription
-                const usedSessions = await Session.countDocuments({
+                const linkedSessionCount = await Session.countDocuments({
                     subscriptionId: subscription._id,
                     status: { $ne: "cancelled" } // Don't count cancelled sessions
                 });
+                // Prefer persisted booking-based usage if present, while staying compatible
+                // with older data that only has linked sessions.
+                const persistedUsed = Number(subscription.sessionsUsed || 0);
+                const usedSessions = Math.max(persistedUsed, linkedSessionCount);
 
                 // Also count bookings made during subscription period for additional context
                 let bookingCount = 0;
@@ -550,10 +554,14 @@ const getAllSubscriptions = async (req, res, next) => {
                 // Count all sessions for this subscription (more accurate approach)
 
                 // Count all non-cancelled sessions for this specific subscription
-                const usedSessions = await Session.countDocuments({
+                const linkedSessionCount = await Session.countDocuments({
                     subscriptionId: subscription._id,
                     status: { $ne: "cancelled" } // Don't count cancelled sessions
                 });
+                // Prefer persisted booking-based usage if present, while staying compatible
+                // with older data that only has linked sessions.
+                const persistedUsed = Number(subscription.sessionsUsed || 0);
+                const usedSessions = Math.max(persistedUsed, linkedSessionCount);
 
                 // Also count bookings made during subscription period for additional context
                 let bookingCount = 0;

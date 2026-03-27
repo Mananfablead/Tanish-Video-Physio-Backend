@@ -391,11 +391,15 @@ const getProfile = async (req, res, next) => {
         
         if (activeSubscription && planDetails) {
             try {
-                // Count used sessions for this subscription
-                usedSessions = await Session.countDocuments({
+                // Count linked sessions for this subscription
+                const linkedSessionCount = await Session.countDocuments({
                     subscriptionId: activeSubscription._id,
                     status: { $ne: "cancelled" }
                 });
+                // Prefer persisted booking-based usage while keeping compatibility
+                // with older data where only Session documents were linked.
+                const persistedUsed = Number(activeSubscription.sessionsUsed || 0);
+                usedSessions = Math.max(persistedUsed, linkedSessionCount);
             } catch (sessionError) {
                 console.error('Error counting sessions:', sessionError);
                 usedSessions = 0;
@@ -460,25 +464,25 @@ const getProfile = async (req, res, next) => {
 
         // If there's an active subscription, add detailed usage information with percentages
         if (activeSubscription && activeSubscription.planId) {
-            const plan = activeSubscription.planId;
+            const plan = planDetails || {};
             
             // Calculate percentage used for sessions
-            const sessionPercentageUsed = plan.sessions > 0 ? Math.round(((responseData.subscriptionData.usedSessions || 0) / plan.sessions) * 100) : 0;
+            const sessionPercentageUsed = (plan.sessions || 0) > 0 ? Math.round(((responseData.subscriptionData.usedSessions || 0) / plan.sessions) * 100) : 0;
             
             // Add session usage info to subscription data
             responseData.subscriptionData.availableSessions = {
-                total: plan.sessions,
+                total: plan.sessions || 0,
                 used: responseData.subscriptionData.usedSessions || 0,
                 remaining: responseData.subscriptionData.remainingSessions || 0,
                 percentageUsed: sessionPercentageUsed
             };
             
             // Calculate percentage used for services
-            const servicePercentageUsed = plan.totalService > 0 ? Math.round(((responseData.subscriptionData.usedServices || 0) / plan.totalService) * 100) : 0;
+            const servicePercentageUsed = (plan.totalService || 0) > 0 ? Math.round(((responseData.subscriptionData.usedServices || 0) / plan.totalService) * 100) : 0;
             
             // Add service usage info to subscription data
             responseData.subscriptionData.availableServices = {
-                total: plan.totalService,
+                total: plan.totalService || 0,
                 used: responseData.subscriptionData.usedServices || 0,
                 remaining: responseData.subscriptionData.remainingServices || 0,
                 percentageUsed: servicePercentageUsed

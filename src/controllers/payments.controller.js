@@ -97,6 +97,9 @@ async function sendWelcomeEmailWithCredentials(email, name, username, password) 
             host: emailCreds.host,
             port: emailCreds.port,
             secure: emailCreds.port === 465, // true for SMTPS
+            connectionTimeout: 15000,
+            greetingTimeout: 15000,
+            socketTimeout: 20000,
             auth: {
                 user: emailCreds.user,
                 pass: emailCreds.password
@@ -200,8 +203,27 @@ async function sendWelcomeEmailWithCredentials(email, name, username, password) 
             html: message
         };
 
-        // Send email
-        const info = await transporter.sendMail(mailOptions);
+        // Send email with one retry for transient SMTP socket errors
+        const sendWithRetry = async () => {
+            try {
+                return await transporter.sendMail(mailOptions);
+            } catch (firstError) {
+                const isTransientSocketError =
+                    firstError?.code === 'ESOCKET' ||
+                    firstError?.code === 'ECONNRESET' ||
+                    (typeof firstError?.message === 'string' && firstError.message.includes('ECONNRESET'));
+
+                if (!isTransientSocketError) {
+                    throw firstError;
+                }
+
+                console.warn('⚠️ Welcome email transient SMTP error, retrying once:', firstError.message);
+                await new Promise(resolve => setTimeout(resolve, 1200));
+                return await transporter.sendMail(mailOptions);
+            }
+        };
+
+        await sendWithRetry();
 
     } catch (error) {
         console.error('❌ Error sending welcome email', {
@@ -1106,7 +1128,6 @@ const verifyGuestPayment = async (req, res, next) => {
 
             // Send new booking notification to ADMIN (not to guest user)
             try {
-                const NotificationService = require('../services/notificationService');
                 const service = await Service.findById(booking.serviceId);
 
                 await NotificationService.sendNotification(
@@ -1387,10 +1408,7 @@ const handleWebhook = async (req, res) => {
                 try {
                     const guestUser = await User.findOne({ email: subscription.guestEmail });
                     if (guestUser && guestUser.status === 'active') {
-                        const NotificationService = require('../services/notificationService');
-                        const notificationService = new NotificationService();
-
-                        await notificationService.sendNotification(
+                        await NotificationService.sendNotification(
                             {
                                 email: guestUser.email,
                                 phone: guestUser.phone ? `+91${guestUser.phone}` : null,
@@ -1600,7 +1618,9 @@ const createSubscriptionOrder = async (req, res, next) => {
             scheduledDate: scheduledDate || null,
             scheduledTime: scheduledTime || null,
             timeSlot: timeSlot || null,
-            therapistId: therapistId || null
+            therapistId: therapistId || null,
+            sessionsUsed: 0,
+            sessionsTotal: plan.sessions || 0
         });
 
         await subscription.save();
@@ -1775,7 +1795,9 @@ const createGuestSubscriptionOrder = async (req, res, next) => {
             scheduledDate: scheduledDate || null,
             scheduledTime: scheduledTime || null,
             timeSlot: timeSlot || null,
-            therapistId: therapistId || null
+            therapistId: therapistId || null,
+            sessionsUsed: 0,
+            sessionsTotal: plan.sessions || 0
         });
 
         await subscription.save();
@@ -1912,10 +1934,7 @@ const verifySubscriptionPayment = async (req, res, next) => {
                 const user = await User.findById(userId);
 
                 if (user && user.status === 'active') {
-                    const { NotificationService } = require('../services/notificationService');
-                    const notificationService = new NotificationService();
-
-                    await notificationService.sendNotification(
+                    await NotificationService.sendNotification(
                         {
                             email: user.email,
                             phone: user.phone ? `+91${user.phone}` : null,
@@ -2018,15 +2037,18 @@ status: 'pending', // Pending admin approval (changed from 'confirmed')
                     await booking.save();
                     console.log(`✅ Booking created for subscription with therapist: ${subscription.therapistId}, Booking ID: ${booking._id}`);
 
+                    // Increment sessionsUsed when booking is created (applies to group and 1-on-1)
+                    await Subscription.findByIdAndUpdate(subscription._id, {
+                        $inc: { sessionsUsed: 1 }
+                    });
+                    console.log(`✅ sessionsUsed incremented on booking creation for subscription ${subscription._id}`);
+
                     // Send plan booking confirmation notification for subscription purchase
                     try {
                         const User = require('../models/User.model');
                         const user = await User.findById(subscription.userId).select('email phone name');
 
                         if (user) {
-                            const { NotificationService } = require('../services/notificationService');
-                            const notificationService = new NotificationService();
-
                             // Wait for notification service to initialize
                             await new Promise(resolve => setTimeout(resolve, 1000));
 
@@ -2038,7 +2060,7 @@ status: 'pending', // Pending admin approval (changed from 'confirmed')
                                 time: bookingTime
                             };
 
-                            await notificationService.sendNotification(
+                            await NotificationService.sendNotification(
                                 { email: user.email, phone: user.phone },
                                 'plan_booking_confirmation',
                                 notificationData
@@ -2240,6 +2262,14 @@ status: 'pending', // Pending admin approval (changed from 'confirmed')
                     // Use the plan fetched at the top of the function
                     const plan = subscriptionPlan;
                     if (plan) {
+                        const sessionType = plan.session_type || 'individual';
+                        const isGroupSession = sessionType === 'group';
+
+                        // Do not auto-create direct Session docs for group plans.
+                        // Group plans should create sessions only from confirmed bookings/admin flow.
+                        if (isGroupSession) {
+                            console.log(`ℹ️ Skipping direct automatic session creation for group subscription ${subscription._id}`);
+                        } else {
                         try {
                             // For subscription plans, we can create sessions directly without bookings
                             // This is for plans where users subscribe directly (like the subscription flow)
@@ -2268,10 +2298,6 @@ status: 'pending', // Pending admin approval (changed from 'confirmed')
                                 // Use default duration if no end time in timeSlot
                                 endTime.setMinutes(endTime.getMinutes() + (plan.duration ? parseInt(plan.duration.match(/(\d+)/)?.[1] || '60') : 60));
                             }
-
-                            // Determine session type based on plan
-                            const sessionType = plan.session_type || 'individual';
-                            const isGroupSession = sessionType === 'group';
 
                             console.log('DEBUG: Creating initial session for subscription:', {
                                 planName: plan.name,
@@ -2380,6 +2406,7 @@ status: 'pending', // Pending admin approval (changed from 'confirmed')
                         } catch (sessionError) {
                             console.error(`❌ Failed to create automatic initial session for subscription ${subscription._id}:`, sessionError);
                             // Don't fail the subscription verification if session creation fails
+                        }
                         }
                     } else {
                         console.log(`ℹ️ No subscription plan found for subscription ${subscription._id} - skipping automatic session creation`);
@@ -2656,15 +2683,18 @@ status: 'pending', // Changed to pending admin approval
                         await booking.save();
                         console.log(`✅ Booking created for guest subscription with therapist: ${subscription.therapistId}, Booking ID: ${booking._id}`);
 
+                        // Increment sessionsUsed when booking is created (applies to group and 1-on-1)
+                        await Subscription.findByIdAndUpdate(subscription._id, {
+                            $inc: { sessionsUsed: 1 }
+                        });
+                        console.log(`✅ sessionsUsed incremented on booking creation for guest subscription ${subscription._id}`);
+
                         // Send plan booking confirmation notification for guest subscription purchase
                         try {
                             const User = require('../models/User.model');
                             const user = await User.findById(userIdToCheck).select('email phone name');
 
                             if (user) {
-                                const NotificationService = require('../services/notificationService');
-                                const notificationService = new NotificationService();
-
                                 // Wait for notification service to initialize
                                 await new Promise(resolve => setTimeout(resolve, 1000));
 
@@ -2676,7 +2706,7 @@ status: 'pending', // Changed to pending admin approval
                                     time: bookingTime
                                 };
 
-                                await notificationService.sendNotification(
+                                await NotificationService.sendNotification(
                                     { email: user.email || subscription.guestEmail, phone: user.phone || subscription.guestPhone },
                                     'plan_booking_confirmation',
                                     notificationData
@@ -2838,12 +2868,6 @@ status: 'pending', // Changed to pending admin approval
 
                                     await session.save();
 
-                                    // Increment sessionsUsed
-                                    await Subscription.findByIdAndUpdate(subscription._id, {
-                                        $inc: { sessionsUsed: 1 }
-                                    });
-                                    console.log(`✅ sessionsUsed incremented for subscription ${subscription._id}`);
-
                                     // Update the booking status
                                     await Booking.findByIdAndUpdate(pendingBooking._id, {
                                         status: 'pending'
@@ -2858,6 +2882,14 @@ status: 'pending', // Changed to pending admin approval
 
                     const subscriptionPlanForSession = await SubscriptionPlan.findOne({ planId: subscription.planId });
                         if (subscriptionPlanForSession) {
+                            const sessionType = subscriptionPlanForSession.session_type || 'individual';
+                            const isGroupSession = sessionType === 'group';
+
+                            // Do not auto-create direct Session docs for group plans.
+                            // Group plans should create sessions only from confirmed bookings/admin flow.
+                            if (isGroupSession) {
+                                console.log(`ℹ️ Skipping direct automatic session creation for group guest subscription ${subscription._id}`);
+                            } else {
                             const sessionDate = subscription.scheduledDate || new Date().toISOString().split('T')[0];
                             const sessionTime = subscription.timeSlot?.start || subscription.scheduledTime ;
 
@@ -2873,10 +2905,6 @@ status: 'pending', // Changed to pending admin approval
                             } else {
                                 endTime.setMinutes(endTime.getMinutes() + (subscriptionPlanForSession.duration ? parseInt(subscriptionPlanForSession.duration.match(/(\d+)/)?.[1] || '60') : 60));
                             }
-
-                            // Determine session type based on plan
-                            const sessionType = subscriptionPlanForSession.session_type || 'individual';
-                            const isGroupSession = sessionType === 'group';
 
                             console.log('DEBUG (Guest): Creating initial session for subscription:', {
                                 planName: subscriptionPlanForSession.name,
@@ -2978,6 +3006,7 @@ status: 'pending', // Changed to pending admin approval
                                 $inc: { sessionsUsed: 1 }
                             });
                             console.log(`✅ sessionsUsed incremented for guest subscription ${subscription._id}`);
+                            }
                         }
                     }
                 } catch (sessionError) {

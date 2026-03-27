@@ -114,6 +114,16 @@ const subscriptionSchema = new mongoose.Schema({
     scheduleType: {
         type: String,
         default: 'now'
+    },
+    sessionsUsed: {
+        type: Number,
+        default: 0,
+        min: 0
+    },
+    sessionsTotal: {
+        type: Number,
+        default: 0,
+        min: 0
     }
 }, {
     timestamps: true
