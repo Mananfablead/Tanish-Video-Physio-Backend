@@ -435,6 +435,67 @@ async function createSessionFromBooking(booking, service) {
                 await session.save();
                 console.log(`✅ Automatic session created for booking ${booking._id}: Session ID ${session._id}`);
                 await Booking.findByIdAndUpdate(booking._id, { status: 'session_created' });
+
+                // Send admin notification for new session
+                try {
+                    const Notification = require('../models/Notification.model');
+                    const { getIO } = require('../utils/socketManager');
+                    const io = getIO();
+                    const NotificationService = require('../services/notificationService');
+                    
+                    console.log('🔔 [Payment Session] Attempting to send admin notification for session:', session._id);
+                    console.log('🔔 [Payment Session] IO instance available:', !!io);
+
+                    const adminNotification = new Notification({
+                        title: 'New Session Booked',
+                        message: `${booking.clientName || 'Client'} booked a session for ${booking.scheduledDate} at ${startTimeValue}`,
+                        type: 'session',
+                        recipientType: 'admin',
+                        sessionId: session._id,
+                        bookingId: booking._id,
+                        priority: 'medium',
+                        channels: { inApp: true },
+                        metadata: {
+                            clientName: booking.clientName,
+                            date: booking.scheduledDate,
+                            time: startTimeValue,
+                            serviceName: service?.name || 'Service'
+                        }
+                    });
+
+                    await adminNotification.save();
+                    console.log(`✅ [Payment Session] Admin notification saved: ${adminNotification._id}`);
+
+                    // Emit real-time notification
+                    io.to('admin_notifications').emit('admin-notification', {
+                        id: adminNotification._id,
+                        type: 'session',
+                        title: 'New Session Booked',
+                        message: `${booking.clientName || 'Client'} booked a session for ${booking.scheduledDate} at ${startTimeValue}`,
+                        sessionId: session._id,
+                        bookingId: booking._id,
+                        date: booking.scheduledDate,
+                        time: startTimeValue,
+                        timestamp: adminNotification.createdAt
+                    });
+                    console.log('✅ [Payment Session] Admin notification emitted to admin_notifications room');
+
+                    // Send email and WhatsApp notification to admin
+                    await NotificationService.sendNotification(
+                        { email: 'placeholder', phone: 'placeholder' }, // Will be replaced by notification service
+                        'new_session_request',
+                        {
+                            clientName: booking.clientName || 'Client',
+                            phone: booking.clientPhone || 'N/A',
+                            serviceName: service?.name || 'Service',
+                            date: booking.scheduledDate,
+                            time: startTimeValue
+                        }
+                    );
+                    console.log('✅ [Payment Session] Admin email/WhatsApp notification sent');
+                } catch (notificationError) {
+                    console.error('❌ Error sending admin notification for session:', notificationError);
+                }
             } catch (sessionError) {
                 console.error(`❌ Failed to create automatic session for booking ${booking._id}:`, sessionError);
             }
@@ -608,12 +669,67 @@ const verifyPayment = async (req, res, next) => {
                 await booking.save();
 
                 // Create session from booking for regular users only if scheduleType is 'now'
-                // For 'later' bookings, session will be created when user schedules it later
+                // For 'later' bookings, just update booking status to 'confirmed' instead of 'session_created'
                 if (booking.scheduleType === 'now') {
                     await createSessionFromBooking(booking, service);
                 } else {
                     // For 'later' bookings, just update booking status to 'confirmed' instead of 'session_created'
                     await Booking.findByIdAndUpdate(booking._id, { status: 'confirmed' });
+
+                    // Send admin notification for later booking
+                    try {
+                        const Notification = require('../models/Notification.model');
+                        const { getIO } = require('../utils/socketManager');
+                        const io = getIO();
+                        const NotificationService = require('../services/notificationService');
+
+                        const adminNotification = new Notification({
+                            title: 'New Booking Confirmed',
+                            message: `${booking.clientName || 'Client'} booked ${service?.name || 'Service'} - Session to be scheduled later`,
+                            type: 'booking',
+                            recipientType: 'admin',
+                            bookingId: booking._id,
+                            priority: 'medium',
+                            channels: { inApp: true },
+                            metadata: {
+                                clientName: booking.clientName,
+                                serviceName: service?.name || 'Service',
+                                amount: booking.amount,
+                                scheduleType: 'later'
+                            }
+                        });
+
+                        await adminNotification.save();
+                        console.log(`✅ [Later Booking] Admin notification saved: ${adminNotification._id}`);
+
+                        // Emit real-time notification
+                        io.to('admin_notifications').emit('admin-notification', {
+                            id: adminNotification._id,
+                            type: 'booking',
+                            title: 'New Booking Confirmed',
+                            message: `${booking.clientName || 'Client'} booked ${service?.name || 'Service'} - Session to be scheduled later`,
+                            bookingId: booking._id,
+                            date: booking.scheduledDate,
+                            time: booking.scheduledTime,
+                            timestamp: adminNotification.createdAt
+                        });
+
+                        // Send email and WhatsApp notification to admin
+                        await NotificationService.sendNotification(
+                            { email: 'placeholder', phone: 'placeholder' }, // Will be replaced by notification service
+                            'new_booking',
+                            {
+                                clientName: booking.clientName || 'Client',
+                                phone: booking.clientPhone || 'N/A',
+                                serviceName: service?.name || 'Service',
+                                date: booking.scheduledDate || 'To be scheduled',
+                                time: booking.scheduledTime || 'To be scheduled'
+                            }
+                        );
+                        console.log('✅ [Later Booking] Admin email/WhatsApp notification sent');
+                    } catch (notificationError) {
+                        console.error('❌ Error sending admin notification for later booking:', notificationError);
+                    }
                 }
 
                 // Send payment success notifications to user and admin
@@ -639,17 +755,16 @@ const verifyPayment = async (req, res, next) => {
                             }
                         );
 
-                        // Send payment received notification to admin
-                        // The notification service will handle getting admin contact from credentials/profile
+                        // Send new booking notification to admin
                         await NotificationService.sendNotification(
                             { email: 'placeholder', phone: 'placeholder' }, // Will be replaced by notification service
-                            'payment_received',
+                            'new_booking',
                             {
-                                amount: payment.amount,
+                                clientName: user.name,
+                                phone: user.phone || 'N/A',
                                 serviceName: service?.name || 'Service',
-                                transactionId: paymentId,
-                                orderId: orderId,
-                                clientName: user.name
+                                date: booking?.date || booking?.scheduledDate || 'N/A',
+                                time: booking?.time || booking?.scheduledTime || 'N/A'
                             }
                         );
                     }
@@ -1304,18 +1419,16 @@ const handleWebhook = async (req, res) => {
                                 }
                             );
 
-                            // Send payment received notification to admin
-                            // Send payment received notification to admin
-                            // The notification service will handle getting admin contact from credentials/profile
+                            // Send new booking notification to admin
                             await NotificationService.sendNotification(
                                 { email: 'placeholder', phone: 'placeholder' }, // Will be replaced by notification service
-                                'payment_received',
+                                'new_booking',
                                 {
-                                    amount: payment.amount,
+                                    clientName: user.name,
+                                    phone: user.phone || 'N/A',
                                     serviceName: service?.name || 'Service',
-                                    transactionId: paymentId,
-                                    orderId: orderId,
-                                    clientName: user.name
+                                    date: booking?.date || booking?.scheduledDate || 'N/A',
+                                    time: booking?.time || booking?.scheduledTime || 'N/A'
                                 }
                             );
                         }
@@ -1408,6 +1521,7 @@ const handleWebhook = async (req, res) => {
                 try {
                     const guestUser = await User.findOne({ email: subscription.guestEmail });
                     if (guestUser && guestUser.status === 'active') {
+                        // Send to user
                         await NotificationService.sendNotification(
                             {
                                 email: guestUser.email,
@@ -1426,6 +1540,56 @@ const handleWebhook = async (req, res) => {
                         );
 
                         console.log(`✅ Plan booking confirmation notification sent to guest user ${guestUser.email}`);
+
+                        // Send admin notification for new subscription purchase
+                        const NotificationService = require('../services/notificationService');
+                        const Notification = require('../models/Notification.model');
+                        const { getIO } = require('../utils/socketManager');
+                        const io = getIO();
+
+                        // Save admin notification to database
+                        const adminNotification = new Notification({
+                            title: 'New Subscription Purchased',
+                            message: `${guestUser.name} purchased ${updatedSubscription.planName} subscription`,
+                            type: 'payment',
+                            recipientType: 'admin',
+                            subscriptionId: subscription._id,
+                            priority: 'high',
+                            channels: { inApp: true },
+                            metadata: {
+                                clientName: guestUser.name,
+                                planName: updatedSubscription.planName,
+                                amount: payment.amount,
+                                email: guestUser.email
+                            }
+                        });
+
+                        await adminNotification.save();
+                        console.log(`✅ [Guest Subscription] Admin notification saved: ${adminNotification._id}`);
+
+                        // Emit real-time notification
+                        io.to('admin_notifications').emit('admin-notification', {
+                            id: adminNotification._id,
+                            type: 'payment',
+                            title: 'New Subscription Purchased',
+                            message: `${guestUser.name} purchased ${updatedSubscription.planName} subscription`,
+                            subscriptionId: subscription._id,
+                            timestamp: adminNotification.createdAt
+                        });
+
+                        // Send email and WhatsApp to admin
+                        await NotificationService.sendNotification(
+                            { email: 'placeholder', phone: 'placeholder' },
+                            'new_session_request',
+                            {
+                                clientName: guestUser.name,
+                                phone: guestUser.phone || 'N/A',
+                                serviceName: `${updatedSubscription.planName} Subscription`,
+                                date: updatedSubscription.startDate ? updatedSubscription.startDate.toISOString().split('T')[0] : 'Flexible',
+                                time: 'Flexible'
+                            }
+                        );
+                        console.log('✅ [Guest Subscription] Admin email/WhatsApp notification sent');
                     } else {
                         console.log(`⚠️ Guest user ${subscription.guestEmail} is not active or not found, skipping notification`);
                     }
@@ -2146,23 +2310,20 @@ status: 'pending', // Pending admin approval (changed from 'confirmed')
                     );
                     */
 
-                    // DISABLED: Send payment received notification to admin
-                    /*
-                    const admins = await User.find({ role: 'admin' }).select('email phone name');
-                    for (const admin of admins) {
-                        await NotificationService.sendNotification(
-                            { email: admin.email, phone: admin.phone },
-                            'payment_received',
-                            {
-                                amount: subscription.amount,
-                                serviceName: 'Subscription Plan',
-                                transactionId: paymentId,
-                                orderId: orderId,
-                                clientName: user.name
-                            }
-                        );
-                    }
-                    */
+                    // Send new booking notification to admin for subscription purchase
+                    const NotificationService = require('../services/notificationService');
+                    await NotificationService.sendNotification(
+                        { email: 'placeholder', phone: 'placeholder' }, // Will be replaced by notification service
+                        'new_booking',
+                        {
+                            clientName: user.name,
+                            phone: user.phone || 'N/A',
+                            serviceName: `${subscription.planName} Subscription`,
+                            date: subscription.startDate ? subscription.startDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                            time: subscription.timeSlot?.start ? `${subscription.timeSlot.start}-${subscription.timeSlot.end}` : 'Flexible'
+                        }
+                    );
+                    console.log('✅ [Subscription Payment] Admin new booking notification sent');
                 }
             } catch (notificationError) {
                 console.error('Error sending subscription payment notifications:', notificationError);
@@ -2240,6 +2401,64 @@ status: 'pending', // Pending admin approval (changed from 'confirmed')
                                     await Booking.findByIdAndUpdate(pendingBooking._id, {
                                         status: 'pending'
                                     });
+
+                                    // Send admin notification for subscription booking session
+                                    try {
+                                        const Notification = require('../models/Notification.model');
+                                        const { getIO } = require('../utils/socketManager');
+                                        const io = getIO();
+                                        const NotificationService = require('../services/notificationService');
+
+                                        const adminNotification = new Notification({
+                                            title: 'New Subscription Session',
+                                            message: `${pendingBooking.clientName || 'Client'} booked session from subscription for ${pendingBooking.scheduledDate} at ${startTimeValue}`,
+                                            type: 'session',
+                                            recipientType: 'admin',
+                                            sessionId: session._id,
+                                            bookingId: pendingBooking._id,
+                                            subscriptionId: subscription._id,
+                                            priority: 'medium',
+                                            channels: { inApp: true },
+                                            metadata: {
+                                                clientName: pendingBooking.clientName,
+                                                date: pendingBooking.scheduledDate,
+                                                time: startTimeValue,
+                                                serviceName: service?.name || 'Service'
+                                            }
+                                        });
+
+                                        await adminNotification.save();
+                                        console.log(`✅ [Subscription Booking] Admin notification saved: ${adminNotification._id}`);
+
+                                        // Emit real-time notification
+                                        io.to('admin_notifications').emit('admin-notification', {
+                                            id: adminNotification._id,
+                                            type: 'session',
+                                            title: 'New Subscription Session',
+                                            message: `${pendingBooking.clientName || 'Client'} booked session from subscription for ${pendingBooking.scheduledDate} at ${startTimeValue}`,
+                                            sessionId: session._id,
+                                            bookingId: pendingBooking._id,
+                                            date: pendingBooking.scheduledDate,
+                                            time: startTimeValue,
+                                            timestamp: adminNotification.createdAt
+                                        });
+
+                                        // Send email and WhatsApp notification to admin
+                                        await NotificationService.sendNotification(
+                                            { email: 'placeholder', phone: 'placeholder' }, // Will be replaced by notification service
+                                            'new_session_request',
+                                            {
+                                                clientName: pendingBooking.clientName || 'Client',
+                                                phone: pendingBooking.clientPhone || 'N/A',
+                                                serviceName: service?.name || 'Service',
+                                                date: pendingBooking.scheduledDate,
+                                                time: startTimeValue
+                                            }
+                                        );
+                                        console.log('✅ [Subscription Booking] Admin email/WhatsApp notification sent');
+                                    } catch (notificationError) {
+                                        console.error('❌ Error sending admin notification for subscription booking session:', notificationError);
+                                    }
                                 } catch (sessionError) {
                                     console.error(`❌ Failed to create automatic session for subscription booking ${pendingBooking._id}:`, sessionError);
                                     // Don't fail the subscription verification if session creation fails
@@ -2403,6 +2622,64 @@ status: 'pending', // Pending admin approval (changed from 'confirmed')
                                 $inc: { sessionsUsed: 1 }
                             });
                             console.log(`✅ sessionsUsed incremented for subscription ${subscription._id}`);
+
+                            // Send admin notification for new subscription session
+                            try {
+                                const Notification = require('../models/Notification.model');
+                                const { getIO } = require('../utils/socketManager');
+                                const io = getIO();
+                                const NotificationService = require('../services/notificationService');
+
+                                const adminNotification = new Notification({
+                                    title: 'New Subscription Session',
+                                    message: `${user?.name || 'Client'} started subscription plan ${plan.name} - Session scheduled for ${sessionDate} at ${sessionTime}`,
+                                    type: 'session',
+                                    recipientType: 'admin',
+                                    sessionId: session._id,
+                                    subscriptionId: subscription._id,
+                                    priority: 'medium',
+                                    channels: { inApp: true },
+                                    metadata: {
+                                        clientName: user?.name,
+                                        date: sessionDate,
+                                        time: sessionTime,
+                                        planName: plan.name,
+                                        sessionType: isGroupSession ? 'group' : '1-on-1'
+                                    }
+                                });
+
+                                await adminNotification.save();
+                                console.log(`✅ [Subscription Session] Admin notification saved: ${adminNotification._id}`);
+
+                                // Emit real-time notification
+                                io.to('admin_notifications').emit('admin-notification', {
+                                    id: adminNotification._id,
+                                    type: 'session',
+                                    title: 'New Subscription Session',
+                                    message: `${user?.name || 'Client'} started subscription plan ${plan.name} - Session scheduled for ${sessionDate} at ${sessionTime}`,
+                                    sessionId: session._id,
+                                    subscriptionId: subscription._id,
+                                    date: sessionDate,
+                                    time: sessionTime,
+                                    timestamp: adminNotification.createdAt
+                                });
+
+                                // Send email and WhatsApp notification to admin
+                                await NotificationService.sendNotification(
+                                    { email: 'placeholder', phone: 'placeholder' }, // Will be replaced by notification service
+                                    'new_session_request',
+                                    {
+                                        clientName: user?.name || 'Client',
+                                        phone: user?.phone || 'N/A',
+                                        serviceName: `${plan.name} (${isGroupSession ? 'group' : '1-on-1'})`,
+                                        date: sessionDate,
+                                        time: sessionTime
+                                    }
+                                );
+                                console.log('✅ [Subscription Session] Admin email/WhatsApp notification sent');
+                            } catch (notificationError) {
+                                console.error('❌ Error sending admin notification for subscription session:', notificationError);
+                            }
                         } catch (sessionError) {
                             console.error(`❌ Failed to create automatic initial session for subscription ${subscription._id}:`, sessionError);
                             // Don't fail the subscription verification if session creation fails
@@ -2746,23 +3023,20 @@ status: 'pending', // Changed to pending admin approval
                         );
                         */
 
-                        // DISABLED: Send payment received notification to admin
-                        /*
-                        const admins = await User.find({ role: 'admin' }).select('email phone name');
-                        for (const admin of admins) {
-                            await NotificationService.sendNotification(
-                                { email: admin.email, phone: admin.phone },
-                                'payment_received',
-                                {
-                                    amount: subscription.amount,
-                                    serviceName: 'Subscription Plan',
-                                    transactionId: paymentId,
-                                    orderId: orderId,
-                                    clientName: user.name
-                                }
-                            );
-                        }
-                        */
+                        // Send new booking notification to admin for guest subscription purchase
+                        const NotificationService = require('../services/notificationService');
+                        await NotificationService.sendNotification(
+                            { email: 'placeholder', phone: 'placeholder' }, // Will be replaced by notification service
+                            'new_booking',
+                            {
+                                clientName: user.name,
+                                phone: user.phone || subscription.guestPhone || 'N/A',
+                                serviceName: `${subscription.planName} Subscription`,
+                                date: subscription.startDate ? subscription.startDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                                time: subscription.timeSlot?.start ? `${subscription.timeSlot.start}-${subscription.timeSlot.end}` : 'Flexible'
+                            }
+                        );
+                        console.log('✅ [Guest Subscription Payment] Admin new booking notification sent');
                     }
                 } catch (notificationError) {
                     console.error('Error sending guest subscription payment notifications:', notificationError);
