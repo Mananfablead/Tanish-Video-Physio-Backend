@@ -32,6 +32,10 @@ const paymentSchema = new mongoose.Schema({
     paymentId: {
         type: String // Razorpay payment ID
     },
+    failureReason: {
+        type: String,
+        maxlength: [300, 'Failure reason cannot exceed 300 characters']
+    },
     status: {
         type: String,
         enum: ['created', 'failed', 'paid'],
@@ -44,7 +48,6 @@ const paymentSchema = new mongoose.Schema({
     paymentMethod: {
         type: String,
         enum: ['card', 'netbanking', 'upi', 'wallet'],
-        default: 'card' // card, netbanking, upi, wallet, cash
     },
     transactionId: {
         type: String // Transaction ID from payment gateway

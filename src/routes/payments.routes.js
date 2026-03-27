@@ -1,5 +1,5 @@
 const express = require('express');
-const { createOrder, createGuestOrder, verifyPayment, verifyGuestPayment, handleWebhook, createSubscriptionOrder, createGuestSubscriptionOrder, verifySubscriptionPayment, verifyGuestSubscriptionPayment, getUserPayments, getAllPayments, getPaymentById, getRazorpayConfig, expireStalePayments, checkStalePayments } = require('../controllers/payments.controller');
+const { createOrder, createGuestOrder, verifyPayment, verifyGuestPayment, markPaymentFailed, handleWebhook, createSubscriptionOrder, createGuestSubscriptionOrder, verifySubscriptionPayment, verifyGuestSubscriptionPayment, getUserPayments, getAllPayments, getPaymentById, getRazorpayConfig, expireStalePayments, checkStalePayments } = require('../controllers/payments.controller');
 const { authenticateToken, authorizeRoles } = require('../middlewares/auth.middleware');
 
 const router = express.Router();
@@ -7,6 +7,7 @@ const router = express.Router();
 // Payment routes for service bookings
 router.post('/create-order', authenticateToken, createOrder);
 router.post('/verify', authenticateToken, verifyPayment);
+router.post('/mark-failed', markPaymentFailed);
 
 // Subscription payment routes
 router.post('/create-subscription-order', authenticateToken, createSubscriptionOrder);

@@ -665,9 +665,16 @@ const verifyPayment = async (req, res, next) => {
                 {
                     paymentId,
                     status: 'failed',
+                    captured: false,
                     failureReason: 'Invalid signature'
                 }
             );
+
+            if (payment.bookingId) {
+                await Booking.findByIdAndUpdate(payment.bookingId, {
+                    paymentStatus: 'failed'
+                });
+            }
 
             return res.status(400).json(ApiResponse.error('Payment verification failed'));
         }
@@ -1139,9 +1146,16 @@ const verifyGuestPayment = async (req, res, next) => {
                 {
                     paymentId,
                     status: 'failed',
+                    captured: false,
                     failureReason: 'Invalid signature'
                 }
             );
+
+            if (payment.bookingId) {
+                await Booking.findByIdAndUpdate(payment.bookingId, {
+                    paymentStatus: 'failed'
+                });
+            }
 
             return res.status(400).json(ApiResponse.error('Payment verification failed'));
         }
@@ -2398,6 +2412,17 @@ const verifySubscriptionPayment = async (req, res, next) => {
                 {
                     paymentId,
                     status: 'failed',
+                    captured: false,
+                    failureReason: 'Invalid signature'
+                }
+            );
+
+            await Payment.findOneAndUpdate(
+                { orderId },
+                {
+                    paymentId,
+                    status: 'failed',
+                    captured: false,
                     failureReason: 'Invalid signature'
                 }
             );
@@ -2868,12 +2893,94 @@ const verifyGuestSubscriptionPayment = async (req, res, next) => {
                 {
                     paymentId,
                     status: 'failed',
+                    captured: false,
+                    failureReason: 'Invalid signature'
+                }
+            );
+
+            await Payment.findOneAndUpdate(
+                { orderId },
+                {
+                    paymentId,
+                    status: 'failed',
+                    captured: false,
                     failureReason: 'Invalid signature'
                 }
             );
 
             return res.status(400).json(ApiResponse.error('Guest subscription payment verification failed'));
         }
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Mark payment as failed from frontend callback/modal close flow
+const markPaymentFailed = async (req, res, next) => {
+    try {
+        const { orderId, paymentId, reason } = req.body;
+
+        if (!orderId) {
+            return res.status(400).json(ApiResponse.error('orderId is required'));
+        }
+
+        const payment = await Payment.findOne({ orderId });
+        if (!payment) {
+            return res.status(404).json(ApiResponse.error('Payment not found'));
+        }
+
+        // Do not downgrade a paid payment
+        if (payment.status === 'paid') {
+            return res.status(200).json(
+                ApiResponse.success(
+                    { orderId, status: payment.status },
+                    'Payment already marked as paid'
+                )
+            );
+        }
+
+        const failureReason = (reason || 'Payment cancelled or failed by user').toString().slice(0, 300);
+
+        await Payment.findOneAndUpdate(
+            { orderId },
+            {
+                paymentId: paymentId || payment.paymentId,
+                status: 'failed',
+                captured: false,
+                failureReason
+            }
+        );
+
+        if (payment.bookingId) {
+            await Booking.findByIdAndUpdate(payment.bookingId, {
+                paymentStatus: 'failed'
+            });
+        }
+
+        if (payment.subscriptionId) {
+            await Subscription.findByIdAndUpdate(payment.subscriptionId, {
+                status: 'failed',
+                captured: false,
+                failureReason
+            });
+        } else {
+            await Subscription.findOneAndUpdate(
+                { orderId },
+                {
+                    paymentId: paymentId || undefined,
+                    status: 'failed',
+                    captured: false,
+                    failureReason
+                }
+            );
+        }
+
+        return res.status(200).json(
+            ApiResponse.success(
+                { orderId, status: 'failed', failureReason },
+                'Payment marked as failed successfully'
+            )
+        );
     } catch (error) {
         next(error);
     }
@@ -3207,6 +3314,7 @@ module.exports = {
     createGuestOrder,
     verifyPayment,
     verifyGuestPayment,
+    markPaymentFailed,
     handleWebhook,
     createSubscriptionOrder,
     createGuestSubscriptionOrder,
