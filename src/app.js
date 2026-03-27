@@ -35,4 +35,8 @@ app.use('/uploads', express.static(path.join(__dirname, '..', 'public', 'uploads
 
 // Handle errors globally
 
+// Health check endpoint with socket status
+const { getIO } = require('./utils/socketManager');
+
 module.exports = app;
+module.exports.getIO = getIO; // Export getIO for testing
