@@ -40,6 +40,27 @@ async function calculateEndDate(planId, startDate = new Date()) {
     return endDate;
 }
 
+// Resolve subscription amount from currency-specific fields.
+// Priority: price_inr/price_usd -> legacy price.
+const getPlanAmountByCurrency = (plan, currency = 'INR') => {
+    if (!plan) return 0;
+
+    const normalizedCurrency = String(currency || 'INR').toUpperCase();
+    const inrAmount = Number(plan.price_inr);
+    const usdAmount = Number(plan.price_usd);
+    const legacyAmount = Number(plan.price);
+
+    if (normalizedCurrency === 'USD') {
+        if (Number.isFinite(usdAmount) && usdAmount > 0) return usdAmount;
+        if (Number.isFinite(inrAmount) && inrAmount > 0) return inrAmount;
+        return Number.isFinite(legacyAmount) ? legacyAmount : 0;
+    }
+
+    if (Number.isFinite(inrAmount) && inrAmount > 0) return inrAmount;
+    if (Number.isFinite(usdAmount) && usdAmount > 0) return usdAmount;
+    return Number.isFinite(legacyAmount) ? legacyAmount : 0;
+};
+
 // Utility function to update subscription status and dates
 async function activateSubscription(subscriptionId) {
     const subscription = await Subscription.findById(subscriptionId);
@@ -97,9 +118,6 @@ async function sendWelcomeEmailWithCredentials(email, name, username, password) 
             host: emailCreds.host,
             port: emailCreds.port,
             secure: emailCreds.port === 465, // true for SMTPS
-            connectionTimeout: 15000,
-            greetingTimeout: 15000,
-            socketTimeout: 20000,
             auth: {
                 user: emailCreds.user,
                 pass: emailCreds.password
@@ -203,27 +221,8 @@ async function sendWelcomeEmailWithCredentials(email, name, username, password) 
             html: message
         };
 
-        // Send email with one retry for transient SMTP socket errors
-        const sendWithRetry = async () => {
-            try {
-                return await transporter.sendMail(mailOptions);
-            } catch (firstError) {
-                const isTransientSocketError =
-                    firstError?.code === 'ESOCKET' ||
-                    firstError?.code === 'ECONNRESET' ||
-                    (typeof firstError?.message === 'string' && firstError.message.includes('ECONNRESET'));
-
-                if (!isTransientSocketError) {
-                    throw firstError;
-                }
-
-                console.warn('⚠️ Welcome email transient SMTP error, retrying once:', firstError.message);
-                await new Promise(resolve => setTimeout(resolve, 1200));
-                return await transporter.sendMail(mailOptions);
-            }
-        };
-
-        await sendWithRetry();
+        // Send email
+        const info = await transporter.sendMail(mailOptions);
 
     } catch (error) {
         console.error('❌ Error sending welcome email', {
@@ -1128,6 +1127,7 @@ const verifyGuestPayment = async (req, res, next) => {
 
             // Send new booking notification to ADMIN (not to guest user)
             try {
+                const NotificationService = require('../services/notificationService');
                 const service = await Service.findById(booking.serviceId);
 
                 await NotificationService.sendNotification(
@@ -1476,16 +1476,26 @@ const createSubscriptionOrder = async (req, res, next) => {
 
         // Validate plan exists in the database
         const plan = await SubscriptionPlan.findOne({ planId, status: 'active' });
-        console.log('📊 Found plan:', plan ? { planId: plan.planId, name: plan.name, price: plan.price, duration: plan.duration } : 'NOT FOUND');
+        console.log('📊 Found plan:', plan ? {
+            planId: plan.planId,
+            name: plan.name,
+            price: plan.price,
+            price_inr: plan.price_inr,
+            price_usd: plan.price_usd,
+            duration: plan.duration
+        } : 'NOT FOUND');
         if (!plan) {
             return res.status(400).json(ApiResponse.error('Invalid or inactive plan ID'));
         }
 
         // Use the provided amount if it's less than or equal to plan price (discount applied)
         // Otherwise use the actual plan price
-        let planAmount = plan.price;
-        let validatedAmount = amount <= planAmount ? amount : planAmount;
-        console.log('💰 Amount calculation:', { planAmount, providedAmount: amount, validatedAmount });
+        const providedAmount = Number(amount);
+        let planAmount = getPlanAmountByCurrency(plan, currency);
+        let validatedAmount = Number.isFinite(providedAmount) && providedAmount > 0 && providedAmount <= planAmount
+            ? providedAmount
+            : planAmount;
+        console.log('💰 Amount calculation:', { currency, planAmount, providedAmount, validatedAmount });
 
         // If coupon code is provided, re-validate it before creating payment order
         if (couponCode) {
@@ -1688,8 +1698,11 @@ const createGuestSubscriptionOrder = async (req, res, next) => {
 
         // Use the provided amount if it's less than or equal to plan price (discount applied)
         // Otherwise use the actual plan price
-        let planAmount = plan.price;
-        let validatedAmount = amount <= planAmount ? amount : planAmount;
+        const providedAmount = Number(amount);
+        let planAmount = getPlanAmountByCurrency(plan, currency);
+        let validatedAmount = Number.isFinite(providedAmount) && providedAmount > 0 && providedAmount <= planAmount
+            ? providedAmount
+            : planAmount;
 
         // If coupon code is provided, re-validate it before creating payment order
         if (couponCode) {
@@ -2049,8 +2062,6 @@ status: 'pending', // Pending admin approval (changed from 'confirmed')
                         const user = await User.findById(subscription.userId).select('email phone name');
 
                         if (user) {
-                            // Wait for notification service to initialize
-                            await new Promise(resolve => setTimeout(resolve, 1000));
 
                             const notificationData = {
                                 clientName: user.name,
@@ -2695,8 +2706,6 @@ status: 'pending', // Changed to pending admin approval
                             const user = await User.findById(userIdToCheck).select('email phone name');
 
                             if (user) {
-                                // Wait for notification service to initialize
-                                await new Promise(resolve => setTimeout(resolve, 1000));
 
                                 const notificationData = {
                                     clientName: user.name || subscription.guestName,

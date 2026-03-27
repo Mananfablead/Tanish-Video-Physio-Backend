@@ -45,9 +45,6 @@ const initializeTransporter = async () => {
             port: emailCreds.port,
             secure: secure, // true for 465, false for other ports
             requireTLS: requireTLS, // Enable STARTTLS if required
-            connectionTimeout: 15000,
-            greetingTimeout: 15000,
-            socketTimeout: 20000,
             auth: {
                 user: emailCreds.user,
                 pass: emailCreds.password,
@@ -60,13 +57,7 @@ const initializeTransporter = async () => {
 
         return true;
     } catch (error) {
-        logger.error('Email transporter configuration error', {
-            message: error.message,
-            code: error.code,
-            command: error.command,
-            host: error?.host,
-            port: error?.port
-        });
+        logger.error('Email transporter configuration error:', error.message);
         return false;
     }
 };
@@ -99,9 +90,6 @@ const sendEmail = async (options) => {
             host: emailCreds.host,
             port: emailCreds.port,
             secure: emailCreds.port === 465, // true for 465, false for other ports
-            connectionTimeout: 15000,
-            greetingTimeout: 15000,
-            socketTimeout: 20000,
             auth: {
                 user: emailCreds.user,
                 pass: emailCreds.password,
@@ -112,11 +100,7 @@ const sendEmail = async (options) => {
         try {
             await freshTransporter.verify();
         } catch (verifyError) {
-            logger.error('Email transporter verification failed', {
-                message: verifyError.message,
-                code: verifyError.code,
-                command: verifyError.command
-            });
+            logger.error('Email transporter verification failed:', verifyError.message);
             // Still attempt to send, as verification sometimes fails but sending succeeds
         }
 
@@ -130,29 +114,7 @@ const sendEmail = async (options) => {
             html: options.html,
         };
 
-        const sendWithRetry = async () => {
-            try {
-                return await freshTransporter.sendMail(mailOptions);
-            } catch (firstError) {
-                const isTransientSocketError =
-                    firstError?.code === 'ESOCKET' ||
-                    firstError?.code === 'ECONNRESET' ||
-                    (typeof firstError?.message === 'string' && firstError.message.includes('ECONNRESET'));
-
-                if (!isTransientSocketError) {
-                    throw firstError;
-                }
-
-                logger.warn('Transient SMTP socket error while sending email, retrying once', {
-                    message: firstError.message,
-                    code: firstError.code
-                });
-                await new Promise(resolve => setTimeout(resolve, 1200));
-                return await freshTransporter.sendMail(mailOptions);
-            }
-        };
-
-        const result = await sendWithRetry();
+        const result = await freshTransporter.sendMail(mailOptions);
         logger.info(`Email sent successfully to ${options.to}`);
         return result;
     } catch (error) {
