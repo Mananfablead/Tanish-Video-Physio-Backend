@@ -1567,17 +1567,28 @@ const setupVideoCallHandlers = (io, socket) => {
     // Handle WebRTC signaling - offer
     socket.on('offer', (data) => {
         try {
-            const { roomId, offer, senderId } = data;
-            
-            // Broadcast offer to other participants in the room
-            socket.to(roomId).emit('offer', {
+            const { roomId, offer, senderId, targetId } = data;
+
+            // IMPORTANT (mesh group calls):
+            // An SDP offer must be delivered to a specific peer connection target.
+            // Broadcasting offers to the whole room causes other peers to consume an
+            // offer not meant for them, which breaks existing connections when a new
+            // participant joins (common "works local, breaks live" symptom).
+            if (!targetId) {
+                logger.warn(`⚠️ offer missing targetId; dropping to avoid room-wide renegotiation issues. roomId=${roomId}, senderId=${senderId}`);
+                return;
+            }
+
+            socket.to(targetId).emit('offer', {
                 offer,
-                senderId
+                senderId,
+                targetId
             });
-            // Also emit to specific WebRTC event
-            socket.to(roomId).emit('webrtc-offer-received', {
+            // Also emit to specific WebRTC event (targeted)
+            socket.to(targetId).emit('webrtc-offer-received', {
                 offer,
-                senderId
+                senderId,
+                targetId
             });
         } catch (error) {
             logger.error('Error handling offer:', error);
@@ -1615,24 +1626,19 @@ const setupVideoCallHandlers = (io, socket) => {
             if (targetId) {
                 socket.to(targetId).emit('ice-candidate', {
                     candidate,
-                    senderId
+                    senderId,
+                    targetId
                 });
                 // Also emit to specific WebRTC event
                 socket.to(targetId).emit('webrtc-ice-candidate-received', {
                     candidate,
-                    senderId
+                    senderId,
+                    targetId
                 });
             } else {
-                // Broadcast to all other participants in the room
-                socket.to(roomId).emit('ice-candidate', {
-                    candidate,
-                    senderId
-                });
-                // Also emit to specific WebRTC event
-                socket.to(roomId).emit('webrtc-ice-candidate-received', {
-                    candidate,
-                    senderId
-                });
+                // In mesh calls, ICE should also be peer-targeted.
+                // Broadcasting can attach candidates to the wrong RTCPeerConnection.
+                logger.warn(`⚠️ ice-candidate missing targetId; dropping broadcast. roomId=${roomId}, senderId=${senderId}`);
             }
         } catch (error) {
             logger.error('Error handling ICE candidate:', error);
