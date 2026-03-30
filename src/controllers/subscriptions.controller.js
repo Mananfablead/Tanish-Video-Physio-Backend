@@ -10,6 +10,8 @@ const getSubscriptionPlans = async (req, res, next) => {
     try {
         const { session_type, country } = req.query;
         
+        console.log('[Subscription Plans] Fetching plans with:', { session_type, country });
+        
         // Build query filter
         let query = { status: 'active' };
         if (session_type) {
@@ -18,18 +20,53 @@ const getSubscriptionPlans = async (req, res, next) => {
         
         const plans = await SubscriptionPlan.find(query).sort({ sortOrder: 1 });
 
+        console.log(`[Subscription Plans] Found ${plans.length} active plans`);
+
         // Add price based on country
         const plansWithCountryPrice = plans.map(plan => {
             let price = plan.price; // fallback to existing price field
             let currency = '₹'; // default to INR
             
-            if (country === 'India' && plan.price_inr > 0) {
-                price = plan.price_inr;
-                currency = '₹';
-            } else if (country !== 'India' && plan.price_usd > 0) {
-                price = plan.price_usd;
-                currency = '$';
+            // Prioritize country-specific prices, but fall back intelligently
+            if (country === 'India') {
+                // For Indian users: prefer INR price, fallback to USD converted or base price
+                if (plan.price_inr && plan.price_inr > 0) {
+                    price = plan.price_inr;
+                    currency = '₹';
+                } else if (plan.price_usd && plan.price_usd > 0) {
+                    // If INR not set, use USD price but convert to INR approximation
+                    price = Math.round(plan.price_usd * 83); // Approximate conversion
+                    currency = '₹';
+                } else {
+                    // Fallback to base price
+                    price = plan.price || 0;
+                    currency = '₹';
+                }
+            } else {
+                // For international users: prefer USD price, fallback to INR or base price
+                if (plan.price_usd && plan.price_usd > 0) {
+                    price = plan.price_usd;
+                    currency = '$';
+                } else if (plan.price_inr && plan.price_inr > 0) {
+                    // If USD not set, use INR price but convert to USD approximation
+                    price = Math.round(plan.price_inr / 83); // Approximate conversion
+                    currency = '$';
+                } else {
+                    // Fallback to base price
+                    price = plan.price || 0;
+                    currency = '$';
+                }
             }
+            
+            // Log pricing details for debugging
+            console.log(`[Subscription Plans] Plan "${plan.name}":`, {
+                originalPrice: plan.price,
+                price_inr: plan.price_inr,
+                price_usd: plan.price_usd,
+                finalPrice: price,
+                currency,
+                country
+            });
             
             return {
                 ...plan.toObject(),
