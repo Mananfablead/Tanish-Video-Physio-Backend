@@ -1247,7 +1247,7 @@ const setupVideoCallHandlers = (io, socket) => {
     socket.on('leave-room', async (data) => {
         try {
             const { roomId, roomType } = data;
-            // const userId = socket.user.userId;
+            const userId = socket.user?.userId;
             
             socket.leave(roomId);
             logger.info(`User ${userId} left ${roomType} room ${roomId}`);
@@ -1565,6 +1565,7 @@ const setupVideoCallHandlers = (io, socket) => {
     });
 
     // Handle WebRTC signaling - offer
+    
     socket.on('offer', (data) => {
         try {
             const { roomId, offer, senderId, targetId } = data;
@@ -1580,12 +1581,6 @@ const setupVideoCallHandlers = (io, socket) => {
             }
 
             socket.to(targetId).emit('offer', {
-                offer,
-                senderId,
-                targetId
-            });
-            // Also emit to specific WebRTC event (targeted)
-            socket.to(targetId).emit('webrtc-offer-received', {
                 offer,
                 senderId,
                 targetId
@@ -1606,11 +1601,6 @@ const setupVideoCallHandlers = (io, socket) => {
                 answer,
                 senderId
             });
-            // Also emit to specific WebRTC event
-            socket.to(targetId).emit('webrtc-answer-received', {
-                answer,
-                senderId
-            });
         } catch (error) {
             logger.error('Error handling answer:', error);
             socket.emit('error', { message: 'Failed to send answer' });
@@ -1625,12 +1615,6 @@ const setupVideoCallHandlers = (io, socket) => {
             // Forward ICE candidate to target participant
             if (targetId) {
                 socket.to(targetId).emit('ice-candidate', {
-                    candidate,
-                    senderId,
-                    targetId
-                });
-                // Also emit to specific WebRTC event
-                socket.to(targetId).emit('webrtc-ice-candidate-received', {
                     candidate,
                     senderId,
                     targetId
