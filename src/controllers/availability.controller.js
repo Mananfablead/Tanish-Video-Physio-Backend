@@ -327,6 +327,7 @@ const createAvailability = async (req, res, next) => {
             duration: slot.duration || 45,
             bookingType: slot.bookingType || 'regular',
             sessionType: slot.sessionType || 'one-to-one',
+            serviceId: slot.serviceId || null,
             maxParticipants: slot.maxParticipants || (slot.sessionType === 'group' ? 5 : 1),
             bookedParticipants: typeof slot.bookedParticipants === 'number' ? slot.bookedParticipants : 0
         }));
@@ -373,6 +374,7 @@ const updateAvailability = async (req, res, next) => {
             duration: slot.duration || 45,
             bookingType: slot.bookingType || 'regular',
             sessionType: slot.sessionType || 'one-to-one',
+            serviceId: slot.serviceId || null,
             maxParticipants: slot.maxParticipants || (slot.sessionType === 'group' ? 5 : 1),
             bookedParticipants: typeof slot.bookedParticipants === 'number' ? slot.bookedParticipants : 0
         }));
@@ -479,6 +481,7 @@ const bulkUpdateAvailability = async (req, res, next) => {
                         duration: slot.duration || 45,
                         bookingType: slot.bookingType || 'regular',
                         sessionType: slot.sessionType || 'one-to-one',
+                        serviceId: slot.serviceId || null,
                         maxParticipants: slot.maxParticipants || (slot.sessionType === 'group' ? 5 : 1),
                         bookedParticipants: typeof slot.bookedParticipants === 'number' ? slot.bookedParticipants : 0
                     }));
@@ -502,6 +505,7 @@ const bulkUpdateAvailability = async (req, res, next) => {
                         duration: slot.duration || 45,
                         bookingType: slot.bookingType || 'regular',
                         sessionType: slot.sessionType || 'one-to-one',
+                        serviceId: slot.serviceId || null,
                         maxParticipants: slot.maxParticipants || (slot.sessionType === 'group' ? 5 : 1),
                         bookedParticipants: typeof slot.bookedParticipants === 'number' ? slot.bookedParticipants : 0
                     }));

@@ -44,6 +44,11 @@ const availabilitySchema = new mongoose.Schema({
             enum: ['one-to-one', 'group'],
             default: 'one-to-one'
         },
+        serviceId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Service',
+            default: null
+        },
         maxParticipants: {
             type: Number,
             default: 1,
