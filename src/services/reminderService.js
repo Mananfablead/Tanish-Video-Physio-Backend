@@ -43,15 +43,23 @@ class ReminderService {
             const startTime = Date.now();
             console.log(`\n⏰ [${new Date().toISOString()}] Running session reminder job...`);
 
-            // First check if there are any upcoming sessions
-            const hasUpcomingSessions = await this.checkUpcomingSessions();
+            try {
+                // First check if there are any upcoming sessions
+                const hasUpcomingSessions = await this.checkUpcomingSessions();
 
-            if (hasUpcomingSessions) {
-                await this.processSessionReminders();
-                console.log(`✅ Session reminder job completed in ${Date.now() - startTime}ms`);
-            } else {
-                console.log('ℹ️ No upcoming sessions - skipping reminder processing to reduce server load');
+                if (hasUpcomingSessions) {
+                    await this.processSessionReminders();
+                    console.log(`✅ Session reminder job completed in ${Date.now() - startTime}ms`);
+                } else {
+                    console.log('ℹ️ No upcoming sessions - skipping reminder processing to reduce server load');
+                }
+            } catch (error) {
+                logger.error('Error in session reminder cron job:', error);
+                console.log(`❌ Session reminder job failed after ${Date.now() - startTime}ms`);
             }
+        }, {
+            scheduled: true,
+            timezone: 'UTC'
         });
 
         this.cronJobs.set('sessionReminders', job);
@@ -63,8 +71,17 @@ class ReminderService {
         const job = cron.schedule('0 9 * * *', async () => {
             const startTime = Date.now();
             console.log(`\n⏰ [${new Date().toISOString()}] Running daily summary job...`);
-            await this.processDailySummary();
-            console.log(`✅ Daily summary job completed in ${Date.now() - startTime}ms`);
+
+            try {
+                await this.processDailySummary();
+                console.log(`✅ Daily summary job completed in ${Date.now() - startTime}ms`);
+            } catch (error) {
+                logger.error('Error in daily summary cron job:', error);
+                console.log(`❌ Daily summary job failed after ${Date.now() - startTime}ms`);
+            }
+        }, {
+            scheduled: true,
+            timezone: 'Asia/Kolkata'
         });
 
         this.cronJobs.set('dailySummary', job);
@@ -85,7 +102,7 @@ class ReminderService {
                 },
                 status: { $in: ['scheduled', 'pending'] },
                 last24HourReminderSent: { $exists: false }
-            });
+            }).maxTimeMS(5000); // Add timeout to prevent hanging queries
 
             // Check for sessions in next 1 hour (for 1h reminders)
             const sessions1h = await Session.countDocuments({
@@ -95,7 +112,7 @@ class ReminderService {
                 },
                 status: { $in: ['scheduled', 'pending'] },
                 last1HourReminderSent: { $exists: false }
-            });
+            }).maxTimeMS(5000); // Add timeout to prevent hanging queries
 
             const total = sessions24h + sessions1h;
 
@@ -130,7 +147,8 @@ class ReminderService {
                 last24HourReminderSent: { $exists: false }
             }).populate('userId', 'name email phone')
                 .populate('therapistId', 'name email phone')
-                .populate('bookingId');
+                .populate('bookingId')
+                .maxTimeMS(10000); // Add timeout to prevent hanging queries
 
             // Find sessions that are starting within the next 1-2 hours (for 1-hour reminder)
             const sessionsFor1HourReminder = await Session.find({
@@ -142,14 +160,20 @@ class ReminderService {
                 last1HourReminderSent: { $exists: false }
             }).populate('userId', 'name email phone')
                 .populate('therapistId', 'name email phone')
-                .populate('bookingId');
+                .populate('bookingId')
+                .maxTimeMS(10000); // Add timeout to prevent hanging queries
 
             // Send 24-hour reminders
             if (sessionsFor24HourReminder.length > 0) {
                 console.log(`Sending ${sessionsFor24HourReminder.length} 24-hour reminders`);
                 for (const session of sessionsFor24HourReminder) {
                     try {
-                        await this.sendSessionReminder(session, '24hour');
+                        await Promise.race([
+                            this.sendSessionReminder(session, '24hour'),
+                            new Promise((_, reject) =>
+                                setTimeout(() => reject(new Error('Send reminder timeout')), 15000)
+                            )
+                        ]);
                         await this.updateSessionReminderSent(session, '24hour');
                     } catch (error) {
                         logger.error(`Error sending 24-hour reminder for session ${session._id}:`, error);
@@ -162,7 +186,12 @@ class ReminderService {
                 console.log(`Sending ${sessionsFor1HourReminder.length} 1-hour reminders`);
                 for (const session of sessionsFor1HourReminder) {
                     try {
-                        await this.sendSessionReminder(session, '1hour');
+                        await Promise.race([
+                            this.sendSessionReminder(session, '1hour'),
+                            new Promise((_, reject) =>
+                                setTimeout(() => reject(new Error('Send reminder timeout')), 15000)
+                            )
+                        ]);
                         await this.updateSessionReminderSent(session, '1hour');
                     } catch (error) {
                         logger.error(`Error sending 1-hour reminder for session ${session._id}:`, error);

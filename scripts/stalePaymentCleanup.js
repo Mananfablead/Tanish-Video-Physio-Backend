@@ -25,13 +25,16 @@ cron.schedule('* * * * *', async () => {
   
   try {
     // First, check if there are any stale payments
-    const checkResponse = await fetch(`${BACKEND_URL}/api/payments/admin/check-stale`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${ADMIN_TOKEN}`,
-        'Content-Type': 'application/json'
-      }
-    });
+    const checkResponse = await Promise.race([
+      fetch(`${BACKEND_URL}/api/payments/admin/check-stale`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${ADMIN_TOKEN}`,
+          'Content-Type': 'application/json'
+        }
+      }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Check stale payments timeout')), 10000))
+    ]);
 
     let hasStalePayments = false;
 
@@ -51,14 +54,17 @@ cron.schedule('* * * * *', async () => {
     }
 
     // Run the actual cleanup
-    const response = await fetch(`${BACKEND_URL}/api/payments/admin/expire-stale`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${ADMIN_TOKEN}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({}) // Send empty JSON object
-    });
+    const response = await Promise.race([
+      fetch(`${BACKEND_URL}/api/payments/admin/expire-stale`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${ADMIN_TOKEN}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({}) // Send empty JSON object
+      }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Cleanup API timeout')), 15000))
+    ]);
     
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -78,6 +84,9 @@ cron.schedule('* * * * *', async () => {
   } catch (error) {
     console.error('❌ Error running cleanup:', error.message);
   }
+}, {
+  scheduled: true,
+  timezone: 'Asia/Kolkata'
 });
 
 // Handle graceful shutdown
