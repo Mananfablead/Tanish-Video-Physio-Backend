@@ -475,7 +475,15 @@ const createBooking = async (req, res, next) => {
         // Always validate the scheduled date and time if provided, regardless of schedule type
         if (scheduledDate && scheduledTime) {
             // Check if the requested time slot is available
-            const slotAvailability = await checkTimeSlotAvailability(therapist._id, scheduledDate, scheduledTime, timeSlot, bookingType, req.user.userId);
+            const slotAvailability = await checkTimeSlotAvailability(
+                therapist._id,
+                scheduledDate,
+                scheduledTime,
+                timeSlot,
+                bookingType,
+                req.user.userId,
+                serviceId
+            );
 
             if (!slotAvailability.available) {
                 return res.status(409).json(ApiResponse.error(slotAvailability.message));
@@ -674,7 +682,7 @@ Looking forward to helping you!
 };
 
 // Helper function to check time slot availability
-async function checkTimeSlotAvailability(therapistId, date, time, timeSlot, bookingType, userId) {
+async function checkTimeSlotAvailability(therapistId, date, time, timeSlot, bookingType, userId, serviceId = null) {
     const mongoose = require('mongoose');
 
     // Validate inputs
@@ -755,6 +763,15 @@ async function checkTimeSlotAvailability(therapistId, date, time, timeSlot, book
                 }
                 if (requestedSlot.bookedParticipants >= (requestedSlot.maxParticipants || 1)) {
                     return { available: false, message: 'Requested time slot is full' };
+                }
+
+                // If slot has a specific service attached, enforce service match
+                if (requestedSlot.serviceId && serviceId) {
+                    const slotServiceId = String(requestedSlot.serviceId);
+                    const requestedServiceId = String(serviceId);
+                    if (slotServiceId !== requestedServiceId) {
+                        return { available: false, message: 'This group slot is not available for the selected service' };
+                    }
                 }
             }
 
@@ -2426,7 +2443,15 @@ const createGuestBooking = async (req, res, next) => {
         // Always validate the scheduled date and time if provided, regardless of schedule type
         if (scheduledDate && scheduledTime) {
             // Check if the requested time slot is available
-            const slotAvailability = await checkTimeSlotAvailability(therapist._id, scheduledDate, scheduledTime, timeSlot, bookingType, user._id);
+            const slotAvailability = await checkTimeSlotAvailability(
+                therapist._id,
+                scheduledDate,
+                scheduledTime,
+                timeSlot,
+                bookingType,
+                user._id,
+                serviceId
+            );
 
             console.log('[createGuestBooking] Slot availability result:', slotAvailability);
 
