@@ -31,18 +31,23 @@ async function triggerReminders() {
     } catch (error) {
         console.error('❌ Error triggering reminders:', error.message);
         process.exit(1);
-    } finally {
-        // Close database connection
-        await mongoose.connection.close();
-        console.log('🔒 Database connection closed');
     }
 }
 
-// Main execution
+// Main execution - keep DB connection open for cron jobs
 async function main() {
     try {
         await connectDB();
-        await triggerReminders();
+
+        // Initialize the reminder service cron jobs
+        const { default: ReminderService } = await import('../src/services/reminderService.js');
+        ReminderService.initialize();
+
+        console.log('✅ Reminder service started with cron jobs');
+        console.log('📊 Service status:', ReminderService.getStatus());
+
+        // Keep the process running - don't close DB connection
+        // The cron jobs will continue to run
     } catch (error) {
         console.error('❌ Fatal error:', error.message);
         process.exit(1);

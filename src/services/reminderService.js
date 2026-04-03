@@ -44,6 +44,19 @@ class ReminderService {
             console.log(`\n⏰ [${new Date().toISOString()}] Running session reminder job...`);
 
             try {
+                // Check database connection before proceeding
+                const mongoose = require('mongoose');
+                if (mongoose.connection.readyState !== 1) {
+                    console.error('❌ Database not connected. Attempting to reconnect...');
+                    try {
+                        await mongoose.connect(process.env.MONGODB_URI);
+                        console.log('✅ Database reconnected successfully');
+                    } catch (error) {
+                        console.error('❌ Failed to reconnect to database:', error.message);
+                        throw new Error('Database connection lost');
+                    }
+                }
+
                 // First check if there are any upcoming sessions
                 const hasUpcomingSessions = await this.checkUpcomingSessions();
 

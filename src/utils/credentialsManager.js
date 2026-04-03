@@ -27,6 +27,22 @@ const getWhatsAppCredentials = async () => {
     };
   } catch (error) {
     console.error("Error retrieving WhatsApp credentials:", error);
+    // Check if it's a MongoDB connection error
+    if (error.name === 'MongoNotConnectedError' || error.message.includes('connect')) {
+      console.error('⚠️ Database connection lost. Attempting to reconnect...');
+      // Reconnect logic
+      try {
+        const mongoose = require('mongoose');
+        if (mongoose.connection.readyState !== 1) {
+          await mongoose.connect(process.env.MONGODB_URI);
+          console.log('✅ Database reconnected successfully');
+          // Retry fetching credentials
+          return await getWhatsAppCredentials();
+        }
+      } catch (reconnectError) {
+        console.error('❌ Failed to reconnect to database:', reconnectError.message);
+      }
+    }
     return null;
   }
 };
@@ -59,6 +75,22 @@ const getEmailCredentials = async () => {
     };
   } catch (error) {
     console.error("Error retrieving Email credentials:", error);
+    // Check if it's a MongoDB connection error
+    if (error.name === 'MongoNotConnectedError' || error.message.includes('connect')) {
+      console.error('⚠️ Database connection lost. Attempting to reconnect...');
+      // Reconnect logic
+      try {
+        const mongoose = require('mongoose');
+        if (mongoose.connection.readyState !== 1) {
+          await mongoose.connect(process.env.MONGODB_URI);
+          console.log('✅ Database reconnected successfully');
+          // Retry fetching credentials
+          return await getEmailCredentials();
+        }
+      } catch (reconnectError) {
+        console.error('❌ Failed to reconnect to database:', reconnectError.message);
+      }
+    }
     return null;
   }
 };
