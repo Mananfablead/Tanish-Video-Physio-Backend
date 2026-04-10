@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Credentials = require("../models/Credentials.model");
 
 /**
@@ -26,7 +27,47 @@ const getWhatsAppCredentials = async () => {
       businessId: credential.whatsappBusinessId,
     };
   } catch (error) {
-    console.error("Error retrieving WhatsApp credentials:", error);
+    console.error("Error retrieving WhatsApp credentials:", error.message);
+
+    // Check if it's a MongoDB connection error
+    if (error.name === 'MongoNotConnectedError' || error.message.includes('connect')) {
+      console.error('⚠️ Database connection lost. Checking connection state...');
+      console.log('Current mongoose connection state:', mongoose.connection.readyState);
+
+      // Only attempt reconnect if not already connected
+      if (mongoose.connection.readyState !== 1) {
+        try {
+          console.log('Attempting to reconnect to database...');
+          await mongoose.connect(process.env.MONGODB_URI);
+          console.log('✅ Database reconnected successfully');
+          console.log('New mongoose connection state:', mongoose.connection.readyState);
+
+          // Retry fetching credentials after successful reconnect
+          console.log('Retrying to fetch WhatsApp credentials...');
+          const retryCredential = await Credentials.findOne({
+            credentialType: "whatsapp",
+            isActive: true,
+          });
+
+          if (!retryCredential) {
+            console.warn("No active WhatsApp credentials found after reconnect");
+            return null;
+          }
+
+          return {
+            accessToken: retryCredential.whatsappAccessToken,
+            phoneNumberId: retryCredential.whatsappPhoneNumberId,
+            businessId: retryCredential.whatsappBusinessId,
+          };
+        } catch (reconnectError) {
+          console.error('❌ Failed to reconnect to database:', reconnectError.message);
+          return null;
+        }
+      } else {
+        console.error('Mongoose reports connected state but query failed');
+        return null;
+      }
+    }
     return null;
   }
 };
@@ -58,7 +99,52 @@ const getEmailCredentials = async () => {
       adminEmail: credential.adminEmail,
     };
   } catch (error) {
-    console.error("Error retrieving Email credentials:", error);
+    console.error("Error retrieving Email credentials:", error.message);
+
+    // Check if it's a MongoDB connection error
+    if (error.name === 'MongoNotConnectedError' || error.message.includes('connect')) {
+      console.error('⚠️ Database connection lost. Checking connection state...');
+      console.log('Current mongoose connection state:', mongoose.connection.readyState);
+
+      // Only attempt reconnect if not already connected
+      if (mongoose.connection.readyState !== 1) {
+        try {
+          console.log('Attempting to reconnect to database...');
+          await mongoose.connect(process.env.MONGODB_URI);
+          console.log('✅ Database reconnected successfully');
+          console.log('New mongoose connection state:', mongoose.connection.readyState);
+
+          // Retry fetching credentials after successful reconnect
+          console.log('Retrying to fetch Email credentials...');
+          const retryCredential = await Credentials.findOne({
+            credentialType: "email",
+            isActive: true,
+          });
+
+          if (!retryCredential) {
+            console.warn("No active Email credentials found after reconnect");
+            return null;
+          }
+
+          console.log('📧 Email credentials retrieved after reconnect - Admin Email:', retryCredential.adminEmail || 'NOT SET');
+          return {
+            host: retryCredential.emailHost,
+            port: retryCredential.emailPort,
+            user: retryCredential.emailUser,
+            username: retryCredential.emailUsername,
+            password: retryCredential.emailPassword,
+            encryption: retryCredential.emailEncryption,
+            adminEmail: retryCredential.adminEmail,
+          };
+        } catch (reconnectError) {
+          console.error('❌ Failed to reconnect to database:', reconnectError.message);
+          return null;
+        }
+      } else {
+        console.error('Mongoose reports connected state but query failed');
+        return null;
+      }
+    }
     return null;
   }
 };

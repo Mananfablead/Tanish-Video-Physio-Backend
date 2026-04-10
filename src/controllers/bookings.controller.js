@@ -2617,7 +2617,7 @@ Looking forward to helping you!
         }
 
         await booking.populate('therapistId', 'name email role profilePicture');
-        
+
         const isFreeConsultation = bookingType === 'free-consultation';
 
         // Send real-time notification to admin panel
