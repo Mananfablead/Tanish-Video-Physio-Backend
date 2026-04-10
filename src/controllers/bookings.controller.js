@@ -591,6 +591,23 @@ Looking forward to helping you!
                             console.error(`❌ Failed to send WhatsApp for booking ${booking._id}:`, whatsappError);
                         }
                     }
+
+                    // Send notification to admin as well
+                    try {
+                        await notificationService.sendNotification(
+                            { email: 'admin@tanishphysio.com', phone: 'admin' }, // Recipient data is handled by service for admin types
+                            'new_booking',
+                            {
+                                ...notificationData,
+                                clientName: user.name,
+                                phone: user.phone || 'N/A',
+                                serviceName: `${booking.serviceName} (Free Consultation)`
+                            }
+                        );
+                        console.log(`✅ Admin notification triggered for free consultation booking ${booking._id}`);
+                    } catch (adminNotifyError) {
+                        console.error(`❌ Failed to send admin notification for booking ${booking._id}:`, adminNotifyError);
+                    }
                 }
             } catch (notificationError) {
                 console.error(`❌ Error sending notifications for booking ${booking._id}:`, notificationError);
@@ -628,13 +645,13 @@ Looking forward to helping you!
 
             // Save to database first
             const adminNotification = new Notification({
-                title: 'New Booking Request',
-                message: `${booking.clientName} booked ${serviceName} for ${date} at ${time}`,
+                title: isFreeConsultation ? 'New Free Consultation Request' : 'New Booking Request',
+                message: `${booking.clientName} booked ${serviceName}${isFreeConsultation ? ' (Free Consultation)' : ''} for ${date} at ${time}`,
                 type: 'booking',
                 recipientType: 'admin',
-                adminId: req.user.userId, // ✅ Set admin ID
+                adminId: null, // Broadcast to all admins
                 bookingId: booking._id,
-                priority: 'medium',
+                priority: isFreeConsultation ? 'high' : 'medium',
                 channels: { inApp: true },
                 metadata: {
                     clientName: booking.clientName,
@@ -653,14 +670,15 @@ Looking forward to helping you!
             const notificationPayload = {
                 id: adminNotification._id,
                 type: 'booking',
-                title: 'New Booking Request',
-                message: `${booking.clientName} booked ${serviceName} for ${date} at ${time}`,
+                title: isFreeConsultation ? 'New Free Consultation Request' : 'New Booking Request',
+                message: `${booking.clientName} booked ${serviceName}${isFreeConsultation ? ' (Free Consultation)' : ''} for ${date} at ${time}`,
                 bookingId: booking._id,
                 clientName: booking.clientName,
-                serviceName: serviceName,
+                serviceName: isFreeConsultation ? `${serviceName} (Free Consultation)` : serviceName,
                 date: date,
                 time: time,
                 status: booking.status,
+                priority: adminNotification.priority,
                 timestamp: adminNotification.createdAt
             };
 
@@ -698,6 +716,25 @@ async function checkTimeSlotAvailability(therapistId, date, time, timeSlot, book
     const therapist = await User.findById(therapistId);
     if (!therapist) {
         return { available: false, message: 'Therapist not found' };
+    }
+
+    // Handle free consultation - Bypass Availability check but maintain conflict check
+    if (bookingType === 'free-consultation') {
+        const existingPaidBooking = await Booking.findOne({
+            therapistId,
+            scheduledDate: date,
+            paymentStatus: 'paid', // Only consider paid bookings as blocking
+            $or: [
+                { 'timeSlot.start': timeSlot ? timeSlot.start : time },
+                { scheduledTime: time }
+            ]
+        });
+
+        if (existingPaidBooking) {
+            return { available: false, message: 'A booking already exists for this time slot' };
+        }
+
+        return { available: true, message: 'Free consultation slot is available' };
     }
 
     // Check if there's availability for the therapist on the given date
@@ -1594,7 +1631,7 @@ const updateBookingStatus = async (req, res, next) => {
                 // Don't fail the operation if socket notification fails
             }
         }
-        
+
         // Handle bookedParticipants decrement for cancelled group sessions
         if (status === 'cancelled' && booking.timeSlot && booking.scheduledDate) {
             try {
@@ -1602,25 +1639,25 @@ const updateBookingStatus = async (req, res, next) => {
                     therapistId: booking.therapistId,
                     date: booking.scheduledDate
                 });
-                
+
                 if (availability) {
-                    const slotIndex = availability.timeSlots.findIndex(s => 
+                    const slotIndex = availability.timeSlots.findIndex(s =>
                         s.start === booking.timeSlot.start && s.end === booking.timeSlot.end
                     );
-                    
+
                     if (slotIndex !== -1) {
                         const slot = availability.timeSlots[slotIndex];
-                        
+
                         // Only decrement for group slots
                         if (slot.sessionType === 'group') {
                             if (typeof slot.bookedParticipants === 'number' && slot.bookedParticipants > 0) {
                                 slot.bookedParticipants -= 1;
-                                
+
                                 // Update slot status based on capacity
                                 if (slot.bookedParticipants < slot.maxParticipants) {
                                     slot.status = 'available';
                                 }
-                                
+
                                 await availability.save();
                                 console.log(`✅ Decremented bookedParticipants for cancelled group slot: ${slot.bookedParticipants}/${slot.maxParticipants} participants booked`);
                             }
@@ -1690,7 +1727,7 @@ const updateBookingStatus = async (req, res, next) => {
                             endTime: groupSessionEndTime,
                             status: 'scheduled'
                         });
-                        
+
                         if (!existingGroupSession) {
                             // Create new GroupSession for this time slot
                             existingGroupSession = new GroupSession({
@@ -1704,16 +1741,16 @@ const updateBookingStatus = async (req, res, next) => {
                                 status: 'scheduled',
                                 isActiveCall: false
                             });
-                            
+
                             await existingGroupSession.save();
                             console.log(`✅ Created new GroupSession ${existingGroupSession._id} for time slot ${booking.timeSlot.start}-${booking.timeSlot.end}`);
                         }
-                        
+
                         // Add user to GroupSession participants if not already added
                         const userAlreadyInGroup = existingGroupSession.participants.some(
                             p => p.userId && p.userId.toString() === booking.userId.toString()
                         );
-                        
+
                         if (!userAlreadyInGroup) {
                             existingGroupSession.participants.push({
                                 userId: booking.userId,
@@ -1721,11 +1758,11 @@ const updateBookingStatus = async (req, res, next) => {
                                 status: 'accepted',
                                 bookingId: booking._id
                             });
-                            
+
                             await existingGroupSession.save();
                             console.log(`✅ Added user ${booking.userId} to GroupSession ${existingGroupSession._id}`);
                         }
-                        
+
                         groupSessionId = existingGroupSession._id;
                         console.log(`✅ Found existing GroupSession ${groupSessionId} for group booking ${booking._id}`);
                     } catch (groupError) {
@@ -1755,7 +1792,7 @@ const updateBookingStatus = async (req, res, next) => {
                 session.endTime = endTime;
 
                 await session.save();
-                
+
                 // Update booking with groupSessionId if this is a group session
                 if (groupSessionId) {
                     booking.groupSessionId = groupSessionId;
@@ -1763,7 +1800,7 @@ const updateBookingStatus = async (req, res, next) => {
                     console.log(`✅ Updated booking ${booking._id} with groupSessionId ${groupSessionId}`);
                 }
                 console.log(`✅ Session created for subscription booking ${booking._id} with sessionType: ${slotSessionType}`);
-                
+
                 // Update availability slot's bookedParticipants for group sessions
                 if (slotSessionType === 'group' && booking.timeSlot && booking.scheduledDate) {
                     try {
@@ -1771,28 +1808,28 @@ const updateBookingStatus = async (req, res, next) => {
                             therapistId: booking.therapistId,
                             date: booking.scheduledDate
                         });
-                        
+
                         if (availability) {
-                            const slotIndex = availability.timeSlots.findIndex(s => 
+                            const slotIndex = availability.timeSlots.findIndex(s =>
                                 s.start === booking.timeSlot.start && s.end === booking.timeSlot.end
                             );
-                            
+
                             if (slotIndex !== -1) {
                                 const slot = availability.timeSlots[slotIndex];
-                                
+
                                 // Increment bookedParticipants for group slots
                                 if (typeof slot.bookedParticipants !== 'number') {
                                     slot.bookedParticipants = 0;
                                 }
                                 slot.bookedParticipants += 1;
-                                
+
                                 // Update slot status based on capacity
                                 if (slot.maxParticipants && slot.bookedParticipants >= slot.maxParticipants) {
                                     slot.status = 'booked';
                                 } else {
                                     slot.status = 'available'; // Keep available until full
                                 }
-                                
+
                                 await availability.save();
                                 console.log(`✅ Updated availability slot: ${slot.bookedParticipants}/${slot.maxParticipants} participants booked`);
                             }
@@ -1854,7 +1891,7 @@ const updateBookingStatus = async (req, res, next) => {
                         const GroupSession = require('../models/GroupSession.model');
                         const groupSessionStartTime = new Date(`${booking.scheduledDate}T${booking.timeSlot.start}:00`);
                         const groupSessionEndTime = new Date(`${booking.scheduledDate}T${booking.timeSlot.end}:00`);
-                        
+
                         // Find existing GroupSession for this time slot
                         let existingGroupSession = await GroupSession.findOne({
                             therapistId: booking.therapistId,
@@ -1862,7 +1899,7 @@ const updateBookingStatus = async (req, res, next) => {
                             endTime: groupSessionEndTime,
                             status: 'scheduled'
                         });
-                        
+
                         if (!existingGroupSession) {
                             // Create new GroupSession for this time slot
                             existingGroupSession = new GroupSession({
@@ -1876,16 +1913,16 @@ const updateBookingStatus = async (req, res, next) => {
                                 status: 'scheduled',
                                 isActiveCall: false
                             });
-                            
+
                             await existingGroupSession.save();
                             console.log(`✅ Created new GroupSession ${existingGroupSession._id} for time slot ${booking.timeSlot.start}-${booking.timeSlot.end}`);
                         }
-                        
+
                         // Add user to GroupSession participants if not already added
                         const userAlreadyInGroup = existingGroupSession.participants.some(
                             p => p.userId && p.userId.toString() === booking.userId.toString()
                         );
-                        
+
                         if (!userAlreadyInGroup) {
                             existingGroupSession.participants.push({
                                 userId: booking.userId,
@@ -1893,11 +1930,11 @@ const updateBookingStatus = async (req, res, next) => {
                                 status: 'accepted',
                                 bookingId: booking._id
                             });
-                            
+
                             await existingGroupSession.save();
                             console.log(`✅ Added user ${booking.userId} to GroupSession ${existingGroupSession._id}`);
                         }
-                        
+
                         groupSessionId = existingGroupSession._id;
                         console.log(`✅ Found existing GroupSession ${groupSessionId} for group booking ${booking._id}`);
                     } catch (groupError) {
@@ -1927,16 +1964,16 @@ const updateBookingStatus = async (req, res, next) => {
                 session.endTime = endTime;
 
                 await session.save();
-                
+
                 // Update booking with groupSessionId if this is a group session
                 if (groupSessionId) {
                     booking.groupSessionId = groupSessionId;
                     await booking.save();
                     console.log(`✅ Updated booking ${booking._id} with groupSessionId ${groupSessionId}`);
                 }
-                
+
                 console.log(`✅ Session created for booking ${booking._id} with sessionType: ${slotSessionType}`);
-                
+
                 // Update availability slot's bookedParticipants for group sessions
                 if (slotSessionType === 'group' && booking.timeSlot && booking.scheduledDate) {
                     try {
@@ -1944,28 +1981,28 @@ const updateBookingStatus = async (req, res, next) => {
                             therapistId: booking.therapistId,
                             date: booking.scheduledDate
                         });
-                        
+
                         if (availability) {
-                            const slotIndex = availability.timeSlots.findIndex(s => 
+                            const slotIndex = availability.timeSlots.findIndex(s =>
                                 s.start === booking.timeSlot.start && s.end === booking.timeSlot.end
                             );
-                            
+
                             if (slotIndex !== -1) {
                                 const slot = availability.timeSlots[slotIndex];
-                                
+
                                 // Increment bookedParticipants for group slots
                                 if (typeof slot.bookedParticipants !== 'number') {
                                     slot.bookedParticipants = 0;
                                 }
                                 slot.bookedParticipants += 1;
-                                
+
                                 // Update slot status based on capacity
                                 if (slot.maxParticipants && slot.bookedParticipants >= slot.maxParticipants) {
                                     slot.status = 'booked';
                                 } else {
                                     slot.status = 'available'; // Keep available until full
                                 }
-                                
+
                                 await availability.save();
                                 console.log(`✅ Updated availability slot: ${slot.bookedParticipants}/${slot.maxParticipants} participants booked`);
                             }
@@ -2549,6 +2586,23 @@ Looking forward to helping you!
                         console.error(`❌ Failed to send WhatsApp for guest booking ${booking._id}:`, whatsappError);
                     }
                 }
+
+                // Send notification to admin as well
+                try {
+                    await notificationService.sendNotification(
+                        { email: 'admin@tanishphysio.com', phone: 'admin' }, // Recipient data is handled by service for admin types
+                        'new_booking',
+                        {
+                            ...notificationData,
+                            clientName: clientName,
+                            phone: clientPhone || 'N/A',
+                            serviceName: `${booking.serviceName} (Free Consultation)`
+                        }
+                    );
+                    console.log(`✅ Admin notification triggered for guest free consultation booking ${booking._id}`);
+                } catch (adminNotifyError) {
+                    console.error(`❌ Failed to send admin notification for guest booking ${booking._id}:`, adminNotifyError);
+                }
             } catch (notificationError) {
                 console.error(`❌ Error sending notifications for guest booking ${booking._id}:`, notificationError);
                 // Don't fail the booking if notifications fail
@@ -2562,9 +2616,64 @@ Looking forward to helping you!
             await updateAvailabilitySlot(therapist._id, scheduledDate, timeSlot.start, timeSlot.end, slotStatus);
         }
 
-        // Populate the response
-        await booking.populate('serviceId', 'name price priceINR priceUSD duration validity images');
         await booking.populate('therapistId', 'name email role profilePicture');
+        
+        const isFreeConsultation = bookingType === 'free-consultation';
+
+        // Send real-time notification to admin panel
+        try {
+            const { getIO } = require('../utils/socketManager');
+            const io = getIO();
+            const Notification = require('../models/Notification.model');
+
+            console.log(`📢 [Guest Booking Notification] Preparing admin notification for booking ${booking._id}`);
+
+            // Save to database first
+            const adminNotification = new Notification({
+                title: isFreeConsultation ? 'New Free Consultation Request' : 'New Guest Booking Request',
+                message: `${clientName} (Guest) booked ${serviceName}${isFreeConsultation ? ' (Free Consultation)' : ''} for ${date} at ${time}`,
+                type: 'booking',
+                recipientType: 'admin',
+                adminId: null, // Broadcast to all admins
+                bookingId: booking._id,
+                priority: isFreeConsultation ? 'high' : 'medium',
+                channels: { inApp: true },
+                metadata: {
+                    clientName: clientName,
+                    serviceName: serviceName,
+                    date: date,
+                    time: time,
+                    status: booking.status,
+                    bookingType: bookingType,
+                    isGuest: true
+                }
+            });
+
+            await adminNotification.save();
+            console.log(`✅ [Guest Booking Notification] Saved to database: ${adminNotification._id}`);
+
+            // Emit with database ID
+            const notificationPayload = {
+                id: adminNotification._id,
+                type: 'booking',
+                title: isFreeConsultation ? 'New Free Consultation Request' : 'New Guest Booking Request',
+                message: `${clientName} (Guest) booked ${serviceName}${isFreeConsultation ? ' (Free Consultation)' : ''} for ${date} at ${time}`,
+                bookingId: booking._id,
+                clientName: clientName,
+                serviceName: isFreeConsultation ? `${serviceName} (Free Consultation)` : serviceName,
+                date: date,
+                time: time,
+                status: booking.status,
+                priority: adminNotification.priority,
+                isGuest: true,
+                timestamp: adminNotification.createdAt
+            };
+
+            io.to('admin_notifications').emit('admin-notification', notificationPayload);
+            console.log('✅ [Guest Booking Notification] Emitted to admin_notifications room');
+        } catch (socketError) {
+            console.error('❌ Error sending live notification for guest booking:', socketError);
+        }
 
         // Send notifications to guest user
         const notificationData = {
